@@ -1,0 +1,96 @@
+{{define "content"}}
+<div x-data="backupsPage()" x-init="init()">
+  <h1 class="text-2xl font-bold mb-6">Backups</h1>
+
+  <!-- Filter -->
+  <div class="flex flex-wrap gap-4 mb-6">
+    <div class="w-64">
+      <label class="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-400">Filter by Site</label>
+      <select x-model="selectedSite" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm">
+        <option value="">All Sites</option>
+        <template x-for="s in uniqueSites" :key="s">
+          <option :value="s" x-text="s"></option>
+        </template>
+      </select>
+    </div>
+    <div class="flex items-end">
+      <span class="text-sm text-gray-500" x-text="filteredBackups.length + ' backup files'"></span>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <template x-if="loading">
+    <div class="flex items-center justify-center py-20">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      <span class="ml-3 text-gray-500">Loading backups...</span>
+    </div>
+  </template>
+
+  <!-- Table -->
+  <template x-if="!loading">
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+      <template x-if="filteredBackups.length === 0">
+        <p class="text-gray-500 text-center py-10">No backups available.</p>
+      </template>
+      <template x-if="filteredBackups.length > 0">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-gray-50 dark:bg-gray-800/50">
+                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Device</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Site</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Host</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">File</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Date</th>
+                <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-400">Action</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+              <template x-for="b in filteredBackups" :key="b.ID">
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
+                  <td class="px-4 py-2.5 text-xs font-medium" x-text="b.device"></td>
+                  <td class="px-4 py-2.5 text-xs" x-text="b.site"></td>
+                  <td class="px-4 py-2.5 font-mono text-xs" x-text="b.host"></td>
+                  <td class="px-4 py-2.5 text-xs text-gray-500 truncate max-w-xs" x-text="b.file_path"></td>
+                  <td class="px-4 py-2.5 text-xs text-gray-500" x-text="new Date(b.CreatedAt).toLocaleDateString()"></td>
+                  <td class="px-4 py-2.5 text-right">
+                    <a :href="'/api/backups/' + b.ID + '/download'" class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                      Download
+                    </a>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </template>
+    </div>
+  </template>
+</div>
+
+<script>
+function backupsPage() {
+  return {
+    backups: [],
+    selectedSite: '',
+    loading: true,
+
+    async init() {
+      const res = await fetch('/api/backups');
+      this.backups = await res.json() || [];
+      this.loading = false;
+    },
+
+    get uniqueSites() {
+      return [...new Set(this.backups.map(b => b.site))].sort();
+    },
+
+    get filteredBackups() {
+      if (!this.selectedSite) return this.backups;
+      return this.backups.filter(b => b.site === this.selectedSite);
+    }
+  }
+}
+</script>
+{{end}}

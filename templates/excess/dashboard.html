@@ -1,0 +1,293 @@
+{{define "content"}}
+<div x-data="dashboardPage()" x-init="init()">
+  <h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+
+  <!-- Tab headers -->
+  <div class="flex border-b border-gray-200 dark:border-gray-700 mb-6">
+    <button @click="tab = 'health'" :class="tab === 'health' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'" class="px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors">
+      Health
+    </button>
+    <button @click="tab = 'powers'" :class="tab === 'powers' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'" class="px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors">
+      Powers
+    </button>
+    <button @click="tab = 'ports'" :class="tab === 'ports' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'" class="px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors">
+      Port Protection
+    </button>
+  </div>
+
+  <!-- Loading -->
+  <template x-if="loading">
+    <div class="flex items-center justify-center py-20">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      <span class="ml-3 text-gray-500">Loading data...</span>
+    </div>
+  </template>
+
+  <!-- ==================== HEALTH TAB ==================== -->
+  <div x-show="tab === 'health' && !loading" x-cloak>
+    <template x-if="healthData.length === 0 && !loading">
+      <p class="text-gray-500 text-center py-10">No health data available yet.</p>
+    </template>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+      <template x-for="h in healthData" :key="h.host">
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-semibold text-sm" x-text="h.device"></h3>
+              <p class="text-xs text-gray-500" x-text="h.host + ' &middot; ' + h.site"></p>
+            </div>
+            <span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Online</span>
+          </div>
+
+          <!-- Uptime -->
+          <div class="mb-3">
+            <span class="text-xs text-gray-500">Uptime</span>
+            <p class="text-sm font-mono" x-text="h.uptime || 'N/A'"></p>
+          </div>
+
+          <!-- CPU Loads -->
+          <div class="mb-3">
+            <span class="text-xs text-gray-500">CPU Load</span>
+            <template x-for="(cpu, i) in (h.cpu_loads || [])" :key="i">
+              <div class="mt-1">
+                <div class="flex justify-between text-xs mb-0.5">
+                  <span x-text="cpu.card || cpu.Card || ('CPU ' + i)"></span>
+                  <span x-text="(cpu.load || cpu.Load || 0) + '%'"></span>
+                </div>
+                <div class="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div class="h-full rounded-full transition-all"
+                    :class="getCpuColor(cpu.load || cpu.Load || 0)"
+                    :style="'width:' + Math.min(100, cpu.load || cpu.Load || 0) + '%'"></div>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <!-- Temperatures -->
+          <div>
+            <span class="text-xs text-gray-500">Temperature</span>
+            <div class="flex flex-wrap gap-2 mt-1">
+              <template x-for="(t, i) in (h.temperatures || [])" :key="i">
+                <span class="text-xs font-mono px-2 py-1 rounded-lg"
+                  :class="getTempColor(t.temperature || t.Temperature || t.temp || 0)"
+                  x-text="(t.board || t.Board || t.slot || ('Slot ' + i)) + ': ' + (t.temperature || t.Temperature || t.temp || 0) + '°C'">
+                </span>
+              </template>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- ==================== POWERS TAB ==================== -->
+  <div x-show="tab === 'powers' && !loading" x-cloak>
+    <!-- Device filter -->
+    <div class="mb-4">
+      <select x-model="powerDevice" class="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm">
+        <option value="">All Devices</option>
+        <template x-for="d in powerDevices" :key="d">
+          <option :value="d" x-text="d"></option>
+        </template>
+      </select>
+    </div>
+
+    <!-- Chart -->
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 mb-6">
+      <canvas id="powerChart" height="100"></canvas>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-gray-50 dark:bg-gray-800/50">
+              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">ONT Index</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">OLT Rx (dBm)</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Device</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Site</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Host</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+            <template x-for="r in filteredPowers" :key="r.ID">
+              <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                <td class="px-4 py-2.5 font-mono text-xs" x-text="r.ont_idx"></td>
+                <td class="px-4 py-2.5">
+                  <span class="font-mono text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" x-text="r.olt_rx.toFixed(1)"></span>
+                </td>
+                <td class="px-4 py-2.5 text-xs" x-text="r.device"></td>
+                <td class="px-4 py-2.5 text-xs" x-text="r.site"></td>
+                <td class="px-4 py-2.5 font-mono text-xs" x-text="r.host"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-800 text-sm text-gray-500" x-text="filteredPowers.length + ' ONTs with weak power'"></div>
+    </div>
+  </div>
+
+  <!-- ==================== PORT PROTECTION TAB ==================== -->
+  <div x-show="tab === 'ports' && !loading" x-cloak>
+    <!-- Device filter -->
+    <div class="mb-4">
+      <select x-model="portDevice" class="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm">
+        <option value="">All Devices</option>
+        <template x-for="d in portDevices" :key="d">
+          <option :value="d" x-text="d"></option>
+        </template>
+      </select>
+    </div>
+
+    <template x-if="filteredPorts.length === 0 && !loading">
+      <p class="text-gray-500 text-center py-10">No down ports detected.</p>
+    </template>
+
+    <!-- Device groups -->
+    <div class="space-y-4">
+      <template x-for="group in portGroups" :key="group.device">
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="font-semibold text-sm" x-text="group.device"></h3>
+              <p class="text-xs text-gray-500" x-text="group.host + ' &middot; ' + group.site"></p>
+            </div>
+            <span class="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" x-text="group.ports.length + ' down'"></span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            <template x-for="p in group.ports" :key="p.port">
+              <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-xs">
+                <span class="w-2 h-2 rounded-full" :class="p.port_state.includes('down') ? 'bg-red-500' : 'bg-green-500'"></span>
+                <span class="font-mono font-medium" x-text="p.port"></span>
+                <span class="text-gray-400">|</span>
+                <span x-text="'Port: ' + p.port_state"></span>
+                <span class="text-gray-400">|</span>
+                <span x-text="'Pair: ' + p.paired_state"></span>
+                <template x-if="p.swo_reason">
+                  <span class="text-gray-400 ml-auto" x-text="p.swo_reason + ' (' + p.num_swo + ')'"></span>
+                </template>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+</div>
+
+<script>
+function dashboardPage() {
+  return {
+    tab: 'health',
+    loading: true,
+    healthData: [],
+    weakPowers: [],
+    downPorts: [],
+    powerDevice: '',
+    portDevice: '',
+    powerChartInstance: null,
+
+    async init() {
+      const [hRes, pRes, portRes] = await Promise.all([
+        fetch('/api/health'),
+        fetch('/api/power/weak'),
+        fetch('/api/ports/down')
+      ]);
+      this.healthData = await hRes.json() || [];
+      this.weakPowers = await pRes.json() || [];
+      this.downPorts = await portRes.json() || [];
+      this.loading = false;
+
+      this.$watch('tab', (val) => {
+        if (val === 'powers') this.$nextTick(() => this.renderPowerChart());
+      });
+      this.$watch('powerDevice', () => {
+        this.$nextTick(() => this.renderPowerChart());
+      });
+    },
+
+    getCpuColor(load) {
+      if (load > 80) return 'bg-red-500';
+      if (load > 60) return 'bg-yellow-500';
+      return 'bg-green-500';
+    },
+
+    getTempColor(temp) {
+      if (temp > 65) return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+      if (temp > 50) return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
+      return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
+    },
+
+    // Powers
+    get powerDevices() {
+      return [...new Set(this.weakPowers.map(p => p.device))].sort();
+    },
+    get filteredPowers() {
+      if (!this.powerDevice) return this.weakPowers;
+      return this.weakPowers.filter(p => p.device === this.powerDevice);
+    },
+
+    renderPowerChart() {
+      const canvas = document.getElementById('powerChart');
+      if (!canvas) return;
+      if (this.powerChartInstance) this.powerChartInstance.destroy();
+
+      const grouped = {};
+      this.filteredPowers.forEach(p => {
+        grouped[p.device] = (grouped[p.device] || 0) + 1;
+      });
+      const labels = Object.keys(grouped);
+      const data = Object.values(grouped);
+
+      const isDark = document.documentElement.classList.contains('dark');
+      this.powerChartInstance = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Weak ONTs',
+            data: data,
+            backgroundColor: 'rgba(239, 68, 68, 0.7)',
+            borderColor: 'rgba(239, 68, 68, 1)',
+            borderWidth: 1,
+            borderRadius: 6,
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            title: { display: true, text: 'Weak Power ONTs per Device', color: isDark ? '#ccc' : '#333' }
+          },
+          scales: {
+            y: { beginAtZero: true, ticks: { color: isDark ? '#aaa' : '#555', stepSize: 1 }, grid: { color: isDark ? '#333' : '#eee' } },
+            x: { ticks: { color: isDark ? '#aaa' : '#555', maxRotation: 45 }, grid: { display: false } }
+          }
+        }
+      });
+    },
+
+    // Ports
+    get portDevices() {
+      return [...new Set(this.downPorts.map(p => p.device))].sort();
+    },
+    get filteredPorts() {
+      if (!this.portDevice) return this.downPorts;
+      return this.downPorts.filter(p => p.device === this.portDevice);
+    },
+    get portGroups() {
+      const map = {};
+      this.filteredPorts.forEach(p => {
+        const key = p.device + '|' + p.host;
+        if (!map[key]) map[key] = { device: p.device, host: p.host, site: p.site, ports: [] };
+        map[key].ports.push(p);
+      });
+      return Object.values(map);
+    }
+  }
+}
+</script>
+{{end}}

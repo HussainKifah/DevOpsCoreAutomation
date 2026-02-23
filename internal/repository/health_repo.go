@@ -6,29 +6,34 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-type HealthRepo struct {
+type HealthRepository interface {
+	Upsert(h *models.OltHealth) error
+	GetAll() ([]models.OltHealth, error)
+	GetByHost(host string) (*models.OltHealth, error)
+}
+
+type healthRepository struct {
 	DB *gorm.DB
 }
 
-func NewHealthRepo(db *gorm.DB) *HealthRepo {
-	return &HealthRepo{DB: db}
+func NewHealthRepository(db *gorm.DB) HealthRepository {
+	return &healthRepository{DB: db}
 }
 
-// Upsert inserts or updates health data keyed by host.
-func (r *HealthRepo) Upsert(h *models.OltHealth) error {
+func (r *healthRepository) Upsert(h *models.OltHealth) error {
 	return r.DB.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "host"}},
 		DoUpdates: clause.AssignmentColumns([]string{"device", "site", "uptime", "cpu_loads", "temperatures", "measured_at"}),
 	}).Create(h).Error
 }
 
-func (r *HealthRepo) GetAll() ([]models.OltHealth, error) {
+func (r *healthRepository) GetAll() ([]models.OltHealth, error) {
 	var out []models.OltHealth
 	err := r.DB.Order("host").Find(&out).Error
 	return out, err
 }
 
-func (r *HealthRepo) GetByHost(host string) (*models.OltHealth, error) {
+func (r *healthRepository) GetByHost(host string) (*models.OltHealth, error) {
 	var h models.OltHealth
 	err := r.DB.Where("host = ?", host).First(&h).Error
 	if err != nil {

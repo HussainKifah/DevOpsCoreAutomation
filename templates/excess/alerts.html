@@ -1,0 +1,177 @@
+{{define "content"}}
+<div x-data="alertsPage()" x-init="init()">
+  <h1 class="text-2xl font-bold mb-6">Alerts</h1>
+
+  <!-- Loading -->
+  <template x-if="loading">
+    <div class="flex items-center justify-center py-20">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      <span class="ml-3 text-gray-500">Loading alerts...</span>
+    </div>
+  </template>
+
+  <template x-if="!loading">
+    <div>
+      <!-- Summary cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+              <svg class="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
+            </div>
+            <div>
+              <p class="text-2xl font-bold" x-text="weakPowers.length"></p>
+              <p class="text-xs text-gray-500">Weak Power ONTs</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+              <svg class="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+            </div>
+            <div>
+              <p class="text-2xl font-bold" x-text="downPorts.length"></p>
+              <p class="text-xs text-gray-500">Down Ports</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
+              <svg class="w-5 h-5 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z"/></svg>
+            </div>
+            <div>
+              <p class="text-2xl font-bold" x-text="healthAlerts.length"></p>
+              <p class="text-xs text-gray-500">Health Warnings</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Power Alerts -->
+      <div class="mb-8">
+        <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-red-500"></span> Power Alerts
+        </h2>
+        <template x-if="weakPowers.length === 0">
+          <p class="text-gray-500 text-sm py-4 px-5 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">No weak power alerts.</p>
+        </template>
+        <div class="space-y-2">
+          <template x-for="a in weakPowers.slice(0, showAllPower ? undefined : 10)" :key="a.ID">
+            <div class="flex items-center gap-4 px-4 py-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
+              <span class="flex-shrink-0 px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">CRITICAL</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium truncate" x-text="a.device + ' - ' + a.ont_idx"></p>
+                <p class="text-xs text-gray-500" x-text="a.site + ' &middot; ' + a.host"></p>
+              </div>
+              <span class="text-sm font-mono font-bold text-red-600 dark:text-red-400" x-text="a.olt_rx.toFixed(1) + ' dBm'"></span>
+            </div>
+          </template>
+          <template x-if="weakPowers.length > 10">
+            <button @click="showAllPower = !showAllPower" class="text-sm text-blue-600 dark:text-blue-400 hover:underline" x-text="showAllPower ? 'Show less' : 'Show all ' + weakPowers.length + ' alerts'"></button>
+          </template>
+        </div>
+      </div>
+
+      <!-- Port Alerts -->
+      <div class="mb-8">
+        <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-orange-500"></span> Port Protection Alerts
+        </h2>
+        <template x-if="downPorts.length === 0">
+          <p class="text-gray-500 text-sm py-4 px-5 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">No down port alerts.</p>
+        </template>
+        <div class="space-y-2">
+          <template x-for="p in downPorts.slice(0, showAllPorts ? undefined : 10)" :key="p.ID">
+            <div class="flex items-center gap-4 px-4 py-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
+              <span class="flex-shrink-0 px-2 py-0.5 text-xs font-medium rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">WARNING</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium truncate" x-text="p.device + ' - ' + p.port"></p>
+                <p class="text-xs text-gray-500" x-text="p.site + ' &middot; ' + p.host"></p>
+              </div>
+              <div class="text-right text-xs">
+                <p x-text="'Port: ' + p.port_state"></p>
+                <p x-text="'Paired: ' + p.paired_state"></p>
+              </div>
+            </div>
+          </template>
+          <template x-if="downPorts.length > 10">
+            <button @click="showAllPorts = !showAllPorts" class="text-sm text-blue-600 dark:text-blue-400 hover:underline" x-text="showAllPorts ? 'Show less' : 'Show all ' + downPorts.length + ' alerts'"></button>
+          </template>
+        </div>
+      </div>
+
+      <!-- Health Alerts -->
+      <div class="mb-8">
+        <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-yellow-500"></span> Health Warnings
+        </h2>
+        <template x-if="healthAlerts.length === 0">
+          <p class="text-gray-500 text-sm py-4 px-5 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">All OLTs are healthy.</p>
+        </template>
+        <div class="space-y-2">
+          <template x-for="a in healthAlerts" :key="a.host + a.issue">
+            <div class="flex items-center gap-4 px-4 py-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
+              <span class="flex-shrink-0 px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" x-text="a.severity"></span>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium truncate" x-text="a.device"></p>
+                <p class="text-xs text-gray-500" x-text="a.site + ' &middot; ' + a.host"></p>
+              </div>
+              <span class="text-sm text-right" x-text="a.issue"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </template>
+</div>
+
+<script>
+function alertsPage() {
+  return {
+    loading: true,
+    weakPowers: [],
+    downPorts: [],
+    healthData: [],
+    showAllPower: false,
+    showAllPorts: false,
+
+    async init() {
+      const [pRes, portRes, hRes] = await Promise.all([
+        fetch('/api/power/weak'),
+        fetch('/api/ports/down'),
+        fetch('/api/health')
+      ]);
+      this.weakPowers = await pRes.json() || [];
+      this.downPorts = await portRes.json() || [];
+      this.healthData = await hRes.json() || [];
+      this.loading = false;
+    },
+
+    get healthAlerts() {
+      const alerts = [];
+      this.healthData.forEach(h => {
+        (h.cpu_loads || []).forEach(cpu => {
+          const load = cpu.load || cpu.Load || 0;
+          if (load > 80) {
+            alerts.push({ device: h.device, site: h.site, host: h.host, severity: 'CRITICAL', issue: 'CPU ' + (cpu.card || cpu.Card || '') + ': ' + load + '%' });
+          } else if (load > 60) {
+            alerts.push({ device: h.device, site: h.site, host: h.host, severity: 'WARNING', issue: 'CPU ' + (cpu.card || cpu.Card || '') + ': ' + load + '%' });
+          }
+        });
+        (h.temperatures || []).forEach(t => {
+          const temp = t.temperature || t.Temperature || t.temp || 0;
+          if (temp > 65) {
+            alerts.push({ device: h.device, site: h.site, host: h.host, severity: 'CRITICAL', issue: 'Temp ' + (t.board || t.Board || t.slot || '') + ': ' + temp + '°C' });
+          } else if (temp > 55) {
+            alerts.push({ device: h.device, site: h.site, host: h.host, severity: 'WARNING', issue: 'Temp ' + (t.board || t.Board || t.slot || '') + ': ' + temp + '°C' });
+          }
+        });
+      });
+      return alerts;
+    }
+  }
+}
+</script>
+{{end}}

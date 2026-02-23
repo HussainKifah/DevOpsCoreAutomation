@@ -9,15 +9,15 @@ import (
 )
 
 type PowerHandler struct {
-	Repo *repository.PowerRepo
+	PowerRepo repository.PowerRepository
 }
 
-func NewPowerHandler(r *repository.PowerRepo) *PowerHandler {
-	return &PowerHandler{Repo: r}
+func NewPowerHandler(powerRepo repository.PowerRepository) *PowerHandler {
+	return &PowerHandler{PowerRepo: powerRepo}
 }
 
 func (h *PowerHandler) GetAll(c *gin.Context) {
-	data, err := h.Repo.GetAll()
+	data, err := h.PowerRepo.GetAll()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -32,7 +32,16 @@ func (h *PowerHandler) GetWeak(c *gin.Context) {
 			threshold = v
 		}
 	}
-	data, err := h.Repo.GetWeak(threshold)
+	data, err := h.PowerRepo.GetWeak(threshold)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, data)
+}
+
+func (h *PowerHandler) GetDevices(c *gin.Context) {
+	data, err := h.PowerRepo.GetDevices()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

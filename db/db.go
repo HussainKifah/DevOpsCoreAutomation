@@ -29,6 +29,7 @@ func Connect(cfg *config.Config) *gorm.DB {
 		&models.OntDescription{},
 		&models.OltHealth{},
 		&models.PortProtectionRecord{},
+		&models.OltBackups{},
 		&models.User{},
 	); err != nil {
 		log.Fatalf("failed to migrate database: %v", err)

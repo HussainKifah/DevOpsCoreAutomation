@@ -7,15 +7,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type HealthHandler struct {
-	Repo repository.HealthRepository
+type DescriptionHandler struct {
+	Repo repository.DescriptionRepository
 }
 
-func NewHealthHandler(r repository.HealthRepository) *HealthHandler {
-	return &HealthHandler{Repo: r}
+func NewDescriptionHandler(r repository.DescriptionRepository) *DescriptionHandler {
+	return &DescriptionHandler{Repo: r}
 }
 
-func (h *HealthHandler) GetAll(c *gin.Context) {
+func (h *DescriptionHandler) GetAll(c *gin.Context) {
 	data, err := h.Repo.GetAll()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -24,7 +24,7 @@ func (h *HealthHandler) GetAll(c *gin.Context) {
 	c.JSON(http.StatusOK, data)
 }
 
-func (h *HealthHandler) GetByHost(c *gin.Context) {
+func (h *DescriptionHandler) GetByHost(c *gin.Context) {
 	host := c.Param("host")
 	data, err := h.Repo.GetByHost(host)
 	if err != nil {

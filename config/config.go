@@ -25,19 +25,23 @@ type Config struct {
 	HealthScanInterval time.Duration
 	DescScanInterval   time.Duration
 	PortScanInterval   time.Duration
+	BackupInterval     time.Duration
 }
 
 func Load() *Config {
+	// Try .env in current dir, then parent dirs (for running from cmd/api/)
 	if err := godotenv.Load(); err != nil {
-		log.Println("WARN: no .env file found, using environment variables")
+		if err2 := godotenv.Load("../../.env"); err2 != nil {
+			log.Println("WARN: no .env file found, using environment variables")
+		}
 	}
 
 	return &Config{
 		DBHost:     getEnv("DB_HOST", "localhost"),
 		DBPort:     getEnv("DB_PORT", "5432"),
-		DBUser:     getEnv("DB_USER", "devops"),
+		DBUser:     getEnv("DB_USER", "hussain"),
 		DBPassword: getEnv("DB_PASSWORD", ""),
-		DBName:     getEnv("DB_NAME", "devops_core"),
+		DBName:     getEnv("DB_NAME", "devopscore"),
 		DBSSLMode:  getEnv("DB_SSLMODE", "disable"),
 
 		ServerPort: getEnv("PORT", "8080"),
@@ -49,6 +53,7 @@ func Load() *Config {
 		HealthScanInterval: parseDuration(getEnv("HEALTH_SCAN_INTERVAL", "1h")),
 		DescScanInterval:   parseDuration(getEnv("DESC_SCAN_INTERVAL", "6h")),
 		PortScanInterval:   parseDuration(getEnv("PORT_SCAN_INTERVAL", "2h")),
+		BackupInterval:     parseDuration(getEnv("BACKUP_INTERVAL", "24h")),
 	}
 }
 
