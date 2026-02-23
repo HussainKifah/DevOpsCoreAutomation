@@ -237,7 +237,3 @@ CMD ["./main"]
 ```
 
 **Note**: This system is designed specifically for Nokia OLT device monitoring and management. All sensor data, power readings, and device interactions are processed through SSH connections to the actual telecommunications equipment.
-
-```
-
-```
