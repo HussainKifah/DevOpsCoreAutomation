@@ -23,8 +23,7 @@ func ExtractOntIdxBelowOltRx(output string, threshold float64) []string {
 
 }
 
-func ExtractOntPowerBelowOltRx(output string, threshold float64) []OntPower {
-
+func ExtractAllOntPower(output string) []OntPower {
 	table, ok := extractOpticsTableSection(output)
 	if !ok {
 		return nil
@@ -64,8 +63,17 @@ func ExtractOntPowerBelowOltRx(output string, threshold float64) []OntPower {
 		if !ok {
 			continue
 		}
-		if oltRx < threshold {
-			out = append(out, OntPower{OntIdx: ontIdx, OltRx: oltRx})
+		out = append(out, OntPower{OntIdx: ontIdx, OltRx: oltRx})
+	}
+	return out
+}
+
+func ExtractOntPowerBelowOltRx(output string, threshold float64) []OntPower {
+	all := ExtractAllOntPower(output)
+	var out []OntPower
+	for _, p := range all {
+		if p.OltRx < threshold {
+			out = append(out, p)
 		}
 	}
 	return out

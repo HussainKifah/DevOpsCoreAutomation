@@ -18,6 +18,7 @@ var re = regexp.MustCompile(
 
 func ExtractAllDesc(output string) []OntDesc {
 
+	output = strings.ToValidUTF8(output, "")
 	output = strings.ReplaceAll(output, "\r\n", "\n")
 	output = strings.ReplaceAll(output, "\r", "\n")
 
@@ -51,8 +52,8 @@ func ExtractAllDesc(output string) []OntDesc {
 
 		results = append(results, OntDesc{
 			OntIdx: m[1],
-			Desc1:  desc1,
-			Desc2:  desc2,
+			Desc1:  strings.ToValidUTF8(desc1, ""),
+			Desc2:  strings.ToValidUTF8(desc2, ""),
 		})
 	}
 	return results

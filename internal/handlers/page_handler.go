@@ -6,11 +6,13 @@ import (
 	"net/http"
 	"path/filepath"
 
+	auth "github.com/Flafl/DevOpsCore/internal/Auth"
 	"github.com/gin-gonic/gin"
 )
 
 type PageHandler struct {
-	templates map[string]*template.Template
+	templates    map[string]*template.Template
+	loginTmpl    *template.Template
 }
 
 func NewPageHandler(templateDir string) *PageHandler {
@@ -31,7 +33,13 @@ func NewPageHandler(templateDir string) *PageHandler {
 		}
 		tmpl[name] = t
 	}
-	return &PageHandler{templates: tmpl}
+
+	loginTmpl, err := template.ParseFiles(filepath.Join(templateDir, "auth", "login.html"))
+	if err != nil {
+		log.Fatalf("failed to parse login template: %v", err)
+	}
+
+	return &PageHandler{templates: tmpl, loginTmpl: loginTmpl}
 }
 
 func (h *PageHandler) render(c *gin.Context, name string, data gin.H) {
@@ -44,9 +52,29 @@ func (h *PageHandler) render(c *gin.Context, name string, data gin.H) {
 		data = gin.H{}
 	}
 	data["Page"] = name
+
+	if claims, exists := c.Get("user"); exists {
+		if uc, ok := claims.(*auth.Claims); ok {
+			data["UserEmail"] = uc.Email
+			data["UserRole"] = uc.Role
+			data["UserID"] = uc.UserID
+		}
+	}
+
 	c.Header("Content-Type", "text/html; charset=utf-8")
 	if err := t.ExecuteTemplate(c.Writer, "base", data); err != nil {
 		log.Printf("template render error: %v", err)
+	}
+}
+
+func (h *PageHandler) Login(c *gin.Context) {
+	if cookie, err := c.Cookie("access_token"); err == nil && cookie != "" {
+		c.Redirect(http.StatusFound, "/dashboard")
+		return
+	}
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	if err := h.loginTmpl.Execute(c.Writer, nil); err != nil {
+		log.Printf("login template render error: %v", err)
 	}
 }
 

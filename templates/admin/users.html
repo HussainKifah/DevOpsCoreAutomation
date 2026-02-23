@@ -39,11 +39,17 @@
             <template x-for="u in users" :key="u.ID">
               <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
                 <td class="px-4 py-2.5 text-xs text-gray-500" x-text="u.ID"></td>
-                <td class="px-4 py-2.5 font-medium" x-text="u.fullname"></td>
+                <td class="px-4 py-2.5 font-medium" x-text="u.full_name"></td>
                 <td class="px-4 py-2.5 text-xs" x-text="u.email"></td>
                 <td class="px-4 py-2.5">
                   <span class="px-2 py-0.5 text-xs rounded-full"
-                    :class="u.role === 'admin' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'"
+                    :class="{
+                      'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400': u.role === 'admin',
+                      'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400': u.role === 'excess',
+                      'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400': u.role === 'noc',
+                      'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400': u.role === 'ip',
+                      'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300': !['admin','excess','noc','ip'].includes(u.role)
+                    }"
                     x-text="u.role"></span>
                 </td>
                 <td class="px-4 py-2.5">
@@ -98,6 +104,9 @@
           <select x-model="form.role" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm">
             <option value="user">User</option>
             <option value="admin">Admin</option>
+            <option value="excess">Excess</option>
+            <option value="noc">NOC</option>
+            <option value="ip">IP</option>
           </select>
         </div>
         <template x-if="editingUser">
@@ -126,7 +135,7 @@
     <div class="fixed inset-0 bg-black/50" @click="showDeleteModal = false"></div>
     <div class="relative bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 w-full max-w-sm mx-4 p-6 shadow-xl">
       <h2 class="text-lg font-semibold mb-2">Delete User</h2>
-      <p class="text-sm text-gray-500 mb-6">Are you sure you want to delete <strong x-text="deletingUser?.fullname"></strong>? This cannot be undone.</p>
+      <p class="text-sm text-gray-500 mb-6">Are you sure you want to delete <strong x-text="deletingUser?.full_name"></strong>? This cannot be undone.</p>
       <div class="flex justify-end gap-3">
         <button @click="showDeleteModal = false" class="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800">Cancel</button>
         <button @click="deleteUser()" class="px-4 py-2 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700">Delete</button>
@@ -178,7 +187,7 @@ function adminUsersPage() {
 
     openEdit(user) {
       this.editingUser = user;
-      this.form = { full_name: user.fullname, email: user.email, role: user.role, active: user.active };
+      this.form = { full_name: user.full_name, email: user.email, role: user.role, active: user.active };
       this.formError = '';
       this.showModal = true;
     },

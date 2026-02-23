@@ -17,6 +17,7 @@ type Config struct {
 	DBSSLMode  string
 
 	ServerPort string
+	JWTSecret  string
 
 	OLTUser string
 	OLTPass string
@@ -45,6 +46,7 @@ func Load() *Config {
 		DBSSLMode:  getEnv("DB_SSLMODE", "disable"),
 
 		ServerPort: getEnv("PORT", "8080"),
+		JWTSecret:  getEnv("JWT_SECRET", ""),
 
 		OLTUser: getEnv("OLT_SSH_USER", ""),
 		OLTPass: getEnv("OLT_SSH_PASS", ""),

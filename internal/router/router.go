@@ -1,68 +1,97 @@
 package router
 
 import (
+	auth "github.com/Flafl/DevOpsCore/internal/Auth"
 	"github.com/Flafl/DevOpsCore/internal/handlers"
+	"github.com/Flafl/DevOpsCore/internal/middleware"
 	"github.com/gin-gonic/gin"
 )
 
 func Setup(
 	r *gin.Engine,
+	jwtManager *auth.JWTManager,
 	powerH *handlers.PowerHandler,
 	descH *handlers.DescriptionHandler,
 	healthH *handlers.HealthHandler,
 	portH *handlers.PortHandler,
 	backupH *handlers.BackupHandler,
 	userH *handlers.UserhHandler,
+	authH *handlers.AuthHandler,
 	pageH *handlers.PageHandler,
 ) {
-	// Page routes
-	r.GET("/", func(c *gin.Context) { c.Redirect(302, "/dashboard") })
-	r.GET("/dashboard", pageH.Dashboard)
-	r.GET("/devices", pageH.Devices)
-	r.GET("/alerts", pageH.Alerts)
-	r.GET("/backups", pageH.Backups)
-	r.GET("/admin/users", pageH.AdminUsers)
+	// Public routes
+	r.GET("/login", pageH.Login)
 
-	// API routes
+	// Auth API (public)
+	r.POST("/api/auth/login", authH.Login)
+
+	// Protected page routes (all authenticated users)
+	pages := r.Group("/")
+	pages.Use(middleware.PageAuthMiddleware(jwtManager))
+	{
+		pages.GET("/", func(c *gin.Context) { c.Redirect(302, "/dashboard") })
+		pages.GET("/dashboard", pageH.Dashboard)
+		pages.GET("/devices", pageH.Devices)
+		pages.GET("/alerts", pageH.Alerts)
+		pages.GET("/backups", pageH.Backups)
+	}
+
+	// Admin-only page routes
+	adminPages := r.Group("/")
+	adminPages.Use(middleware.PageAuthMiddleware(jwtManager), middleware.PageRoleGuard("admin"))
+	{
+		adminPages.GET("/admin/users", pageH.AdminUsers)
+	}
+
+	// Protected API routes (all authenticated users)
 	api := r.Group("/api")
-
-	api.GET("/devices", powerH.GetDevices)
-
-	power := api.Group("/power")
+	api.Use(middleware.AuthMiddleware(jwtManager))
 	{
-		power.GET("/readings", powerH.GetAll)
-		power.GET("/weak", powerH.GetWeak)
-	}
+		api.POST("/auth/logout", authH.Logout)
+		api.GET("/auth/me", authH.Me)
+		api.POST("/auth/refresh", authH.Refresh)
 
-	desc := api.Group("/descriptions")
-	{
-		desc.GET("", descH.GetAll)
-		desc.GET("/:host", descH.GetByHost)
-	}
+		api.GET("/devices", powerH.GetDevices)
 
-	health := api.Group("/health")
-	{
-		health.GET("", healthH.GetAll)
-		health.GET("/:host", healthH.GetByHost)
-	}
+		power := api.Group("/power")
+		{
+			power.GET("/readings", powerH.GetAll)
+			power.GET("/weak", powerH.GetWeak)
+			power.GET("/summary", powerH.GetSummary)
+		}
 
-	ports := api.Group("/ports")
-	{
-		ports.GET("/down", portH.GetDown)
-		ports.GET("/:host", portH.GetByHost)
-	}
+		desc := api.Group("/descriptions")
+		{
+			desc.GET("", descH.GetAll)
+			desc.GET("/:host", descH.GetByHost)
+		}
 
-	backups := api.Group("/backups")
-	{
-		backups.GET("", backupH.GetAll)
-		backups.GET("/:id/download", backupH.Download)
-	}
+		health := api.Group("/health")
+		{
+			health.GET("", healthH.GetAll)
+			health.GET("/:host", healthH.GetByHost)
+		}
 
-	users := api.Group("/admin/users")
-	{
-		users.GET("", userH.ListUsers)
-		users.POST("", userH.Create)
-		users.PUT("/:id", userH.UpdateUser)
-		users.DELETE("/:id", userH.DeleteUser)
+		ports := api.Group("/ports")
+		{
+			ports.GET("/down", portH.GetDown)
+			ports.GET("/:host", portH.GetByHost)
+		}
+
+		backups := api.Group("/backups")
+		{
+			backups.GET("", backupH.GetAll)
+			backups.GET("/:id/download", backupH.Download)
+		}
+
+		// Admin-only API routes
+		users := api.Group("/admin/users")
+		users.Use(middleware.RoleGuard("admin"))
+		{
+			users.GET("", userH.ListUsers)
+			users.POST("", userH.Create)
+			users.PUT("/:id", userH.UpdateUser)
+			users.DELETE("/:id", userH.DeleteUser)
+		}
 	}
 }

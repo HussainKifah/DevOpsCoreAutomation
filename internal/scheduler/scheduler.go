@@ -58,6 +58,17 @@ func (s *Scheduler) Start() {
 
 	sched.Start()
 	log.Println("scheduler started")
+
+	// Run ll jobs immediately in background without blocking
+	// go func() {
+	// log.Println("[startup] running all jobs immediately")
+	// 	// 	s.runHealthScan()
+	// 	// 	s.runPowerScan()
+	// s.runDescScan()
+	// 	// 	s.runPortScan()
+	// 	// 	s.runBackup()
+	// 	log.Println("[startup] initial scan complete")
+	// }()
 }
 
 func mustAdd(sched gocron.Scheduler, interval time.Duration, fn func(), name string) {
@@ -65,6 +76,7 @@ func mustAdd(sched gocron.Scheduler, interval time.Duration, fn func(), name str
 		gocron.DurationJob(interval),
 		gocron.NewTask(fn),
 		gocron.WithName(name),
+		gocron.WithSingletonMode(gocron.LimitModeReschedule),
 	)
 	if err != nil {
 		log.Fatalf("scheduler: add job %s: %v", name, err)
@@ -83,7 +95,7 @@ func (s *Scheduler) runPowerScan() {
 			log.Printf("[job] power-scan: ERROR %s: %v", r.Host, r.Err)
 			continue
 		}
-		powers := extractor.ExtractOntPowerBelowOltRx(r.Data, -24.0)
+		powers := extractor.ExtractAllOntPower(r.Data)
 		if len(powers) == 0 {
 			continue
 		}
@@ -244,11 +256,13 @@ func (s *Scheduler) runBackup() {
 			continue
 		}
 
+		cleaned := extractor.CleanBackupOutput(r.Data)
+
 		name := strings.ReplaceAll(r.Device, "/", "-")
 		filename := fmt.Sprintf("%s_%s.txt", name, r.Host)
 		path := filepath.Join(folder, filename)
 
-		if err := os.WriteFile(path, []byte(r.Data), 0o644); err != nil {
+		if err := os.WriteFile(path, []byte(cleaned), 0o644); err != nil {
 			log.Printf("[job] backup: write %s: %v", path, err)
 			continue
 		}

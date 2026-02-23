@@ -6,7 +6,8 @@
   <div class="flex flex-wrap gap-4 mb-6">
     <div class="w-64">
       <label class="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-400">OLT Device</label>
-      <select x-model="selectedDevice" @change="fetchReadings()" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+      <select x-model="selectedDevice" @change="page = 1; fetchPage()"
+        class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
         <option value="">All Devices</option>
         <template x-for="d in uniqueDevices" :key="d">
           <option :value="d" x-text="d"></option>
@@ -14,16 +15,13 @@
       </select>
     </div>
     <div class="w-64">
-      <label class="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-400">Site</label>
-      <select x-model="selectedSite" @change="fetchReadings()" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-        <option value="">All Sites</option>
-        <template x-for="s in uniqueSites" :key="s">
-          <option :value="s" x-text="s"></option>
-        </template>
-      </select>
+      <label class="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-400">Search ONT</label>
+      <input type="text" x-model.debounce.300ms="search" @input="page = 1; fetchPage()"
+        placeholder="Search ONT index or description..."
+        class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
     </div>
     <div class="flex items-end">
-      <span class="text-sm text-gray-500 dark:text-gray-400" x-text="filteredReadings.length + ' ONTs'"></span>
+      <span class="text-sm text-gray-500 dark:text-gray-400" x-text="total + ' ONTs'"></span>
     </div>
   </div>
 
@@ -42,31 +40,18 @@
         <table class="w-full text-sm">
           <thead>
             <tr class="bg-gray-50 dark:bg-gray-800/50">
-              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">
-                ONT Index
-                <input type="text" x-model="filters.ontIdx" placeholder="Filter..." class="mt-1 block w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-xs">
-              </th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">
-                OLT Rx (dBm)
-                <input type="text" x-model="filters.oltRx" placeholder="Filter..." class="mt-1 block w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-xs">
-              </th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">
-                Device
-                <input type="text" x-model="filters.device" placeholder="Filter..." class="mt-1 block w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-xs">
-              </th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">
-                Site
-                <input type="text" x-model="filters.site" placeholder="Filter..." class="mt-1 block w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-xs">
-              </th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">
-                Host
-                <input type="text" x-model="filters.host" placeholder="Filter..." class="mt-1 block w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-xs">
-              </th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">ONT Index</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">OLT Rx (dBm)</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Desc 1</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Desc 2</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Device</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Site</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Host</th>
               <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Measured At</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-            <template x-for="r in paginatedReadings" :key="r.ID">
+            <template x-for="r in readings" :key="r.ID">
               <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
                 <td class="px-4 py-2.5 font-mono text-xs" x-text="r.ont_idx"></td>
                 <td class="px-4 py-2.5">
@@ -74,6 +59,8 @@
                     :class="r.olt_rx < -25 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : r.olt_rx < -24 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'"
                     x-text="r.olt_rx.toFixed(1)"></span>
                 </td>
+                <td class="px-4 py-2.5 text-xs" x-text="r.desc1 || '—'"></td>
+                <td class="px-4 py-2.5 text-xs" x-text="r.desc2 || '—'"></td>
                 <td class="px-4 py-2.5 text-xs" x-text="r.device"></td>
                 <td class="px-4 py-2.5 text-xs" x-text="r.site"></td>
                 <td class="px-4 py-2.5 font-mono text-xs" x-text="r.host"></td>
@@ -86,10 +73,12 @@
 
       <!-- Pagination -->
       <div class="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-800">
-        <span class="text-sm text-gray-500" x-text="'Page ' + page + ' of ' + totalPages"></span>
+        <span class="text-sm text-gray-500" x-text="'Page ' + page + ' of ' + totalPages + ' \u00B7 ' + total + ' ONTs'"></span>
         <div class="flex gap-2">
-          <button @click="page = Math.max(1, page-1)" :disabled="page <= 1" class="px-3 py-1 text-sm rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-800">Prev</button>
-          <button @click="page = Math.min(totalPages, page+1)" :disabled="page >= totalPages" class="px-3 py-1 text-sm rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-800">Next</button>
+          <button @click="page = Math.max(1, page - 1); fetchPage()" :disabled="page <= 1"
+            class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-800">Prev</button>
+          <button @click="page = Math.min(totalPages, page + 1); fetchPage()" :disabled="page >= totalPages"
+            class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-800">Next</button>
         </div>
       </div>
     </div>
@@ -102,53 +91,34 @@ function devicesPage() {
     devices: [],
     readings: [],
     selectedDevice: '',
-    selectedSite: '',
-    filters: { ontIdx: '', oltRx: '', device: '', site: '', host: '' },
+    search: '',
     loading: true,
     page: 1,
-    perPage: 50,
+    total: 0,
+    totalPages: 1,
 
     async init() {
-      const [devRes, readRes] = await Promise.all([
-        fetch('/api/devices'),
-        fetch('/api/power/readings')
-      ]);
+      const devRes = await fetch('/api/devices');
       this.devices = await devRes.json() || [];
-      this.readings = await readRes.json() || [];
+      await this.fetchPage();
       this.loading = false;
     },
 
     get uniqueDevices() {
       return [...new Set(this.devices.map(d => d.device))].sort();
     },
-    get uniqueSites() {
-      return [...new Set(this.devices.map(d => d.site))].sort();
-    },
 
-    get filteredReadings() {
-      this.page = 1;
-      return this.readings.filter(r => {
-        if (this.selectedDevice && r.device !== this.selectedDevice) return false;
-        if (this.selectedSite && r.site !== this.selectedSite) return false;
-        if (this.filters.ontIdx && !r.ont_idx.toLowerCase().includes(this.filters.ontIdx.toLowerCase())) return false;
-        if (this.filters.oltRx && !String(r.olt_rx).includes(this.filters.oltRx)) return false;
-        if (this.filters.device && !r.device.toLowerCase().includes(this.filters.device.toLowerCase())) return false;
-        if (this.filters.site && !r.site.toLowerCase().includes(this.filters.site.toLowerCase())) return false;
-        if (this.filters.host && !r.host.includes(this.filters.host)) return false;
-        return true;
-      });
-    },
-
-    get totalPages() {
-      return Math.max(1, Math.ceil(this.filteredReadings.length / this.perPage));
-    },
-
-    get paginatedReadings() {
-      const start = (this.page - 1) * this.perPage;
-      return this.filteredReadings.slice(start, start + this.perPage);
-    },
-
-    fetchReadings() { /* dropdown changes already trigger reactivity */ }
+    async fetchPage() {
+      const params = new URLSearchParams({ page: this.page, per_page: 50 });
+      if (this.selectedDevice) params.set('device', this.selectedDevice);
+      if (this.search) params.set('search', this.search);
+      const res = await fetch('/api/power/readings?' + params);
+      const json = await res.json();
+      this.readings = json.data || [];
+      this.total = json.total || 0;
+      this.totalPages = json.total_pages || 1;
+      this.page = json.page || 1;
+    }
   }
 }
 </script>
