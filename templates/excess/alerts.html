@@ -92,8 +92,8 @@
               </svg>
             </div>
             <div>
-              <p class="text-2xl font-bold" x-text="healthAlerts.length"></p>
-              <p class="text-xs text-gray-500">Health Warnings</p>
+              <p class="text-2xl font-bold" x-text="healthSummary.filter(o => o.status !== 'NORMAL').length + ' / ' + healthSummary.length"></p>
+              <p class="text-xs text-gray-500">Health Alerts</p>
             </div>
           </div>
         </div>
@@ -200,37 +200,61 @@
         </div>
       </div>
 
-      <!-- Health Alerts -->
+      <!-- Health Status -->
       <div class="mb-8">
         <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-yellow-500"></span> Health
-          Warnings
+          <span class="w-2 h-2 rounded-full bg-yellow-500"></span> Health Status
+          <span class="text-xs font-normal text-gray-500" x-text="'(' + healthSummary.length + ' OLTs)'"></span>
         </h2>
-        <template x-if="healthAlerts.length === 0">
-          <p
-            class="text-gray-500 text-sm py-4 px-5 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800"
-          >
-            All OLTs are healthy.
+        <template x-if="healthSummary.length === 0">
+          <p class="text-gray-500 text-sm py-4 px-5 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
+            No health data available yet.
           </p>
         </template>
         <div class="space-y-2">
-          <template x-for="a in healthAlerts" :key="a.host + a.issue">
-            <div
-              class="flex items-center gap-4 px-4 py-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800"
-            >
+          <template x-for="olt in (showAllHealth ? healthSummary : healthSummary.slice(0, 10))" :key="olt.host">
+            <div class="flex items-center gap-4 px-4 py-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
               <span
-                class="flex-shrink-0 px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                x-text="a.severity"
+                class="flex-shrink-0 px-2 py-0.5 text-xs font-medium rounded-full"
+                :class="{
+                  'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400': olt.status === 'CRITICAL',
+                  'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400': olt.status === 'WARNING',
+                  'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400': olt.status === 'NORMAL'
+                }"
+                x-text="olt.status"
               ></span>
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium truncate" x-text="a.device"></p>
-                <p
-                  class="text-xs text-gray-500"
-                  x-text="a.site + ' &middot; ' + a.host"
-                ></p>
+                <p class="text-sm font-medium truncate" x-text="olt.device"></p>
+                <p class="text-xs text-gray-500" x-text="olt.site + ' \u00B7 ' + olt.host"></p>
               </div>
-              <span class="text-sm text-right" x-text="a.issue"></span>
+              <div class="flex items-center gap-3">
+                <span class="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md"
+                  :class="{
+                    'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400': olt.cpu > 80,
+                    'bg-yellow-50 text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-400': olt.cpu > 60 && olt.cpu <= 80,
+                    'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400': olt.cpu <= 60
+                  }">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25z"/></svg>
+                  <span x-text="olt.cpu + '%'"></span>
+                </span>
+                <span class="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md"
+                  :class="{
+                    'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400': olt.temp > 65,
+                    'bg-yellow-50 text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-400': olt.temp > 55 && olt.temp <= 65,
+                    'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400': olt.temp <= 55
+                  }">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z"/></svg>
+                  <span x-text="olt.temp + '\u00B0C'"></span>
+                </span>
+              </div>
             </div>
+          </template>
+          <template x-if="healthSummary.length > 10">
+            <button
+              @click="showAllHealth = !showAllHealth"
+              class="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              x-text="showAllHealth ? 'Show less' : 'Show all ' + healthSummary.length + ' OLTs'"
+            ></button>
           </template>
         </div>
       </div>
@@ -247,6 +271,7 @@
       healthData: [],
       showAllPower: false,
       showAllPorts: false,
+      showAllHealth: false,
 
       async init() {
         const [pRes, portRes, hRes] = await Promise.all([
@@ -260,27 +285,14 @@
         this.loading = false;
       },
 
-      get healthAlerts() {
-        const alerts = [];
-        this.healthData.forEach(h => {
-          (h.cpu_loads || []).forEach(cpu => {
-            const load = cpu.average_pct || 0;
-            if (load > 80) {
-              alerts.push({ device: h.device, site: h.site, host: h.host, severity: 'CRITICAL', issue: 'CPU ' + (cpu.slot || '') + ': ' + load + '%' });
-            } else if (load > 60) {
-              alerts.push({ device: h.device, site: h.site, host: h.host, severity: 'WARNING', issue: 'CPU ' + (cpu.slot || '') + ': ' + load + '%' });
-            }
-          });
-          (h.temperatures || []).forEach(t => {
-            const temp = t.act_temp || 0;
-            if (temp > 65) {
-              alerts.push({ device: h.device, site: h.site, host: h.host, severity: 'CRITICAL', issue: 'Temp ' + (t.slot || '') + ': ' + temp + '\u00B0C' });
-            } else if (temp > 55) {
-              alerts.push({ device: h.device, site: h.site, host: h.host, severity: 'WARNING', issue: 'Temp ' + (t.slot || '') + ': ' + temp + '\u00B0C' });
-            }
-          });
-        });
-        return alerts;
+      get healthSummary() {
+        const sev = (cpu, temp) => (cpu > 80 || temp > 65) ? 'CRITICAL' : (cpu > 60 || temp > 55) ? 'WARNING' : 'NORMAL';
+        const order = { CRITICAL: 0, WARNING: 1, NORMAL: 2 };
+        return this.healthData.map(h => {
+          const cpu = Math.max(...(h.cpu_loads || []).map(c => c.average_pct || 0), 0);
+          const temp = Math.max(...(h.temperatures || []).map(t => t.act_temp || 0), 0);
+          return { device: h.device, site: h.site, host: h.host, cpu, temp, status: sev(cpu, temp) };
+        }).sort((a, b) => (order[a.status] ?? 2) - (order[b.status] ?? 2));
       }
     }
   }

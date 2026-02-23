@@ -1,0 +1,991 @@
+configure alarm log-sev-level indeterminate log-full-action wrap non-itf-rep-sev-level major
+configure alarm entry der-temp1 severity critical service-affecting reporting logging
+configure alarm filter temporal filterid 1 alarmid link-down status used
+configure alarm filter temporal filterid 2 alarmid all
+configure alarm filter temporal filterid 3 alarmid all
+configure alarm filter temporal filterid 4 alarmid all
+configure alarm filter temporal filterid 5 alarmid all
+configure alarm filter temporal filterid 6 alarmid all
+configure alarm filter temporal filterid 7 alarmid all
+configure alarm filter temporal filterid 8 alarmid all
+configure alarm filter temporal filterid 9 alarmid all
+configure alarm filter temporal filterid 10 alarmid all
+configure alarm filter temporal filterid 11 alarmid all
+configure alarm filter temporal filterid 12 alarmid all
+configure alarm filter temporal filterid 13 alarmid all
+configure alarm filter temporal filterid 14 alarmid all
+configure alarm filter temporal filterid 15 alarmid all
+configure alarm filter temporal filterid 16 alarmid all
+configure alarm filter temporal filterid 17 alarmid all
+configure alarm filter temporal filterid 18 alarmid all
+configure alarm filter temporal filterid 19 alarmid all
+configure alarm filter temporal filterid 20 alarmid all
+configure alarm filter temporal filterid 21 alarmid all
+configure alarm filter temporal filterid 22 alarmid all
+configure alarm filter temporal filterid 23 alarmid all
+configure alarm filter temporal filterid 24 alarmid all
+configure alarm filter temporal filterid 25 alarmid all
+configure alarm filter temporal filterid 26 alarmid all
+configure alarm filter temporal filterid 27 alarmid all
+configure alarm filter temporal filterid 28 alarmid all
+configure alarm filter temporal filterid 29 alarmid all
+configure alarm filter temporal filterid 30 alarmid all
+configure alarm filter temporal filterid 31 alarmid all
+configure alarm filter spatial filterid 1 alarmid all
+configure alarm filter spatial filterid 2 alarmid all
+configure alarm filter spatial filterid 3 alarmid all
+configure alarm filter spatial filterid 4 alarmid all
+configure alarm filter spatial filterid 5 alarmid all
+configure alarm filter spatial filterid 6 alarmid all
+configure alarm filter spatial filterid 7 alarmid all
+configure alarm filter spatial filterid 8 alarmid all
+configure alarm filter spatial filterid 9 alarmid all
+configure alarm filter spatial filterid 10 alarmid all
+configure alarm filter spatial filterid 11 alarmid all
+configure alarm filter spatial filterid 12 alarmid all
+configure alarm filter spatial filterid 13 alarmid all
+configure alarm filter spatial filterid 14 alarmid all
+configure alarm filter spatial filterid 15 alarmid all
+configure alarm filter spatial filterid 16 alarmid all
+configure alarm filter spatial filterid 17 alarmid all
+configure alarm filter spatial filterid 18 alarmid all
+configure alarm filter spatial filterid 19 alarmid all
+configure alarm filter spatial filterid 20 alarmid all
+configure alarm filter spatial filterid 21 alarmid all
+configure alarm filter spatial filterid 22 alarmid all
+configure alarm filter spatial filterid 23 alarmid all
+configure alarm filter spatial filterid 24 alarmid all
+configure alarm filter spatial filterid 25 alarmid all
+configure alarm filter spatial filterid 26 alarmid all
+configure alarm filter spatial filterid 27 alarmid all
+configure alarm filter spatial filterid 28 alarmid all
+configure alarm filter spatial filterid 29 alarmid all
+configure alarm filter spatial filterid 30 alarmid all
+configure alarm filter spatial filterid 31 alarmid all
+configure alarm delta-log indet-log-full-action wrap warn-log-full-action wrap minor-log-full-action wrap major-log-full-action wrap crit-log-full-act wrap
+configure trap definition cold-start priority medium
+configure trap definition link-down priority medium
+configure trap definition link-up priority medium
+configure trap definition auth-failure priority medium
+configure trap definition change-occured priority medium
+configure trap definition line-test-report priority medium
+configure trap definition init-started priority medium
+configure trap definition lic-key-chg-occr priority medium
+configure trap definition topology-chg priority medium
+configure trap definition selt-state-chg priority medium
+configure trap definition dhcp-sess-pre priority medium
+configure trap definition radius-server-failure priority medium
+configure trap definition login-occured priority medium
+configure trap definition logout-occured priority medium
+configure trap definition trapmngr-chg-occr priority medium
+configure trap definition mst-genral priority medium
+configure trap definition mst-error priority medium
+- configure trap definition mst-protocol-mig priority medium
+configure trap definition mst-inv-bpdu-rx priority medium
+configure trap definition mst-reg-conf-chg priority medium
+configure trap definition alrm-change-occured priority medium
+configure trap definition out-of-sync priority medium
+configure trap definition actual-cp-changed priority medium
+- configure trap definition avail-bw-changed priority medium
+configure trap definition mac-auth-failure priority medium
+configure trap definition new-ont-alrm priority medium
+configure trap definition ont-prov-status priority medium
+configure trap definition sw-upgrade-finished priority medium
+configure trap definition login-occuredv6 priority medium
+configure trap definition logout-occuredv6 priority medium
+configure trap definition trapmngr-chg-occrv6 priority medium
+configure trap definition ont-prov-template priority medium
+- configure trap definition auto-replan-board priority medium
+configure trap manager 10.90.2.200:9001 priority low cold-start-trap change-trap alarm-chg-trap eqpt-change-trap success-set-trap other-alarm-trap warning-trap minor-trap major-trap critical-trap redundancy-trap eqpt-prot-trap dying-gasp actual-cp-changed avail-bw-changed auto-replan-board min-severity indeterminate
+configure trap manager 127.0.0.1:162 priority low change-trap alarm-chg-trap other-alarm-trap warning-trap minor-trap major-trap critical-trap min-severity indeterminate
+configure equipment shelf 1/1 planned-type nfxs-e
+configure equipment slot acu:1/1 planned-type ngfc-e unlock disable-key plain:******
+configure equipment slot nt-a planned-type fant-f unlock disable-key plain:******
+configure equipment slot nt-b planned-type fant-f unlock disable-key plain:******
+configure equipment slot lt:1/1/1 planned-type fglt-a unlock capab-profile fttu_lt operational-mode gpon disable-key plain:******
+configure equipment slot lt:1/1/2 planned-type fglt-a unlock capab-profile fttu_lt operational-mode gpon disable-key plain:******
+configure equipment slot lt:1/1/3 planned-type fglt-a unlock capab-profile fttu_lt operational-mode gpon disable-key plain:******
+configure equipment slot lt:1/1/4 planned-type fglt-a power-down unlock capab-profile fttu_lt operational-mode gpon disable-key plain:******
+configure equipment slot lt:1/1/5 planned-type fglt-a power-down unlock capab-profile fttu_lt operational-mode gpon disable-key plain:******
+configure equipment slot lt:1/1/6 planned-type fglt-a power-down unlock capab-profile fttu_lt operational-mode gpon disable-key plain:******
+configure equipment slot lt:1/1/7 planned-type fwlt-c unlock capab-profile gpon-managed-ngpon operational-mode gpon disable-key plain:******
+configure equipment slot lt:1/1/8 planned-type fglt-d power-down unlock capab-profile fttu_lt operational-mode gpon disable-key plain:******
+configure equipment slot vlt:1/1/63 unlock disable-key plain:******
+configure equipment slot vlt:1/1/64 unlock disable-key plain:******
+configure equipment protection-group 1 eps-quenchfactor 3000
+configure equipment protection-group 33 admin-status lock eps-quenchfactor 0
+configure equipment ont sw-ctrl 1 hw-version 3FE49165** ont-variant DO plnd-sw-version 3FE49717AOCK61 plnd-sw-ver-conf 3FE49717AOCK61 sw-dwload-ver 3FE49717AOCK51
+configure equipment fan-tray fanmode classic
+configure equipment replan boardautoreplan disable
+configure interface port pon:1/1/1/1 admin-up link-updown-trap user ""
+configure interface port pon:1/1/1/2 admin-up link-updown-trap user ""
+configure interface port pon:1/1/1/3 admin-up link-updown-trap user ""
+configure interface port pon:1/1/1/4 admin-up link-updown-trap user ""
+configure interface port pon:1/1/1/5 admin-up link-updown-trap user ""
+configure interface port pon:1/1/1/6 admin-up link-updown-trap user ""
+configure interface port pon:1/1/1/7 admin-up link-updown-trap user ""
+configure interface port pon:1/1/1/8 admin-up link-updown-trap user ""
+configure interface port pon:1/1/1/9 admin-up link-updown-trap user ""
+configure interface port pon:1/1/1/10 admin-up link-updown-trap user ""
+configure interface port pon:1/1/1/11 admin-up link-updown-trap user ""
+configure interface port pon:1/1/1/12 admin-up link-updown-trap user ""
+configure interface port pon:1/1/1/13 admin-up link-updown-trap user ""
+configure interface port pon:1/1/1/14 admin-up link-updown-trap user ""
+configure interface port pon:1/1/1/15 admin-up link-updown-trap user ""
+configure interface port pon:1/1/1/16 admin-up link-updown-trap user ""
+configure interface port pon:1/1/2/1 admin-up link-updown-trap user ""
+configure interface port pon:1/1/2/2 admin-up link-updown-trap user ""
+configure interface port pon:1/1/2/3 admin-up link-updown-trap user ""
+configure interface port pon:1/1/2/4 admin-up link-updown-trap user ""
+configure interface port pon:1/1/2/5 admin-up link-updown-trap user ""
+configure interface port pon:1/1/2/6 admin-up link-updown-trap user ""
+configure interface port pon:1/1/2/7 admin-up link-updown-trap user ""
+configure interface port pon:1/1/2/8 admin-up link-updown-trap user ""
+configure interface port pon:1/1/2/9 admin-up link-updown-trap user ""
+configure interface port pon:1/1/2/10 admin-up link-updown-trap user ""
+configure interface port pon:1/1/2/11 admin-up link-updown-trap user ""
+configure interface port pon:1/1/2/12 admin-up link-updown-trap user ""
+configure interface port pon:1/1/2/13 admin-up link-updown-trap user ""
+configure interface port pon:1/1/2/14 admin-up link-updown-trap user ""
+configure interface port pon:1/1/2/15 admin-up link-updown-trap user ""
+configure interface port pon:1/1/2/16 admin-up link-updown-trap user ""
+configure interface port pon:1/1/3/1 admin-up link-updown-trap user ""
+configure interface port pon:1/1/3/2 admin-up link-updown-trap user ""
+configure interface port pon:1/1/3/3 admin-up link-updown-trap user ""
+configure interface port pon:1/1/3/4 admin-up link-updown-trap user ""
+configure interface port pon:1/1/3/5 admin-up link-updown-trap user ""
+configure interface port pon:1/1/3/6 admin-up link-updown-trap user ""
+configure interface port pon:1/1/3/7 admin-up link-updown-trap user ""
+configure interface port pon:1/1/3/8 admin-up link-updown-trap user ""
+configure interface port pon:1/1/3/9 admin-up link-updown-trap user ""
+configure interface port pon:1/1/3/10 admin-up link-updown-trap user ""
+configure interface port pon:1/1/3/11 admin-up link-updown-trap user ""
+configure interface port pon:1/1/3/12 admin-up link-updown-trap user ""
+configure interface port pon:1/1/3/13 admin-up link-updown-trap user ""
+configure interface port pon:1/1/3/14 admin-up link-updown-trap user ""
+configure interface port pon:1/1/3/15 admin-up link-updown-trap user ""
+configure interface port pon:1/1/3/16 admin-up link-updown-trap user ""
+configure interface port pon:1/1/4/1 admin-up link-updown-trap user ""
+configure interface port pon:1/1/4/2 admin-up link-updown-trap user ""
+configure interface port pon:1/1/4/3 admin-up link-updown-trap user ""
+configure interface port pon:1/1/4/4 admin-up link-updown-trap user ""
+configure interface port pon:1/1/4/5 admin-up link-updown-trap user ""
+configure interface port pon:1/1/4/6 admin-up link-updown-trap user ""
+configure interface port pon:1/1/4/7 admin-up link-updown-trap user ""
+configure interface port pon:1/1/4/8 admin-up link-updown-trap user ""
+configure interface port pon:1/1/4/9 admin-up link-updown-trap user ""
+configure interface port pon:1/1/4/10 admin-up link-updown-trap user ""
+configure interface port pon:1/1/4/11 admin-up link-updown-trap user ""
+configure interface port pon:1/1/4/12 admin-up link-updown-trap user ""
+configure interface port pon:1/1/4/13 admin-up link-updown-trap user ""
+configure interface port pon:1/1/4/14 admin-up link-updown-trap user ""
+configure interface port pon:1/1/4/15 admin-up link-updown-trap user ""
+configure interface port pon:1/1/4/16 admin-up link-updown-trap user ""
+configure interface port pon:1/1/5/1 admin-up link-updown-trap user ""
+configure interface port pon:1/1/5/2 admin-up link-updown-trap user ""
+configure interface port pon:1/1/5/3 admin-up link-updown-trap user ""
+configure interface port pon:1/1/5/4 admin-up link-updown-trap user ""
+configure interface port pon:1/1/5/5 admin-up link-updown-trap user ""
+configure interface port pon:1/1/5/6 admin-up link-updown-trap user ""
+configure interface port pon:1/1/5/7 admin-up link-updown-trap user ""
+configure interface port pon:1/1/5/8 admin-up link-updown-trap user ""
+configure interface port pon:1/1/5/9 admin-up link-updown-trap user ""
+configure interface port pon:1/1/5/10 admin-up link-updown-trap user ""
+configure interface port pon:1/1/5/11 admin-up link-updown-trap user ""
+configure interface port pon:1/1/5/12 admin-up link-updown-trap user ""
+configure interface port pon:1/1/5/13 admin-up link-updown-trap user ""
+configure interface port pon:1/1/5/14 admin-up link-updown-trap user ""
+configure interface port pon:1/1/5/15 admin-up link-updown-trap user ""
+configure interface port pon:1/1/5/16 admin-up link-updown-trap user ""
+configure interface port pon:1/1/6/1 admin-up link-updown-trap user ""
+configure interface port pon:1/1/6/2 admin-up link-updown-trap user ""
+configure interface port pon:1/1/6/3 admin-up link-updown-trap user ""
+configure interface port pon:1/1/6/4 admin-up link-updown-trap user ""
+configure interface port pon:1/1/6/5 admin-up link-updown-trap user ""
+configure interface port pon:1/1/6/6 admin-up link-updown-trap user ""
+configure interface port pon:1/1/6/7 admin-up link-updown-trap user ""
+configure interface port pon:1/1/6/8 admin-up link-updown-trap user ""
+configure interface port pon:1/1/6/9 admin-up link-updown-trap user ""
+configure interface port pon:1/1/6/10 admin-up link-updown-trap user ""
+configure interface port pon:1/1/6/11 admin-up link-updown-trap user ""
+configure interface port pon:1/1/6/12 admin-up link-updown-trap user ""
+configure interface port pon:1/1/6/13 admin-up link-updown-trap user ""
+configure interface port pon:1/1/6/14 admin-up link-updown-trap user ""
+configure interface port pon:1/1/6/15 admin-up link-updown-trap user ""
+configure interface port pon:1/1/6/16 admin-up link-updown-trap user ""
+configure interface port pon:1/1/7/1 link-updown-trap user ""
+configure interface port pon:1/1/7/2 link-updown-trap user ""
+configure interface port pon:1/1/7/3 link-updown-trap user ""
+configure interface port pon:1/1/7/4 link-updown-trap user ""
+configure interface port pon:1/1/7/5 link-updown-trap user ""
+configure interface port pon:1/1/7/6 link-updown-trap user ""
+configure interface port pon:1/1/7/7 link-updown-trap user ""
+configure interface port pon:1/1/7/8 link-updown-trap user ""
+configure interface port pon:1/1/7/9 link-updown-trap user ""
+configure interface port pon:1/1/7/10 link-updown-trap user ""
+configure interface port pon:1/1/7/11 link-updown-trap user ""
+configure interface port pon:1/1/7/12 link-updown-trap user ""
+configure interface port pon:1/1/7/13 link-updown-trap user ""
+configure interface port pon:1/1/7/14 link-updown-trap user ""
+configure interface port pon:1/1/7/15 link-updown-trap user ""
+configure interface port pon:1/1/7/16 link-updown-trap user ""
+configure interface port pon:1/1/8/1 admin-up link-updown-trap user ""
+configure interface port pon:1/1/8/2 admin-up link-updown-trap user ""
+configure interface port pon:1/1/8/3 admin-up link-updown-trap user ""
+configure interface port pon:1/1/8/4 admin-up link-updown-trap user ""
+configure interface port pon:1/1/8/5 admin-up link-updown-trap user ""
+configure interface port pon:1/1/8/6 admin-up link-updown-trap user ""
+configure interface port pon:1/1/8/7 admin-up link-updown-trap user ""
+configure interface port pon:1/1/8/8 admin-up link-updown-trap user ""
+configure interface port pon:1/1/8/9 admin-up link-updown-trap user ""
+configure interface port pon:1/1/8/10 admin-up link-updown-trap user ""
+configure interface port pon:1/1/8/11 admin-up link-updown-trap user ""
+configure interface port pon:1/1/8/12 admin-up link-updown-trap user ""
+configure interface port pon:1/1/8/13 admin-up link-updown-trap user ""
+configure interface port pon:1/1/8/14 admin-up link-updown-trap user ""
+configure interface port pon:1/1/8/15 admin-up link-updown-trap user ""
+configure interface port pon:1/1/8/16 admin-up link-updown-trap user ""
+configure interface alarm chpair default-severity indeterminate
+configure interface alarm pon default-severity indeterminate
+configure interface alarm epon default-severity indeterminate
+configure interface alarm eont default-severity indeterminate
+configure interface alarm ont default-severity indeterminate
+configure interface cage lt:1/1/1:cage:1 operational-mode gpon
+configure interface cage lt:1/1/1:cage:2 operational-mode gpon
+configure interface cage lt:1/1/1:cage:3 operational-mode gpon
+configure interface cage lt:1/1/1:cage:4 operational-mode gpon
+configure interface cage lt:1/1/1:cage:5 operational-mode gpon
+configure interface cage lt:1/1/1:cage:6 operational-mode gpon
+configure interface cage lt:1/1/1:cage:7 operational-mode gpon
+configure interface cage lt:1/1/1:cage:8 operational-mode gpon
+configure interface cage lt:1/1/1:cage:9 operational-mode gpon
+configure interface cage lt:1/1/1:cage:10 operational-mode gpon
+configure interface cage lt:1/1/1:cage:11 operational-mode gpon
+configure interface cage lt:1/1/1:cage:12 operational-mode gpon
+configure interface cage lt:1/1/1:cage:13 operational-mode gpon
+configure interface cage lt:1/1/1:cage:14 operational-mode gpon
+configure interface cage lt:1/1/1:cage:15 operational-mode gpon
+configure interface cage lt:1/1/1:cage:16 operational-mode gpon
+configure interface cage lt:1/1/2:cage:1 operational-mode gpon
+configure interface cage lt:1/1/2:cage:2 operational-mode gpon
+configure interface cage lt:1/1/2:cage:3 operational-mode gpon
+configure interface cage lt:1/1/2:cage:4 operational-mode gpon
+configure interface cage lt:1/1/2:cage:5 operational-mode gpon
+configure interface cage lt:1/1/2:cage:6 operational-mode gpon
+configure interface cage lt:1/1/2:cage:7 operational-mode gpon
+configure interface cage lt:1/1/2:cage:8 operational-mode gpon
+configure interface cage lt:1/1/2:cage:9 operational-mode gpon
+configure interface cage lt:1/1/2:cage:10 operational-mode gpon
+configure interface cage lt:1/1/2:cage:11 operational-mode gpon
+configure interface cage lt:1/1/2:cage:12 operational-mode gpon
+configure interface cage lt:1/1/2:cage:13 operational-mode gpon
+configure interface cage lt:1/1/2:cage:14 operational-mode gpon
+configure interface cage lt:1/1/2:cage:15 operational-mode gpon
+configure interface cage lt:1/1/2:cage:16 operational-mode gpon
+configure interface cage lt:1/1/3:cage:1 operational-mode gpon
+configure interface cage lt:1/1/3:cage:2 operational-mode gpon
+configure interface cage lt:1/1/3:cage:3 operational-mode gpon
+configure interface cage lt:1/1/3:cage:4 operational-mode gpon
+configure interface cage lt:1/1/3:cage:5 operational-mode gpon
+configure interface cage lt:1/1/3:cage:6 operational-mode gpon
+configure interface cage lt:1/1/3:cage:7 operational-mode gpon
+configure interface cage lt:1/1/3:cage:8 operational-mode gpon
+configure interface cage lt:1/1/3:cage:9 operational-mode gpon
+configure interface cage lt:1/1/3:cage:10 operational-mode gpon
+configure interface cage lt:1/1/3:cage:11 operational-mode gpon
+configure interface cage lt:1/1/3:cage:12 operational-mode gpon
+configure interface cage lt:1/1/3:cage:13 operational-mode gpon
+configure interface cage lt:1/1/3:cage:14 operational-mode gpon
+configure interface cage lt:1/1/3:cage:15 operational-mode gpon
+configure interface cage lt:1/1/3:cage:16 operational-mode gpon
+configure interface cage lt:1/1/4:cage:1 operational-mode gpon
+configure interface cage lt:1/1/4:cage:2 operational-mode gpon
+configure interface cage lt:1/1/4:cage:3 operational-mode gpon
+configure interface cage lt:1/1/4:cage:4 operational-mode gpon
+configure interface cage lt:1/1/4:cage:5 operational-mode gpon
+configure interface cage lt:1/1/4:cage:6 operational-mode gpon
+configure interface cage lt:1/1/4:cage:7 operational-mode gpon
+configure interface cage lt:1/1/4:cage:8 operational-mode gpon
+configure interface cage lt:1/1/4:cage:9 operational-mode gpon
+configure interface cage lt:1/1/4:cage:10 operational-mode gpon
+configure interface cage lt:1/1/4:cage:11 operational-mode gpon
+configure interface cage lt:1/1/4:cage:12 operational-mode gpon
+configure interface cage lt:1/1/4:cage:13 operational-mode gpon
+configure interface cage lt:1/1/4:cage:14 operational-mode gpon
+configure interface cage lt:1/1/4:cage:15 operational-mode gpon
+configure interface cage lt:1/1/4:cage:16 operational-mode gpon
+configure interface cage lt:1/1/5:cage:1 operational-mode gpon
+configure interface cage lt:1/1/5:cage:2 operational-mode gpon
+configure interface cage lt:1/1/5:cage:3 operational-mode gpon
+configure interface cage lt:1/1/5:cage:4 operational-mode gpon
+configure interface cage lt:1/1/5:cage:5 operational-mode gpon
+configure interface cage lt:1/1/5:cage:6 operational-mode gpon
+configure interface cage lt:1/1/5:cage:7 operational-mode gpon
+configure interface cage lt:1/1/5:cage:8 operational-mode gpon
+configure interface cage lt:1/1/5:cage:9 operational-mode gpon
+configure interface cage lt:1/1/5:cage:10 operational-mode gpon
+configure interface cage lt:1/1/5:cage:11 operational-mode gpon
+configure interface cage lt:1/1/5:cage:12 operational-mode gpon
+configure interface cage lt:1/1/5:cage:13 operational-mode gpon
+configure interface cage lt:1/1/5:cage:14 operational-mode gpon
+configure interface cage lt:1/1/5:cage:15 operational-mode gpon
+configure interface cage lt:1/1/5:cage:16 operational-mode gpon
+configure interface cage lt:1/1/6:cage:1 operational-mode gpon
+configure interface cage lt:1/1/6:cage:2 operational-mode gpon
+configure interface cage lt:1/1/6:cage:3 operational-mode gpon
+configure interface cage lt:1/1/6:cage:4 operational-mode gpon
+configure interface cage lt:1/1/6:cage:5 operational-mode gpon
+configure interface cage lt:1/1/6:cage:6 operational-mode gpon
+configure interface cage lt:1/1/6:cage:7 operational-mode gpon
+configure interface cage lt:1/1/6:cage:8 operational-mode gpon
+configure interface cage lt:1/1/6:cage:9 operational-mode gpon
+configure interface cage lt:1/1/6:cage:10 operational-mode gpon
+configure interface cage lt:1/1/6:cage:11 operational-mode gpon
+configure interface cage lt:1/1/6:cage:12 operational-mode gpon
+configure interface cage lt:1/1/6:cage:13 operational-mode gpon
+configure interface cage lt:1/1/6:cage:14 operational-mode gpon
+configure interface cage lt:1/1/6:cage:15 operational-mode gpon
+configure interface cage lt:1/1/6:cage:16 operational-mode gpon
+configure interface cage lt:1/1/7:cage:1 operational-mode gpon
+configure interface cage lt:1/1/7:cage:2 operational-mode gpon
+configure interface cage lt:1/1/7:cage:3 operational-mode gpon
+configure interface cage lt:1/1/7:cage:4 operational-mode gpon
+configure interface cage lt:1/1/7:cage:5 operational-mode gpon
+configure interface cage lt:1/1/7:cage:6 operational-mode gpon
+configure interface cage lt:1/1/7:cage:7 operational-mode gpon
+configure interface cage lt:1/1/7:cage:8 operational-mode gpon
+configure interface cage lt:1/1/7:cage:9 operational-mode gpon
+configure interface cage lt:1/1/7:cage:10 operational-mode gpon
+configure interface cage lt:1/1/7:cage:11 operational-mode gpon
+configure interface cage lt:1/1/7:cage:12 operational-mode gpon
+configure interface cage lt:1/1/7:cage:13 operational-mode gpon
+configure interface cage lt:1/1/7:cage:14 operational-mode gpon
+configure interface cage lt:1/1/7:cage:15 operational-mode gpon
+configure interface cage lt:1/1/7:cage:16 operational-mode gpon
+configure interface cage lt:1/1/8:cage:1 operational-mode gpon
+configure interface cage lt:1/1/8:cage:2 operational-mode gpon
+configure interface cage lt:1/1/8:cage:3 operational-mode gpon
+configure interface cage lt:1/1/8:cage:4 operational-mode gpon
+configure interface cage lt:1/1/8:cage:5 operational-mode gpon
+configure interface cage lt:1/1/8:cage:6 operational-mode gpon
+configure interface cage lt:1/1/8:cage:7 operational-mode gpon
+configure interface cage lt:1/1/8:cage:8 operational-mode gpon
+configure interface cage lt:1/1/8:cage:9 operational-mode gpon
+configure interface cage lt:1/1/8:cage:10 operational-mode gpon
+configure interface cage lt:1/1/8:cage:11 operational-mode gpon
+configure interface cage lt:1/1/8:cage:12 operational-mode gpon
+configure interface cage lt:1/1/8:cage:13 operational-mode gpon
+configure interface cage lt:1/1/8:cage:14 operational-mode gpon
+configure interface cage lt:1/1/8:cage:15 operational-mode gpon
+configure interface cage lt:1/1/8:cage:16 operational-mode gpon
+configure system id Al-Andalus-ISAM-FX8-OLT-1-ALCATEL name ASAM location "Nokia - Antwerpen" contact-person Nokia en-snmp-auth-trap nt-intercon-vlan 4092 internal-nw-vlan 4089 system-mac 54:a6:19:35:d4:13/54:a6:19:35:cd:28/32 port-num-in-proto type-based voiceoswp sip bsnap-state disable bsnap-server-ip 169.254.1.1 bsnap-server-port 0
+configure system sntp server-ip-addr 10.90.6.4 enable timezone-offset 180
+configure system sntp server-table ip-address 10.90.6.4 priority 1
+configure system loop-id-syntax atm-based-dsl "Access_Node_ID atm Rack/Frame/Slot/Port:VPI.VCI" efm-based-dsl "Access_Node_ID eth Rack/Frame/Slot/Port" efm-based-pon "Access_Node_ID eth Rack/Frame/Slot/Port/ONU/OnuSlt/UNI" efm-based-epon "Bras Access_Node_ID/Rack/Frame/Slot/Subslot/Port/ONT Oft" efm-based-ngpon2 "Access_Node_ID eth ng2:Channelgroup/Subchannelgroup/ONU/OnuSlt/UNI"
+configure system max-lt-link-speed link-speed twenty-gb
+configure system security login-banner "UNAUTHORIZED ACCESS TO THIS DEVICE IS PROHIBITED. You must have explicit, authorized permission to access or configure this device.Unauthorized attempts and actions to access or use this system may result in civil and/or criminal penaltiesrn" welcome-banner "Welcome to Al-Andalus-OLT01"
+configure system security operator isadmin password encrypted:78:83:f4:ad:39:0b:f6:7f:78:36:3c:7f:c5:f7:2b:77:de:56:e5:4b:4a:4b:30:cc:85:e0:01:79:fb:02:77:03:5b:e5:99:b6:5a:ee:5c:28:cd:d4:58:e7:78:61:71:bf:c7:1d:23:b8:2f:38:dd:6a:59:a2:84:c7:fc:0c:3f:a6:be:6a:19:c4 no bgn-time no end-time prompt Al-Andalus-OLT01:%n%d%c description "default administrator" no more no confirm-prompt
+configure system security operator hanan profile admin password encrypted:6f:30:2b:fc:d4:d6:b6:be:73:56:0f:31:8d:bd:8b:f0:a5:91:73:ef:2b:32:eb:02:35:dd:42:32:1f:6f:2d:b2:a8:d4:3f:79:80:da:ba:af:4b:29:ba:1b:54:5b:66:f9:af:81:a7:36:f8:fa:1e:a3:08:5e:ac:e8:62:5b:99:cc:43:ee:0d:f4 prompt Al-Andalus-Nokia-OLT01:%n%d%c description Test
+configure system security operator farah profile admin password encrypted:6a:be:4e:28:1a:a2:4c:d6:d6:75:fd:01:cc:48:e9:58:8c:5f:95:63:9f:e2:66:2a:35:de:e0:e2:7a:db:62:aa:99:6c:ed:52:2c:1d:9f:96:31:43:af:48:34:ba:65:be:2c:80:3a:7d:25:ea:5f:2b:d8:60:aa:c3:94:9d:6e:1c:b3:d5:8a:4c
+configure system security operator sftp profile isadmin password encrypted:19:7d:c3:5c:08:7a:a8:64:a3:2a:89:30:10:a0:6f:a9:6e:71:10:9b:f9:fc:ce:b3:91:86:89:cc:5c:e5:16:27:df:12:93:75:c3:a9:51:ed:fd:0b:09:c0:ef:cf:fc:22:7e:f0:67:ab:2f:4c:6e:31:52:8a:1f:e5:31:ad:1d:78:77:82:78:dd
+configure system security operator nokia profile admin password encrypted:05:3a:1d:54:4a:8a:fd:e5:d9:06:8f:dc:a5:df:63:b1:4a:bb:a6:a1:5e:62:2c:d6:dd:3c:5f:cf:bf:65:9a:41:82:66:80:97:f1:3d:3a:ca:ec:49:33:e1:a6:ae:d8:ae:92:9c:c1:76:06:0b:6e:22:97:3d:5e:89:b7:a2:c7:ae:5b:d7:a8:4a
+configure system security operator dev profile admin password encrypted:87:0a:de:c0:1c:20:1c:dc:ec:e3:d2:d4:27:0d:6d:b9:04:6d:09:27:70:b7:64:73:94:60:7f:9e:04:ef:21:c7:a8:96:ce:6f:e6:14:36:3a:d1:cb:c4:ad:ed:41:c4:d3:d5:43:3d:0e:86:26:a8:5a:0d:84:8b:c3:11:ce:4b:54:f2:ac:ad:7b
+configure system security operator devops profile admin password encrypted:99:ac:3f:13:da:0a:b0:95:17:38:67:c7:ca:59:98:cb:91:6b:28:03:a0:10:88:67:27:1f:7d:e1:77:e1:91:a6:50:cf:79:2d:62:b4:f2:17:3f:c1:85:7c:9b:44:75:c6:9c:c2:72:f4:09:64:27:5d:ef:8d:b5:69:ff:a0:fb:11:4a:68:c5:7e
+configure system security operator zabbixssh profile read password encrypted:c4:50:ec:66:98:f0:ce:80:dc:a6:61:84:a1:66:66:c4:14:7b:cb:9d:9a:38:02:43:cd:35:83:93:61:77:d3:b8:23:ca:38:55:95:71:f6:d6:f2:9a:99:68:71:fc:4e:41:2f:9f:a8:d4:98:b6:27:13:47:09:01:f2:19:38:aa:ea:40:b4:c8:d7
+configure system security operator adam profile admin password encrypted:12:32:12:c2:6f:1f:8b:2a:cf:1b:ad:99:fc:fd:b5:41:61:85:d8:b5:20:a7:73:63:c8:af:81:ea:f7:8a:61:7d:c8:cf:82:9c:d8:5e:8f:3e:ee:e4:3f:38:94:e9:8a:a8:6b:47:61:39:48:02:31:17:c6:25:62:6f:b4:09:8c:1b:f4:2d:d9:96
+configure system security profile admin no prompt no password-timeout no terminal-timeout slot-numbering type-based description "default administrator group" aaa write atm write alarm write dhcp write equipment write igmp write ip write pppoe write qos write software-mngt write transport write vlan write xdsl write sip write megaco write lacp write mstp write security write service write debug write debug-mirror write filter write link write log write oam write no liadmin no liuser drouter write ai write no livoice lldpmed write no lldp
+- configure system security profile isadmin
+configure system security profile sftp aaa write atm write alarm write dhcp write equipment write igmp write ip write pppoe write qos write software-mngt write transport write vlan write xdsl write sip write megaco write lacp write mstp write security write service write debug write debug-mirror write filter write link write log write oam write liadmin write liuser write drouter write ai write livoice write lldpmed write lldp write
+configure system security profile sft
+configure system security profile read prompt read slot-numbering type-based description read aaa read atm read alarm read dhcp read equipment read igmp read ip read pppoe read qos read software-mngt read transport read vlan read xdsl read sip read megaco read lacp read mstp read security read service read debug read debug-mirror read filter read link read log read oam read
+configure system security profile dev prompt read slot-numbering type-based description read aaa write atm read alarm read dhcp read equipment write igmp read ip write pppoe read qos write software-mngt write transport write vlan write xdsl read megaco read lacp read security read service write debug read debug-mirror read filter write link read log read liadmin read liuser read drouter read ai write livoice read lldpmed read lldp write
+configure system security profile limited alarm read lacp read
+configure system security default-profile liadmin none liuser none livoice none lldp none
+configure system security snmp community t&Joh2R8{R,!2lo3 host-address 192.168.116.246/32 context ihub privilege read-only
+configure system security snmp community automation host-address 188.72.40.242/32 privilege read-only
+configure system security snmp community IACM host-address 10.90.2.200/32
+configure system security snmp community IHUB host-address 10.90.2.200/32
+configure system security snmp community prtg host-address 10.90.6.2/32
+configure system security snmp notify-profile 5a0ac802/nt_trap snmp-version v2:IACM
+configure system security snmp notify-profile tl1 snmp-version v1:public
+configure system security snmp manager 5a0ac802/nt_trap destination 10.90.2.200:9001 notify-profile 5a0ac802/nt_trap nt
+configure system security password min-length 6 min-num-numeric-char 0 min-num-special-char 1
+configure system security ssh server-profile server-host-key rsa
+configure system security ssh access protocol sftp cli ssh tl1 ssh debug ssh
+configure system security ssh sftp-user amssftp password encrypted:05:51:5f:1d:3a:45:1b:6a
+configure system security filetransfer protocol sftp
+configure system transaction log-full-action wrap
+configure system syslog destination diagnostic type file:diagnostic:2000
+configure system syslog route diagnostic msg-type eqpt facility local0
+configure system epon pm-collect enable
+configure system sync-if-timing revert output-ql-thresh clk-ql-dnu ssmout-ceiling clk-ql-prc
+configure system sync-if-timing bits autoselect
+configure system sync-if-timing ref-order prio1 none
+configure system sync-if-timing ref-order prio2 none
+configure system sync-if-timing ssm bits-a default-ql clk-ql-prc target-ql clk-ql-dnu
+configure system sync-if-timing ssm bits-b default-ql clk-ql-prc target-ql clk-ql-dnu
+configure system sync-if-timing ssm synce-1 default-ql clk-ql-prc target-ql clk-ql-dnu
+configure system sync-if-timing ssm synce-2 default-ql clk-ql-prc target-ql clk-ql-dnu
+configure system sync-if-timing ssm ieee1588-a default-ql clk-ql-prc target-ql clk-ql-dnu
+configure system sync-if-timing ssm ieee1588-b default-ql clk-ql-prc target-ql clk-ql-dnu
+- configure system sync-if-timing synce synce-1 none
+configure system sync-if-timing synce synce-2 none
+configure system sync-if-timing force-reference none
+configure system relay-id-syntax atm-based-dsl "S-MAC Rack/Frame/Slot/Port:VPI.VCI" efm-based-dsl "S-MAC Rack/Frame/Slot/Port"
+configure software-mngt sw-replacement-mode upgrade-via-standby
+configure software-mngt oswp 1 primary-file-server-id 10.90.2.200 second-file-server-id 0.0.0.0
+configure software-mngt oswp 2 primary-file-server-id 192.168.1.3 second-file-server-id 0.0.0.0
+configure qos tc-map-dot1p 0 tc 0 dpcolor green policer-color green
+configure qos tc-map-dot1p 1 tc 1 dpcolor green policer-color green
+configure qos tc-map-dot1p 2 tc 2 dpcolor green policer-color green
+configure qos tc-map-dot1p 3 tc 3 dpcolor green policer-color green
+configure qos tc-map-dot1p 4 tc 4 dpcolor green policer-color green
+configure qos tc-map-dot1p 5 tc 5 dpcolor green policer-color green
+configure qos tc-map-dot1p 6 tc 6 dpcolor green policer-color green
+configure qos tc-map-dot1p 7 tc 7 dpcolor green policer-color green
+configure qos dscp-map-dot1p 0 dot1p-value 0
+configure qos dscp-map-dot1p 1 dot1p-value 0
+configure qos dscp-map-dot1p 2 dot1p-value 0
+configure qos dscp-map-dot1p 3 dot1p-value 0
+configure qos dscp-map-dot1p 4 dot1p-value 0
+configure qos dscp-map-dot1p 5 dot1p-value 0
+configure qos dscp-map-dot1p 6 dot1p-value 0
+configure qos dscp-map-dot1p 7 dot1p-value 0
+configure qos dscp-map-dot1p 8 dot1p-value 1
+configure qos dscp-map-dot1p 9 dot1p-value 1
+configure qos dscp-map-dot1p 10 dot1p-value 1
+configure qos dscp-map-dot1p 11 dot1p-value 1
+configure qos dscp-map-dot1p 12 dot1p-value 1
+configure qos dscp-map-dot1p 13 dot1p-value 1
+configure qos dscp-map-dot1p 14 dot1p-value 1
+configure qos dscp-map-dot1p 15 dot1p-value 1
+configure qos dscp-map-dot1p 16 dot1p-value 2
+configure qos dscp-map-dot1p 17 dot1p-value 2
+configure qos dscp-map-dot1p 18 dot1p-value 2
+configure qos dscp-map-dot1p 19 dot1p-value 2
+configure qos dscp-map-dot1p 20 dot1p-value 2
+configure qos dscp-map-dot1p 21 dot1p-value 2
+configure qos dscp-map-dot1p 22 dot1p-value 2
+configure qos dscp-map-dot1p 23 dot1p-value 2
+configure qos dscp-map-dot1p 24 dot1p-value 3
+configure qos dscp-map-dot1p 25 dot1p-value 3
+configure qos dscp-map-dot1p 26 dot1p-value 3
+configure qos dscp-map-dot1p 27 dot1p-value 3
+configure qos dscp-map-dot1p 28 dot1p-value 3
+configure qos dscp-map-dot1p 29 dot1p-value 3
+configure qos dscp-map-dot1p 30 dot1p-value 3
+configure qos dscp-map-dot1p 31 dot1p-value 3
+configure qos dscp-map-dot1p 32 dot1p-value 4
+configure qos dscp-map-dot1p 33 dot1p-value 4
+configure qos dscp-map-dot1p 34 dot1p-value 4
+configure qos dscp-map-dot1p 35 dot1p-value 4
+configure qos dscp-map-dot1p 36 dot1p-value 4
+configure qos dscp-map-dot1p 37 dot1p-value 4
+configure qos dscp-map-dot1p 38 dot1p-value 4
+configure qos dscp-map-dot1p 39 dot1p-value 4
+configure qos dscp-map-dot1p 40 dot1p-value 5
+configure qos dscp-map-dot1p 41 dot1p-value 5
+configure qos dscp-map-dot1p 42 dot1p-value 5
+configure qos dscp-map-dot1p 43 dot1p-value 5
+configure qos dscp-map-dot1p 44 dot1p-value 5
+configure qos dscp-map-dot1p 45 dot1p-value 5
+configure qos dscp-map-dot1p 46 dot1p-value 5
+configure qos dscp-map-dot1p 47 dot1p-value 5
+configure qos dscp-map-dot1p 48 dot1p-value 6
+configure qos dscp-map-dot1p 49 dot1p-value 6
+configure qos dscp-map-dot1p 50 dot1p-value 6
+configure qos dscp-map-dot1p 51 dot1p-value 6
+configure qos dscp-map-dot1p 52 dot1p-value 6
+configure qos dscp-map-dot1p 53 dot1p-value 6
+configure qos dscp-map-dot1p 54 dot1p-value 6
+configure qos dscp-map-dot1p 55 dot1p-value 6
+configure qos dscp-map-dot1p 56 dot1p-value 7
+configure qos dscp-map-dot1p 57 dot1p-value 7
+configure qos dscp-map-dot1p 58 dot1p-value 7
+configure qos dscp-map-dot1p 59 dot1p-value 7
+configure qos dscp-map-dot1p 60 dot1p-value 7
+configure qos dscp-map-dot1p 61 dot1p-value 7
+configure qos dscp-map-dot1p 62 dot1p-value 7
+configure qos dscp-map-dot1p 63 dot1p-value 7
+configure qos profiles queue FD_BEQ red:24:48:80
+configure qos profiles queue FD_CLQ red:24:48:80
+configure qos profiles queue BACKPLQ threecolour-taildrop:48:40:32
+configure qos profiles queue FD_VideoQ tail-drop:64
+configure qos profiles queue FD_VoiceQ tail-drop:10
+configure qos profiles queue NNI_BECLQ red:24:48:80
+configure qos profiles queue UNI_BECLQ red:24:48:80
+configure qos profiles queue NNI_VideoQ tail-drop:64
+configure qos profiles queue NNI_VoiceQ tail-drop:10
+configure qos profiles queue UNI_VideoQ tail-drop:64
+configure qos profiles queue UNI_VoiceQ tail-drop:10
+configure qos profiles queue DSLNNI_BECLQ red:341:682:5
+configure qos profiles queue DSLNNI_Video tail-drop:401
+configure qos profiles queue DSLNNI_Voice tail-drop:49
+configure qos profiles queue NGLT_Default gpon-tail-drop:16:512
+configure qos profiles queue NGVR_UPLINK_BECLQ threecolour-red:149:745:5:75:373:5:1:2:100
+configure qos profiles queue NGVR_UPLINK_VideoQ threecolour-taildrop:1813:906:2
+configure qos profiles queue NGVR_UPLINK_VoiceQ threecolour-taildrop:46:23:2
+configure qos profiles scheduler-node NGLT_Default priority 2 weight 50 shaper-profile none mcast-inc-shape no-mcast-shap
+configure qos profiles scheduler-node Broadcast_Default priority 5 weight 50 shaper-profile none mcast-inc-shape no-mcast-shap
+configure qos profiles scheduler-node Multicast_Default priority 6 weight 50 shaper-profile none mcast-inc-shape no-mcast-shap
+configure qos profiles cac DataOnly res-voice-bandwidth 0 max-mcast-bandwidth 0 res-data-bandwidth 0 cac-type generic-pon-cac
+configure qos profiles cac FD_Default res-voice-bandwidth 0 max-mcast-bandwidth 60000 res-data-bandwidth 0
+configure qos profiles cac FD_DataVideo res-voice-bandwidth 0 max-mcast-bandwidth 3000 res-data-bandwidth 250
+configure qos profiles cac FD_GponVideo res-voice-bandwidth 0 max-mcast-bandwidth 1900000 res-data-bandwidth 0 cac-type generic-pon-cac
+configure qos profiles cac FD_TriplePlay res-voice-bandwidth 100 max-mcast-bandwidth 3000 res-data-bandwidth 250
+configure qos profiles cac FD_ONTUniVideo res-voice-bandwidth 0 max-mcast-bandwidth 24000 res-data-bandwidth 0
+configure qos profiles marker d1p FD_Marker_BE default-dot1p 0
+configure qos profiles marker d1p FD_Marker_CL default-dot1p 3
+configure qos profiles marker d1p FD_Marker_Voice default-dot1p 6
+configure qos profiles policer FD_Pol_Voice committed-info-rate 100 committed-burst-size 1522
+configure qos profiles policer FD_Pol_Data_DS committed-info-rate 3000 committed-burst-size 22000
+configure qos profiles policer FD_Pol_Data_US committed-info-rate 256 committed-burst-size 3000
+configure qos profiles session FD_Voice logical-flow-type pvc up-policer name:FD_Pol_Voice down-policer name:FD_Pol_Voice up-marker name:FD_Marker_Voice
+configure qos profiles session FD_HSI_premium logical-flow-type generic up-policer name:FD_Pol_Data_US down-policer name:FD_Pol_Data_DS up-marker name:FD_Marker_CL
+configure qos profiles session FD_HSI_standard logical-flow-type generic up-policer name:FD_Pol_Data_US down-policer name:FD_Pol_Data_DS up-marker name:FD_Marker_BE
+configure qos profiles aggrqueuesconfig DefaultDnQueuesConfig q0-priority 6 q1-priority 6 q2-priority 7 q3-priority 8 q0-weight 36 q1-weight 64 q2-weight 0 q3-weight 0 q4-weight 0 q5-weight 0 q6-weight 0 q7-weight 0 q0-queue-prof name:NGLT_Default q1-queue-prof name:NGLT_Default q2-queue-prof name:NGLT_Default q3-queue-prof name:NGLT_Default
+configure qos profiles aggrqueuesconfig DefaultUpQueuesConfig
+configure qos profiles bandwidth GPONProfile committed-info-rate 64 assured-info-rate 64 excessive-info-rate 1228544 delay-tolerance 32
+configure qos profiles ingress-qos Default_TC0 dot1-p0-tc 0 dot1-p1-tc 0 dot1-p2-tc 0 dot1-p3-tc 0 dot1-p4-tc 0 dot1-p5-tc 0 dot1-p6-tc 0 dot1-p7-tc 0
+configure qos profiles ingress-qos Default_TC1 dot1-p0-tc 1 dot1-p1-tc 1 dot1-p2-tc 1 dot1-p3-tc 1 dot1-p4-tc 1 dot1-p5-tc 1 dot1-p6-tc 1 dot1-p7-tc 1
+configure qos profiles ingress-qos Default_TC2 dot1-p0-tc 2 dot1-p1-tc 2 dot1-p2-tc 2 dot1-p3-tc 2 dot1-p4-tc 2 dot1-p5-tc 2 dot1-p6-tc 2 dot1-p7-tc 2
+configure qos profiles ingress-qos Default_TC3 dot1-p0-tc 3 dot1-p1-tc 3 dot1-p2-tc 3 dot1-p3-tc 3 dot1-p4-tc 3 dot1-p5-tc 3 dot1-p6-tc 3 dot1-p7-tc 3
+configure qos profiles ingress-qos Default_TC4 dot1-p0-tc 4 dot1-p1-tc 4 dot1-p2-tc 4 dot1-p3-tc 4 dot1-p4-tc 4 dot1-p5-tc 4 dot1-p6-tc 4 dot1-p7-tc 4
+configure qos profiles ingress-qos Default_TC5 dot1-p0-tc 5 dot1-p1-tc 5 dot1-p2-tc 5 dot1-p3-tc 5 dot1-p4-tc 5 dot1-p5-tc 5 dot1-p6-tc 5 dot1-p7-tc 5
+configure qos profiles ingress-qos Default_TC6 dot1-p0-tc 6 dot1-p1-tc 6 dot1-p2-tc 6 dot1-p3-tc 6 dot1-p4-tc 6 dot1-p5-tc 6 dot1-p6-tc 6 dot1-p7-tc 6
+configure qos profiles ingress-qos Default_TC7 dot1-p0-tc 7 dot1-p1-tc 7 dot1-p2-tc 7 dot1-p3-tc 7 dot1-p4-tc 7 dot1-p5-tc 7 dot1-p6-tc 7 dot1-p7-tc 7
+configure qos profiles ingress-qos Ingress_Default dot1-p0-tc 0 dot1-p1-tc 1 dot1-p2-tc 2 dot1-p3-tc 3 dot1-p4-tc 4 dot1-p5-tc 5 dot1-p6-tc 6 dot1-p7-tc 7
+configure qos profiles rate-limit reserve1
+configure qos profiles rate-limit reserve2
+configure qos profiles rate-limit defaultllid total-rate 80 total-burst 100
+configure qos interface pon:1/1/1/1 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/1/2 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/1/3 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/1/4 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/1/5 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/1/6 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/1/7 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/1/8 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/1/9 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/1/10 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/1/11 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/1/12 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/1/13 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/1/14 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/1/15 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/1/16 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/2/1 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/2/2 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/2/3 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/2/4 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/2/5 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/2/6 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/2/7 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/2/8 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/2/9 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/2/10 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/2/11 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/2/12 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/2/13 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/2/14 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/2/15 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/2/16 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/3/1 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/3/2 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/3/3 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/3/4 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/3/5 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/3/6 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/3/7 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/3/8 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/3/9 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/3/10 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/3/11 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/3/12 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/3/13 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/3/14 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/3/15 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/3/16 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/4/1 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/4/2 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/4/3 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/4/4 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/4/5 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/4/6 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/4/7 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/4/8 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/4/9 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/4/10 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/4/11 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/4/12 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/4/13 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/4/14 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/4/15 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/4/16 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/5/1 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/5/2 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/5/3 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/5/4 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/5/5 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/5/6 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/5/7 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/5/8 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/5/9 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/5/10 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/5/11 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/5/12 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/5/13 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/5/14 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/5/15 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/5/16 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/6/1 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/6/2 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/6/3 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/6/4 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/6/5 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/6/6 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/6/7 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/6/8 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/6/9 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/6/10 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/6/11 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/6/12 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/6/13 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/6/14 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/6/15 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/6/16 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/7/1 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/7/2 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/7/3 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/7/4 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/7/5 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/7/6 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/7/7 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/7/8 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/7/9 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/7/10 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/7/11 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/7/12 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/7/13 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/7/14 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/7/15 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/7/16 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/8/1 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/8/2 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/8/3 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/8/4 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/8/5 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/8/6 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/8/7 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/8/8 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/8/9 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/8/10 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/8/11 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/8/12 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/8/13 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/8/14 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/8/15 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos interface pon:1/1/8/16 cac-profile name:FD_GponVideo ds-num-rem-queue not-applicable us-num-queue not-applicable oper-weight 0 oper-rate 0 gem-sharing not-applicable
+configure qos up-ctrl-pkt arp
+configure qos up-ctrl-pkt igmp
+configure qos up-ctrl-pkt dhcpv4
+configure qos up-ctrl-pkt dhcpv6
+configure qos up-ctrl-pkt icmpv6
+configure qos up-ctrl-pkt cfm
+configure qos up-ctrl-pkt pppox
+configure qos up-ctrl-pkt lacp
+configure qos up-ctrl-pkt dot1x
+configure qos dn-ctrl-pkt arp
+configure qos dn-ctrl-pkt igmp
+configure qos dn-ctrl-pkt dhcpv4
+configure qos dn-ctrl-pkt dhcpv6
+configure qos dn-ctrl-pkt icmpv6
+configure qos dn-ctrl-pkt cfm
+configure qos dn-ctrl-pkt pppox
+configure qos dn-ctrl-pkt lacp
+configure qos dn-ctrl-pkt dot1x
+configure vlan broadcast-frames priority-policy vlan-specific
+configure vlan vmac-address-format host-id 0
+configure vlan id 150 mode residential-bridge name IE-Internet-Vlan-150 in-qos-prof-name name:Default_TC0
+configure vlan id 550 mode residential-bridge name IE-Internet-Vlan-550 in-qos-prof-name name:Default_TC0
+configure vlan priority-regen 1 profile-name TrustedPort pbit0 0 pbit1 1 pbit2 2 pbit3 3 pbit4 4 pbit5 5 pbit6 6 pbit7 7
+configure vlan priority-regen 2 profile-name BestEffort pbit0 0 pbit1 0 pbit2 0 pbit3 0 pbit4 0 pbit5 0 pbit6 0 pbit7 0
+configure vlan priority-regen 3 profile-name ControlledLoad3 pbit0 3 pbit1 3 pbit2 3 pbit3 3 pbit4 3 pbit5 3 pbit6 3 pbit7 3
+configure vlan priority-regen 4 profile-name ControlledLoad4 pbit0 4 pbit1 4 pbit2 4 pbit3 4 pbit4 4 pbit5 4 pbit6 4 pbit7 4
+configure vlan priority-regen 5 profile-name Background pbit0 1 pbit1 1 pbit2 1 pbit3 1 pbit4 1 pbit5 1 pbit6 1 pbit7 1
+configure vlan priority-regen 6 profile-name BE_ControlledLoad_Voice pbit0 0 pbit1 0 pbit2 3 pbit3 3 pbit4 0 pbit5 0 pbit6 6 pbit7 6
+configure vlan priority-regen 7 profile-name BE_ControlledLoad_Voice.1d pbit0 0 pbit1 0 pbit2 0 pbit3 4 pbit4 0 pbit5 0 pbit6 6 pbit7 6
+configure vlan priority-regen 8 profile-name BestEffort_Voice pbit0 0 pbit1 0 pbit2 0 pbit3 0 pbit4 0 pbit5 0 pbit6 6 pbit7 6
+configure vlan priority-regen 9 profile-name 3ClassL2VPN pbit0 0 pbit1 0 pbit2 2 pbit3 2 pbit4 4 pbit5 4 pbit6 0 pbit7 0
+configure vlan priority-regen 10 profile-name 4ClassL2VPN pbit0 0 pbit1 0 pbit2 2 pbit3 2 pbit4 4 pbit5 4 pbit6 6 pbit7 6
+configure vlan tpid 1 value 8100
+configure li_vlan vlan-id 0
+configure igmp mcast-svc-context Default
+configure mcast general package-member [1...1024]
+configure xdsl-bonding group-assembly-time 0
+configure voice sip vsp vsp1 domain-name DomainName.com timer-b 32000 timer-f 32000 timer-t1 500 timer-t2 4000
+configure voice sip redundancy-cmd vsp1 fail-x-type geo-fail-over
+configure voice sip statistics stats-config per-line per-board per-system per-call out-any-rsp in-any-rsp
+configure voice sip cas-nsm-prof common-cas-profile international-prefix "#" country-code "#" outg-cpn-length 0
+configure xstp general enable-stp region-name 54:a6:19:2f:a9:32
+configure pon interface 1/1/1/1 label GPON-1-ALCATEL-1 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/1/1 utilization pon-pmcollect pm-enable
+configure pon interface 1/1/1/1 admin-state up
+configure pon interface 1/1/1/2 label GPON-1-ALCATEL-2 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/1/2 admin-state up
+configure pon interface 1/1/1/3 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/1/3 admin-state up
+configure pon interface 1/1/1/4 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/1/4 admin-state up
+configure pon interface 1/1/1/5 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/1/5 admin-state up
+configure pon interface 1/1/1/6 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/1/6 admin-state up
+configure pon interface 1/1/1/7 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/1/7 admin-state up
+configure pon interface 1/1/1/8 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/1/8 admin-state up
+configure pon interface 1/1/1/9 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/1/9 admin-state up
+configure pon interface 1/1/1/10 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/1/10 admin-state up
+configure pon interface 1/1/1/11 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/1/11 admin-state up
+configure pon interface 1/1/1/12 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/1/12 admin-state up
+configure pon interface 1/1/1/13 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/1/13 admin-state up
+configure pon interface 1/1/1/14 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/1/14 admin-state up
+configure pon interface 1/1/1/15 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/1/15 admin-state up
+configure pon interface 1/1/1/16 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/1/16 admin-state up
+configure pon interface 1/1/2/1 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/2/1 admin-state up
+configure pon interface 1/1/2/2 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/2/2 admin-state up
+configure pon interface 1/1/2/3 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/2/3 admin-state up
+configure pon interface 1/1/2/4 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/2/4 admin-state up
+configure pon interface 1/1/2/5 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/2/5 admin-state up
+configure pon interface 1/1/2/6 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/2/6 admin-state up
+configure pon interface 1/1/2/7 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/2/7 admin-state up
+configure pon interface 1/1/2/8 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/2/8 admin-state up
+configure pon interface 1/1/2/9 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/2/9 admin-state up
+configure pon interface 1/1/2/10 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/2/10 admin-state up
+configure pon interface 1/1/2/11 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/2/11 admin-state up
+configure pon interface 1/1/2/12 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/2/12 admin-state up
+configure pon interface 1/1/2/13 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/2/13 admin-state up
+configure pon interface 1/1/2/14 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/2/14 admin-state up
+configure pon interface 1/1/2/15 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/2/15 admin-state up
+configure pon interface 1/1/2/16 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/2/16 admin-state up
+configure pon interface 1/1/3/1 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/3/1 admin-state up
+configure pon interface 1/1/3/2 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/3/2 admin-state up
+configure pon interface 1/1/3/3 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/3/3 admin-state up
+configure pon interface 1/1/3/4 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/3/4 admin-state up
+configure pon interface 1/1/3/5 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/3/5 admin-state up
+configure pon interface 1/1/3/6 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/3/6 admin-state up
+configure pon interface 1/1/3/7 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/3/7 admin-state up
+configure pon interface 1/1/3/8 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/3/8 admin-state up
+configure pon interface 1/1/3/9 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/3/9 admin-state up
+configure pon interface 1/1/3/10 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/3/10 admin-state up
+configure pon interface 1/1/3/11 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/3/11 admin-state up
+configure pon interface 1/1/3/12 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/3/12 admin-state up
+configure pon interface 1/1/3/13 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/3/13 admin-state up
+configure pon interface 1/1/3/14 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/3/14 admin-state up
+configure pon interface 1/1/3/15 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/3/15 admin-state up
+configure pon interface 1/1/3/16 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/3/16 admin-state up
+configure pon interface 1/1/4/1 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/4/1 admin-state up
+configure pon interface 1/1/4/2 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/4/2 admin-state up
+configure pon interface 1/1/4/3 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/4/3 admin-state up
+configure pon interface 1/1/4/4 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/4/4 admin-state up
+configure pon interface 1/1/4/5 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/4/5 admin-state up
+configure pon interface 1/1/4/6 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/4/6 admin-state up
+configure pon interface 1/1/4/7 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/4/7 admin-state up
+configure pon interface 1/1/4/8 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/4/8 admin-state up
+configure pon interface 1/1/4/9 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/4/9 admin-state up
+configure pon interface 1/1/4/10 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/4/10 admin-state up
+configure pon interface 1/1/4/11 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/4/11 admin-state up
+configure pon interface 1/1/4/12 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/4/12 admin-state up
+configure pon interface 1/1/4/13 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/4/13 admin-state up
+configure pon interface 1/1/4/14 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/4/14 admin-state up
+configure pon interface 1/1/4/15 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/4/15 admin-state up
+configure pon interface 1/1/4/16 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/4/16 admin-state up
+configure pon interface 1/1/5/1 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/5/1 admin-state up
+configure pon interface 1/1/5/2 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/5/2 admin-state up
+configure pon interface 1/1/5/3 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/5/3 admin-state up
+configure pon interface 1/1/5/4 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/5/4 admin-state up
+configure pon interface 1/1/5/5 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/5/5 admin-state up
+configure pon interface 1/1/5/6 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/5/6 admin-state up
+configure pon interface 1/1/5/7 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/5/7 admin-state up
+configure pon interface 1/1/5/8 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/5/8 admin-state up
+configure pon interface 1/1/5/9 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/5/9 admin-state up
+configure pon interface 1/1/5/10 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/5/10 admin-state up
+configure pon interface 1/1/5/11 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/5/11 admin-state up
+configure pon interface 1/1/5/12 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/5/12 admin-state up
+configure pon interface 1/1/5/13 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/5/13 admin-state up
+configure pon interface 1/1/5/14 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/5/14 admin-state up
+configure pon interface 1/1/5/15 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/5/15 admin-state up
+configure pon interface 1/1/5/16 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/5/16 admin-state up
+configure pon interface 1/1/6/1 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/6/1 admin-state up
+configure pon interface 1/1/6/2 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/6/2 admin-state up
+configure pon interface 1/1/6/3 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/6/3 admin-state up
+configure pon interface 1/1/6/4 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/6/4 admin-state up
+configure pon interface 1/1/6/5 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/6/5 admin-state up
+configure pon interface 1/1/6/6 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/6/6 admin-state up
+configure pon interface 1/1/6/7 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/6/7 admin-state up
+configure pon interface 1/1/6/8 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/6/8 admin-state up
+configure pon interface 1/1/6/9 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/6/9 admin-state up
+configure pon interface 1/1/6/10 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/6/10 admin-state up
+configure pon interface 1/1/6/11 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/6/11 admin-state up
+configure pon interface 1/1/6/12 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/6/12 admin-state up
+configure pon interface 1/1/6/13 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/6/13 admin-state up
+configure pon interface 1/1/6/14 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/6/14 admin-state up
+configure pon interface 1/1/6/15 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/6/15 admin-state up
+configure pon interface 1/1/6/16 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/6/16 admin-state up
+configure pon interface 1/1/7/1 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/7/2 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/7/3 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/7/4 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/7/5 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/7/6 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/7/7 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/7/8 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/7/9 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/7/10 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/7/11 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/7/12 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/7/13 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/7/14 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/7/15 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/7/16 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/8/1 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/8/1 admin-state up
+configure pon interface 1/1/8/2 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/8/2 admin-state up
+configure pon interface 1/1/8/3 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/8/3 admin-state up
+configure pon interface 1/1/8/4 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/8/4 admin-state up
+configure pon interface 1/1/8/5 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/8/5 admin-state up
+configure pon interface 1/1/8/6 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/8/6 admin-state up
+configure pon interface 1/1/8/7 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/8/7 admin-state up
+configure pon interface 1/1/8/8 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/8/8 admin-state up
+configure pon interface 1/1/8/9 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/8/9 admin-state up
+configure pon interface 1/1/8/10 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/8/10 admin-state up
+configure pon interface 1/1/8/11 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/8/11 admin-state up
+configure pon interface 1/1/8/12 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/8/12 admin-state up
+configure pon interface 1/1/8/13 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/8/13 admin-state up
+configure pon interface 1/1/8/14 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/8/14 admin-state up
+configure pon interface 1/1/8/15 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/8/15 admin-state up
+configure pon interface 1/1/8/16 fec-dn disable tconts-per-frame 64
+configure pon interface 1/1/8/16 admin-state up
+configure iphost
+configure channel-pair profiles wavelength-prof 1 name defaultChannel1 upstream-channel-id 1 downstream-channel-id 1 downstream-lambda 159634
+configure channel-pair profiles wavelength-prof 2 name defaultChannel2 upstream-channel-id 2 downstream-channel-id 2 downstream-lambda 159719
+configure channel-pair profiles wavelength-prof 3 name defaultChannel3 upstream-channel-id 3 downstream-channel-id 3 downstream-lambda 159804
+configure channel-pair profiles wavelength-prof 4 name defaultChannel4 upstream-channel-id 4 downstream-channel-id 4 downstream-lambda 159889
+configure channel-pair profiles wavelength-prof 5 name defaultChannel5 upstream-channel-id 5 downstream-channel-id 5 downstream-lambda 159975
+configure channel-pair profiles wavelength-prof 6 name defaultChannel6 upstream-channel-id 6 downstream-channel-id 6 downstream-lambda 160060
+configure channel-pair profiles wavelength-prof 7 name defaultChannel7 upstream-channel-id 7 downstream-channel-id 7 downstream-lambda 160146
+configure channel-pair profiles wavelength-prof 8 name defaultChannel8 upstream-channel-id 8 downstream-channel-id 8 downstream-lambda 160231
+configure channel-pair profiles wavelength-prof 33 name defaultXgsponBasicSet upstream-channel-id 1 downstream-channel-id 1 downstream-lambda 157700
+configure channel-pair profiles wavelength-prof 34 name defaultXgsponOptionalSet upstream-channel-id 1 downstream-channel-id 1 downstream-lambda 149000
+configure epon profiles ontalarm default ethp-loopback
+configure generic-pon dpinteg-threshold 0
+configure generic-pon utilization pon-pmcollect pm-enable ont-pmcollect enable
+configure generic-pon olt-ont-lock prev-key Fiber-x@2030 curr-key KZ5dRYTBNXSE new-key ""
+configure dhcp-server start-addr 0.0.0.0 stop-addr 0.0.0.0 restart
+configure mcast-control mcast-svc-context Default
+#
+
+typ:devops

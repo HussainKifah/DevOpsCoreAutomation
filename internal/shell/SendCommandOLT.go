@@ -34,7 +34,7 @@ func NkSendCommandOLT(host, user, pass string, cmds ...string) (string, error) {
 		options.WithPromptPattern(regexp.MustCompile(`(?m)(>#)\s*$`)),
 		options.WithTransportType(transport.StandardTransport),
 		options.WithSSHConfigFile(""),
-		options.WithTimeoutOps(90*time.Minute),
+		options.WithTimeoutOps(120*time.Minute),
 		options.WithTermWidth(511),
 	)
 	if err != nil {

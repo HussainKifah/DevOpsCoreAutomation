@@ -61,12 +61,16 @@ func (s *Scheduler) Start() {
 
 	// Run ll jobs immediately in background without blocking
 	// go func() {
-	// log.Println("[startup] running all jobs immediately")
-	// 	// 	s.runHealthScan()
-	// 	// 	s.runPowerScan()
-	// s.runDescScan()
-	// 	// 	s.runPortScan()
-	// 	// 	s.runBackup()
+	// 	log.Println("[startup] running all jobs immediately")
+	// 	s.runHealthScan()
+	// 	s.runPowerScan()
+	// 	s.runHealthScan()
+	// 	s.runDescScan()
+	// 	s.runHealthScan()
+	// 	s.runPortScan()
+	// 	s.runHealthScan()
+	// 	s.runBackup()
+	// 	s.runHealthScan()
 	// 	log.Println("[startup] initial scan complete")
 	// }()
 }
