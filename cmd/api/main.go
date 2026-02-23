@@ -2,6 +2,8 @@ package main
 
 import (
 	"log"
+	"path/filepath"
+	"runtime"
 
 	"github.com/Flafl/DevOpsCore/config"
 	"github.com/Flafl/DevOpsCore/db"
@@ -17,12 +19,14 @@ func main() {
 
 	database := db.Connect(cfg)
 
-	powerRepo := repository.NewPowerRepo(database)
-	descRepo := repository.NewDescriptionRepo(database)
-	healthRepo := repository.NewHealthRepo(database)
+	powerRepo := repository.NewPowerRepository(database)
+	descRepo := repository.NewDescriptionRepository(database)
+	healthRepo := repository.NewHealthRepository(database)
 	portRepo := repository.NewPortProtectionRepo(database)
+	backupRepo := repository.NewBackupRepository(database)
+	userRepo := repository.NewUserRepository(database)
 
-	sched := scheduler.New(cfg, powerRepo, descRepo, healthRepo, portRepo)
+	sched := scheduler.New(cfg, powerRepo, descRepo, healthRepo, portRepo, backupRepo)
 	sched.Start()
 
 	server := gin.Default()
@@ -31,8 +35,14 @@ func main() {
 	descH := handlers.NewDescriptionHandler(descRepo)
 	healthH := handlers.NewHealthHandler(healthRepo)
 	portH := handlers.NewPortHandler(portRepo)
+	backupH := handlers.NewBackupHandler(backupRepo)
+	userH := handlers.NewUserHandler(userRepo)
 
-	router.Setup(server, powerH, descH, healthH, portH)
+	_, thisFile, _, _ := runtime.Caller(0)
+	projectRoot := filepath.Join(filepath.Dir(thisFile), "..", "..")
+	pageH := handlers.NewPageHandler(filepath.Join(projectRoot, "templates"))
+
+	router.Setup(server, powerH, descH, healthH, portH, backupH, userH, pageH)
 
 	log.Printf("server starting on :%s", cfg.ServerPort)
 	if err := server.Run(":" + cfg.ServerPort); err != nil {
