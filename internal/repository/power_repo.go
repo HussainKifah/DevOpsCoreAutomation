@@ -80,22 +80,16 @@ func (r *powerRepository) GetAll() ([]models.PowerReading, error) {
 }
 
 func (r *powerRepository) GetPaginated(page, perPage int, device, search string) (*PaginatedReadings, error) {
-	join := "LEFT JOIN ont_descriptions ON power_readings.ont_idx = ont_descriptions.ont_idx AND power_readings.host = ont_descriptions.host"
+	descJoin := "LEFT JOIN ont_descriptions ON power_readings.ont_idx = ont_descriptions.ont_idx AND power_readings.host = ont_descriptions.host AND ont_descriptions.deleted_at IS NULL"
 
-	countQ := r.DB.Table("power_readings").Joins(join)
-	dataQ := r.DB.Table("power_readings").
-		Select("power_readings.id, power_readings.device, power_readings.site, power_readings.host, power_readings.ont_idx, power_readings.olt_rx, power_readings.measured_at, COALESCE(ont_descriptions.desc1, '') as desc1, COALESCE(ont_descriptions.desc2, '') as desc2").
-		Joins(join)
-
+	// Count query — Model() handles soft delete automatically
+	countQ := r.DB.Model(&models.PowerReading{}).Joins(descJoin)
 	if device != "" {
 		countQ = countQ.Where("power_readings.device = ?", device)
-		dataQ = dataQ.Where("power_readings.device = ?", device)
 	}
 	if search != "" {
 		pattern := "%" + search + "%"
-		cond := "power_readings.ont_idx ILIKE ? OR ont_descriptions.desc1 ILIKE ? OR ont_descriptions.desc2 ILIKE ?"
-		countQ = countQ.Where(cond, pattern, pattern, pattern)
-		dataQ = dataQ.Where(cond, pattern, pattern, pattern)
+		countQ = countQ.Where("power_readings.ont_idx ILIKE ? OR ont_descriptions.desc1 ILIKE ? OR ont_descriptions.desc2 ILIKE ?", pattern, pattern, pattern)
 	}
 
 	var total int64
@@ -106,6 +100,18 @@ func (r *powerRepository) GetPaginated(page, perPage int, device, search string)
 	totalPages := int((total + int64(perPage) - 1) / int64(perPage))
 	if page > totalPages && totalPages > 0 {
 		page = totalPages
+	}
+
+	// Data query — separate fresh query to avoid shared state with Count
+	dataQ := r.DB.Model(&models.PowerReading{}).
+		Select("power_readings.id, power_readings.device, power_readings.site, power_readings.host, power_readings.ont_idx, power_readings.olt_rx, power_readings.measured_at, COALESCE(ont_descriptions.desc1, '') as desc1, COALESCE(ont_descriptions.desc2, '') as desc2").
+		Joins(descJoin)
+	if device != "" {
+		dataQ = dataQ.Where("power_readings.device = ?", device)
+	}
+	if search != "" {
+		pattern := "%" + search + "%"
+		dataQ = dataQ.Where("power_readings.ont_idx ILIKE ? OR ont_descriptions.desc1 ILIKE ? OR ont_descriptions.desc2 ILIKE ?", pattern, pattern, pattern)
 	}
 
 	var data []PowerReadingWithDesc
