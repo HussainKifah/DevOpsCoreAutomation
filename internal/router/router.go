@@ -4,12 +4,14 @@ import (
 	auth "github.com/Flafl/DevOpsCore/internal/Auth"
 	"github.com/Flafl/DevOpsCore/internal/handlers"
 	"github.com/Flafl/DevOpsCore/internal/middleware"
+	websocket "github.com/Flafl/DevOpsCore/internal/webSocket"
 	"github.com/gin-gonic/gin"
 )
 
 func Setup(
 	r *gin.Engine,
 	jwtManager *auth.JWTManager,
+	hub *websocket.Hub,
 	powerH *handlers.PowerHandler,
 	descH *handlers.DescriptionHandler,
 	healthH *handlers.HealthHandler,
@@ -19,6 +21,9 @@ func Setup(
 	authH *handlers.AuthHandler,
 	pageH *handlers.PageHandler,
 ) {
+	// WebSocket endpoint (auth inside handler)
+	r.GET("/ws", websocket.ServerWs(hub, jwtManager))
+
 	// Public routes
 	r.GET("/login", pageH.Login)
 

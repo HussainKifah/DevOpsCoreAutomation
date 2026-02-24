@@ -18,6 +18,7 @@ import (
 	"github.com/Flafl/DevOpsCore/internal/repository"
 	"github.com/Flafl/DevOpsCore/internal/router"
 	"github.com/Flafl/DevOpsCore/internal/scheduler"
+	websocket "github.com/Flafl/DevOpsCore/internal/webSocket"
 	"github.com/gin-gonic/gin"
 )
 
@@ -40,7 +41,10 @@ func main() {
 		Issuer:               "devopscore",
 	})
 
-	sched := scheduler.New(cfg, powerRepo, descRepo, healthRepo, portRepo, backupRepo)
+	hub := websocket.NewHub()
+	go hub.Run()
+
+	sched := scheduler.New(cfg, hub, powerRepo, descRepo, healthRepo, portRepo, backupRepo)
 	sched.Start()
 
 	server := gin.Default()
@@ -59,7 +63,7 @@ func main() {
 
 	pageH := handlers.NewPageHandler(filepath.Join(projectRoot, "templates"))
 
-	router.Setup(server, jwtManager, powerH, descH, healthH, portH, backupH, userH, authH, pageH)
+	router.Setup(server, jwtManager, hub, powerH, descH, healthH, portH, backupH, userH, authH, pageH)
 
 	// Graceful shutdown
 	srv := &http.Server{

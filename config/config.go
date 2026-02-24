@@ -52,9 +52,9 @@ func Load() *Config {
 		OLTPass: getEnv("OLT_SSH_PASS", ""),
 
 		PowerScanInterval:  parseDuration(getEnv("POWER_SCAN_INTERVAL", "6h")),
-		HealthScanInterval: parseDuration(getEnv("HEALTH_SCAN_INTERVAL", "1h")),
+		HealthScanInterval: parseDuration(getEnv("HEALTH_SCAN_INTERVAL", "0.5h")),
 		DescScanInterval:   parseDuration(getEnv("DESC_SCAN_INTERVAL", "6h")),
-		PortScanInterval:   parseDuration(getEnv("PORT_SCAN_INTERVAL", "2h")),
+		PortScanInterval:   parseDuration(getEnv("PORT_SCAN_INTERVAL", "0.5h")),
 		BackupInterval:     parseDuration(getEnv("BACKUP_INTERVAL", "24h")),
 	}
 }

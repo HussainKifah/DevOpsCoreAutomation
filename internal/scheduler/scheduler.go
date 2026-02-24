@@ -14,11 +14,13 @@ import (
 	"github.com/Flafl/DevOpsCore/internal/models"
 	"github.com/Flafl/DevOpsCore/internal/repository"
 	"github.com/Flafl/DevOpsCore/internal/shell"
+	websocket "github.com/Flafl/DevOpsCore/internal/webSocket"
 	"github.com/go-co-op/gocron/v2"
 )
 
 type Scheduler struct {
 	cfg        *config.Config
+	hub        *websocket.Hub
 	powerRepo  repository.PowerRepository
 	descRepo   repository.DescriptionRepository
 	healthRepo repository.HealthRepository
@@ -28,6 +30,7 @@ type Scheduler struct {
 
 func New(
 	cfg *config.Config,
+	hub *websocket.Hub,
 	pr repository.PowerRepository,
 	dr repository.DescriptionRepository,
 	hr repository.HealthRepository,
@@ -36,6 +39,7 @@ func New(
 ) *Scheduler {
 	return &Scheduler{
 		cfg:        cfg,
+		hub:        hub,
 		powerRepo:  pr,
 		descRepo:   dr,
 		healthRepo: hr,
@@ -119,6 +123,7 @@ func (s *Scheduler) runPowerScan() {
 			log.Printf("[job] power-scan: insert %s: %v", r.Host, err)
 		}
 	}
+	s.notify("power_update")
 	log.Println("[job] power-scan: done")
 }
 
@@ -154,6 +159,7 @@ func (s *Scheduler) runDescScan() {
 			log.Printf("[job] desc-scan: insert %s: %v", r.Host, err)
 		}
 	}
+	s.notify("desc_update")
 	log.Println("[job] desc-scan: done")
 }
 
@@ -196,6 +202,7 @@ func (s *Scheduler) runHealthScan() {
 			log.Printf("[job] health-scan: upsert %s: %v", r.Host, err)
 		}
 	}
+	s.notify("health_update")
 	log.Println("[job] health-scan: done")
 }
 
@@ -234,6 +241,7 @@ func (s *Scheduler) runPortScan() {
 			}
 		}
 	}
+	s.notify("port_update")
 	log.Println("[job] port-scan: done")
 }
 
@@ -281,5 +289,15 @@ func (s *Scheduler) runBackup() {
 			log.Printf("[job] backup: db %s: %v", r.Host, err)
 		}
 	}
+	s.notify("backup_update")
 	log.Println("[job] backup: done")
+}
+
+// --- notify ---
+
+func (s *Scheduler) notify(eventType string) {
+	msg, _ := json.Marshal(map[string]string{
+		"type": eventType,
+	})
+	s.hub.Broadcast(msg)
 }
