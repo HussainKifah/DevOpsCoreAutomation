@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-
-	"github.com/joho/godotenv"
 )
 
 type OLT struct {
@@ -19,8 +17,6 @@ type OLT struct {
 type OLTs []OLT
 
 func OLTsData() (nokia OLTs, huawei OLTs) {
-	_ = godotenv.Load("../.env")
-
 	res, err := http.Get(os.Getenv("OLTS_API_ENV"))
 	if err != nil {
 		panic(err)

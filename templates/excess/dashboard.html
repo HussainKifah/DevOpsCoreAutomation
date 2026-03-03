@@ -1,6 +1,492 @@
 {{define "content"}}
 <div x-data="dashboardPage()" x-init="init()">
-  <h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold">Dashboard</h1>
+    <button
+      @click="calOpen = !calOpen; if(calOpen) loadCalendar()"
+      class="relative p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-sm"
+      title="History Calendar"
+    >
+      <svg
+        class="w-5 h-5 text-gray-600 dark:text-gray-400"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z"
+        />
+      </svg>
+    </button>
+  </div>
+
+  <!-- Calendar backdrop -->
+  <div
+    x-show="calOpen"
+    @click="calOpen = false"
+    x-transition:enter="transition ease-out duration-200"
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100"
+    x-transition:leave="transition ease-in duration-150"
+    x-transition:leave-start="opacity-100"
+    x-transition:leave-end="opacity-0"
+    class="fixed inset-0 bg-black/30 z-40"
+    x-cloak
+  ></div>
+
+  <!-- Calendar slide-over panel -->
+  <div
+    x-show="calOpen"
+    x-transition:enter="transition ease-out duration-300 transform"
+    x-transition:enter-start="translate-x-full"
+    x-transition:enter-end="translate-x-0"
+    x-transition:leave="transition ease-in duration-200 transform"
+    x-transition:leave-start="translate-x-0"
+    x-transition:leave-end="translate-x-full"
+    class="fixed inset-y-0 right-0 w-[420px] max-w-full z-50 bg-white dark:bg-gray-900 shadow-2xl border-l border-gray-200 dark:border-gray-800 flex flex-col"
+    x-cloak
+  >
+    <!-- Header -->
+    <div
+      class="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800"
+    >
+      <div class="flex items-center gap-2.5">
+        <svg
+          class="w-5 h-5 text-blue-600 dark:text-blue-400"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"
+          />
+        </svg>
+        <h2 class="text-base font-semibold">History Calendar</h2>
+      </div>
+      <button
+        @click="calOpen = false"
+        class="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+      >
+        <svg
+          class="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M6 18L18 6M6 6l12 12"
+          />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Month navigation -->
+    <div class="flex items-center justify-between px-5 py-3">
+      <button
+        @click="calPrevMonth()"
+        class="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+      >
+        <svg
+          class="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M15.75 19.5L8.25 12l7.5-7.5"
+          />
+        </svg>
+      </button>
+      <span class="text-sm font-semibold" x-text="calMonthLabel"></span>
+      <button
+        @click="calNextMonth()"
+        class="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+      >
+        <svg
+          class="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M8.25 4.5l7.5 7.5-7.5 7.5"
+          />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Weekday headers -->
+    <div class="grid grid-cols-7 px-5 pb-1">
+      <template
+        x-for="wd in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']"
+        :key="wd"
+      >
+        <div
+          class="text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 py-1"
+          x-text="wd"
+        ></div>
+      </template>
+    </div>
+
+    <!-- Calendar grid -->
+    <div class="grid grid-cols-7 gap-1 px-5 pb-3">
+      <template x-for="cell in calCells" :key="cell.key">
+        <button
+          :disabled="!cell.day"
+          @click="cell.day && selectCalDay(cell.dateStr)"
+          class="aspect-square rounded-lg text-xs flex flex-col items-center justify-center relative transition-all"
+          :class="{
+            'hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer': cell.day,
+            'cursor-default': !cell.day,
+            'bg-blue-600 text-white hover:bg-blue-700 dark:hover:bg-blue-700 shadow-sm': cell.isSelected,
+            'ring-2 ring-blue-400 ring-offset-1 dark:ring-offset-gray-900': cell.isToday && !cell.isSelected,
+            'text-gray-800 dark:text-gray-200': cell.day && !cell.isSelected,
+          }"
+        >
+          <span class="font-medium leading-none" x-text="cell.day || ''"></span>
+          <div
+            class="flex gap-0.5 mt-0.5"
+            x-show="cell.hasHealth || cell.hasPorts"
+          >
+            <span
+              x-show="cell.hasHealth"
+              class="w-1.5 h-1.5 rounded-full"
+              :class="cell.isSelected ? 'bg-blue-200' : 'bg-blue-500'"
+            ></span>
+            <span
+              x-show="cell.hasPorts"
+              class="w-1.5 h-1.5 rounded-full"
+              :class="cell.isSelected ? 'bg-red-300' : 'bg-red-500'"
+            ></span>
+          </div>
+        </button>
+      </template>
+    </div>
+
+    <!-- Legend -->
+    <div
+      class="flex items-center justify-center gap-5 px-5 py-2 border-t border-gray-100 dark:border-gray-800"
+    >
+      <div class="flex items-center gap-1.5 text-xs text-gray-500">
+        <span class="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>
+        Health
+      </div>
+      <div class="flex items-center gap-1.5 text-xs text-gray-500">
+        <span class="w-2 h-2 rounded-full bg-red-500 inline-block"></span> Port
+        Down
+      </div>
+      <div class="flex items-center gap-1.5 text-xs text-gray-500">
+        <span
+          class="w-2 h-2 rounded-full ring-2 ring-blue-400 inline-block"
+        ></span>
+        Today
+      </div>
+    </div>
+
+    <!-- Day detail (scrollable) -->
+    <div
+      class="flex-1 overflow-y-auto border-t border-gray-200 dark:border-gray-800"
+    >
+      <!-- No day selected -->
+      <template x-if="!calSelectedDate">
+        <div
+          class="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-600 px-8 text-center"
+        >
+          <svg
+            class="w-10 h-10 mb-3 opacity-40"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"
+            />
+          </svg>
+          <p class="text-sm">Select a day to view readings</p>
+        </div>
+      </template>
+
+      <!-- Day selected -->
+      <template x-if="calSelectedDate">
+        <div class="px-5 py-4">
+          <h3
+            class="text-sm font-semibold mb-4"
+            x-text="calSelectedDateLabel"
+          ></h3>
+
+          <!-- Loading -->
+          <template x-if="calDayLoading">
+            <div class="flex items-center justify-center py-8">
+              <div
+                class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"
+              ></div>
+              <span class="ml-2 text-gray-400 text-xs">Loading...</span>
+            </div>
+          </template>
+
+          <template x-if="!calDayLoading">
+            <div>
+              <!-- 3-level accordion: Time → Host → Readings -->
+              <template x-if="calTimeGroups.length > 0">
+                <div class="space-y-1.5">
+                  <template x-for="grp in calTimeGroups" :key="grp.key">
+                    <div
+                      class="text-xs rounded-lg border overflow-hidden"
+                      :class="grp.type === 'health' ? 'border-blue-100 dark:border-blue-900/40' : 'border-red-100 dark:border-red-900/40'"
+                    >
+                      <!-- Level 1: Time group -->
+                      <button
+                        @click="calExpandedGroup === grp.key ? (calExpandedGroup = null, calExpandedHost = null) : (calExpandedGroup = grp.key, calExpandedHost = null)"
+                        class="w-full flex items-center gap-2 px-3 py-2.5 text-left transition-colors"
+                        :class="grp.type === 'health'
+                          ? 'bg-blue-50 hover:bg-blue-100/70 dark:bg-blue-950/30 dark:hover:bg-blue-950/50'
+                          : 'bg-red-50 hover:bg-red-100/70 dark:bg-red-950/30 dark:hover:bg-red-950/50'"
+                      >
+                        <span
+                          class="w-2 h-2 rounded-full shrink-0"
+                          :class="grp.type === 'health' ? 'bg-blue-500' : 'bg-red-500'"
+                        ></span>
+                        <span
+                          class="font-semibold uppercase tracking-wider text-[10px] w-14 shrink-0"
+                          :class="grp.type === 'health' ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'"
+                          x-text="grp.label"
+                        ></span>
+                        <span
+                          class="font-mono font-semibold text-gray-700 dark:text-gray-300 shrink-0"
+                          x-text="grp.time"
+                        ></span>
+                        <span
+                          class="text-gray-400 ml-auto text-[10px] shrink-0"
+                          x-text="grp.hosts.length + ' OLT' + (grp.hosts.length !== 1 ? 's' : '')"
+                        ></span>
+                        <svg
+                          class="w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform duration-200"
+                          :class="calExpandedGroup === grp.key && 'rotate-180'"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                          />
+                        </svg>
+                      </button>
+                      <!-- Level 2: Hosts list -->
+                      <div
+                        x-show="calExpandedGroup === grp.key"
+                        x-transition
+                        x-cloak
+                        class="border-t"
+                        :class="grp.type === 'health' ? 'border-blue-100 dark:border-blue-900/40' : 'border-red-100 dark:border-red-900/40'"
+                      >
+                        <template x-for="h in grp.hosts" :key="h.uid">
+                          <div
+                            class="border-b last:border-b-0 border-gray-100 dark:border-gray-800"
+                          >
+                            <button
+                              @click="calExpandedHost === h.uid ? (calExpandedHost = null) : (calExpandedHost = h.uid)"
+                              class="w-full flex flex-col gap-0.5 px-4 py-2 text-left transition-colors"
+                              :class="grp.type === 'port' && h.ports && h.ports.some(function(p){ return p.port_state === 'act-down'; })
+                                ? 'bg-red-50 hover:bg-red-100/60 dark:bg-red-950/20 dark:hover:bg-red-950/30'
+                                : 'hover:bg-gray-50 dark:hover:bg-gray-800/40'"
+                            >
+                              <div class="flex items-center gap-2 w-full">
+                                <svg
+                                  class="w-3 h-3 shrink-0 transition-transform duration-200"
+                                  :class="[calExpandedHost === h.uid && 'rotate-90', grp.type === 'port' && h.ports && h.ports.some(function(p){ return p.port_state === 'act-down'; }) ? 'text-red-400' : 'text-gray-400']"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M8.25 4.5l7.5 7.5-7.5 7.5"
+                                  />
+                                </svg>
+                                <span
+                                  class="font-medium text-xs"
+                                  :class="grp.type === 'port' && h.ports && h.ports.some(function(p){ return p.port_state === 'act-down'; }) ? 'text-red-700 dark:text-red-400' : 'text-gray-700 dark:text-gray-200'"
+                                  x-text="h.device"
+                                ></span>
+                              </div>
+                              <div class="flex items-center gap-2 pl-5">
+                                <span
+                                  class="text-gray-400 font-mono text-[10px]"
+                                  x-text="h.host"
+                                ></span>
+                                <template
+                                  x-if="grp.type === 'port' && h.ports && h.ports.filter(function(p){ return p.port_state === 'act-down'; }).length > 0"
+                                >
+                                  <span
+                                    class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-200 text-red-800 dark:bg-red-900/50 dark:text-red-300"
+                                    x-text="h.ports.filter(function(p){ return p.port_state === 'act-down'; }).length + ' act-down'"
+                                  ></span>
+                                </template>
+                              </div>
+                            </button>
+                            <!-- Level 3: Readings -->
+                            <div
+                              x-show="calExpandedHost === h.uid"
+                              x-transition
+                              x-cloak
+                            >
+                              <template x-if="grp.type === 'health'">
+                                <div
+                                  class="px-5 py-2.5 space-y-2 bg-gray-50/50 dark:bg-gray-900/40"
+                                >
+                                  <template
+                                    x-if="h.data.cpu_loads && h.data.cpu_loads.length > 0"
+                                  >
+                                    <div>
+                                      <span
+                                        class="text-[10px] font-semibold uppercase text-gray-400"
+                                        >CPU Load</span
+                                      >
+                                      <div class="mt-1 space-y-1">
+                                        <template
+                                          x-for="c in h.data.cpu_loads"
+                                          :key="c.slot"
+                                        >
+                                          <div class="flex items-center gap-2">
+                                            <span
+                                              class="text-gray-500 w-20 shrink-0"
+                                              x-text="c.slot"
+                                            ></span>
+                                            <div
+                                              class="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden"
+                                            >
+                                              <div
+                                                class="h-full rounded-full transition-all"
+                                                :class="c.average_pct > 80 ? 'bg-red-500' : c.average_pct > 60 ? 'bg-yellow-500' : 'bg-green-500'"
+                                                :style="'width:' + Math.min(100, c.average_pct) + '%'"
+                                              ></div>
+                                            </div>
+                                            <span
+                                              class="font-mono font-semibold w-10 text-right"
+                                              :class="c.average_pct > 80 ? 'text-red-600' : c.average_pct > 60 ? 'text-yellow-600' : 'text-green-600'"
+                                              x-text="c.average_pct + '%'"
+                                            ></span>
+                                          </div>
+                                        </template>
+                                      </div>
+                                    </div>
+                                  </template>
+                                  <template
+                                    x-if="h.data.temperatures && h.data.temperatures.length > 0"
+                                  >
+                                    <div>
+                                      <span
+                                        class="text-[10px] font-semibold uppercase text-gray-400"
+                                        >Temperature</span
+                                      >
+                                      <div class="flex flex-wrap gap-3 mt-1">
+                                        <template
+                                          x-for="(t, ti) in (h.data.temperatures || [])"
+                                          :key="ti"
+                                        >
+                                          <div
+                                            class="flex items-center gap-1.5 px-2 py-1 rounded-md"
+                                            :class="t.act_temp > 65 ? 'bg-red-100 dark:bg-red-900/30' : t.act_temp > 50 ? 'bg-orange-100 dark:bg-orange-900/20' : 'bg-green-100 dark:bg-green-900/20'"
+                                          >
+                                            <span
+                                              class="text-gray-500"
+                                              x-text="t.slot"
+                                            ></span>
+                                            <span
+                                              class="font-mono font-bold"
+                                              :class="t.act_temp > 65 ? 'text-red-600' : t.act_temp > 50 ? 'text-orange-500' : 'text-green-600'"
+                                              x-text="t.act_temp + '\u00B0C'"
+                                            ></span>
+                                          </div>
+                                        </template>
+                                      </div>
+                                    </div>
+                                  </template>
+                                  <template
+                                    x-if="(!h.data.cpu_loads || h.data.cpu_loads.length === 0) && (!h.data.temperatures || h.data.temperatures.length === 0)"
+                                  >
+                                    <p class="text-gray-400 italic">
+                                      No CPU or temperature data
+                                    </p>
+                                  </template>
+                                </div>
+                              </template>
+                              <template x-if="grp.type === 'port'">
+                                <div
+                                  class="px-5 py-2.5 bg-gray-50/50 dark:bg-gray-900/40"
+                                >
+                                  <span
+                                    class="text-[10px] font-semibold uppercase text-gray-400 block mb-1"
+                                    >Down Ports (<span
+                                      x-text="h.ports.length"
+                                    ></span
+                                    >)</span
+                                  >
+                                  <div class="flex flex-wrap gap-1.5">
+                                    <template x-for="p in h.ports" :key="p.id">
+                                      <span
+                                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border"
+                                        :class="p.port_state === 'act-down' ? 'bg-red-100 border-red-200 text-red-700 dark:bg-red-900/30 dark:border-red-800 dark:text-red-400' : 'bg-gray-100 border-gray-200 text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400'"
+                                      >
+                                        <span
+                                          class="font-mono"
+                                          x-text="p.port"
+                                        ></span>
+                                        <span
+                                          class="text-[9px]"
+                                          x-text="p.port_state"
+                                        ></span>
+                                      </span>
+                                    </template>
+                                  </div>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+
+              <!-- No data -->
+              <template x-if="calTimeGroups.length === 0">
+                <div class="text-center py-8">
+                  <p class="text-gray-400 dark:text-gray-600 text-sm">
+                    No readings recorded on this day
+                  </p>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </template>
+    </div>
+  </div>
 
   <!-- Tab headers -->
   <div class="flex border-b border-gray-200 dark:border-gray-700 mb-6">
@@ -25,12 +511,41 @@
     >
       Port Protection
     </button>
+    <button
+      @click="tab = 'inventory'; $nextTick(() => renderInventoryCharts())"
+      :class="tab === 'inventory' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+      class="px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors"
+    >
+      Inventory
+    </button>
+  </div>
+
+  <!-- Action buttons for current tab -->
+  <div class="flex items-center gap-2 mb-4" x-show="!loading" x-cloak>
+    <button
+      @click="exportExcel()"
+      class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+    >
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+      Export Excel
+    </button>
+    <button
+      @click="runScanNow()"
+      :disabled="scanRunning"
+      class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-blue-500 bg-blue-500 text-white hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      <svg x-show="!scanRunning" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"/></svg>
+      <svg x-show="scanRunning" class="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 019.95 9" stroke-linecap="round"/></svg>
+      <span x-text="scanRunning ? 'Scanning...' : 'Run Scan Now'"></span>
+    </button>
   </div>
 
   <!-- Loading -->
   <template x-if="loading">
     <div class="flex items-center justify-center py-20">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      <div
+        class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"
+      ></div>
       <span class="ml-3 text-gray-500">Loading data...</span>
     </div>
   </template>
@@ -38,72 +553,137 @@
   <!-- ==================== HEALTH TAB ==================== -->
   <div x-show="tab === 'health' && !loading" x-cloak>
     <template x-if="healthData.length === 0 && !loading">
-      <p class="text-gray-500 text-center py-10">No health data available yet.</p>
+      <p class="text-gray-500 text-center py-10">
+        No health data available yet.
+      </p>
     </template>
 
     <template x-if="healthData.length > 0">
       <div>
         <!-- OLT navigation -->
         <div class="flex items-center justify-between mb-6">
-          <button @click="healthIdx = (healthIdx - 1 + healthData.length) % healthData.length"
-            class="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
+          <button
+            @click="healthIdx = (healthIdx - 1 + healthData.length) % healthData.length"
+            class="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm"
+          >
+            <svg
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M15.75 19.5L8.25 12l7.5-7.5"
+              />
+            </svg>
             Previous
           </button>
           <div class="text-center">
             <p class="text-sm font-semibold" x-text="currentHealth.device"></p>
-            <p class="text-xs text-gray-500" x-text="currentHealth.host + ' \u00B7 ' + currentHealth.site"></p>
-            <p class="text-xs text-gray-400 mt-0.5" x-text="(healthIdx + 1) + ' of ' + healthData.length + ' OLTs'"></p>
+            <p
+              class="text-xs text-gray-500"
+              x-text="currentHealth.host + ' \u00B7 ' + currentHealth.site"
+            ></p>
+            <p
+              class="text-xs text-gray-400 mt-0.5"
+              x-text="(healthIdx + 1) + ' of ' + healthData.length + ' OLTs'"
+            ></p>
           </div>
-          <button @click="healthIdx = (healthIdx + 1) % healthData.length"
-            class="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm">
+          <button
+            @click="healthIdx = (healthIdx + 1) % healthData.length"
+            class="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm"
+          >
             Next
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+            <svg
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M8.25 4.5l7.5 7.5-7.5 7.5"
+              />
+            </svg>
           </button>
         </div>
 
         <!-- OLT selector pills -->
         <div class="flex flex-wrap gap-2 mb-6">
           <template x-for="(h, i) in healthData" :key="h.host">
-            <button @click="healthIdx = i"
+            <button
+              @click="healthIdx = i"
               :class="healthIdx === i ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:border-blue-400'"
               class="px-3 py-1.5 text-xs font-medium rounded-full border transition-colors"
-              x-text="h.device">
-            </button>
+              x-text="h.device"
+            ></button>
           </template>
         </div>
 
         <!-- Health card for current OLT -->
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+        <div
+          class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6"
+        >
           <div class="flex items-center justify-between mb-6">
             <div>
-              <h3 class="text-lg font-semibold" x-text="currentHealth.device"></h3>
-              <p class="text-sm text-gray-500" x-text="currentHealth.host + ' \u00B7 ' + currentHealth.site"></p>
+              <h3
+                class="text-lg font-semibold"
+                x-text="currentHealth.device"
+              ></h3>
+              <p
+                class="text-sm text-gray-500"
+                x-text="currentHealth.host + ' \u00B7 ' + currentHealth.site"
+              ></p>
             </div>
-            <span class="text-xs px-3 py-1.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 font-medium">Online</span>
+            <span
+              class="text-xs px-3 py-1.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 font-medium"
+              >Online</span
+            >
           </div>
 
           <!-- Uptime -->
           <div class="mb-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-            <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Uptime</span>
-            <p class="text-lg font-mono mt-1" x-text="currentHealth.uptime || 'N/A'"></p>
+            <span
+              class="text-xs font-medium text-gray-500 uppercase tracking-wide"
+              >Uptime</span
+            >
+            <p
+              class="text-lg font-mono mt-1"
+              x-text="currentHealth.uptime || 'N/A'"
+            ></p>
           </div>
 
-          <!-- CPU Loads -->
+          <!-- CPU Loads - Radial ring gauge -->
           <div class="mb-6">
             <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">CPU Load</h4>
-            <div class="space-y-3">
+            <div class="flex flex-wrap gap-5">
               <template x-for="(cpu, i) in (currentHealth.cpu_loads || [])" :key="i">
-                <div>
-                  <div class="flex justify-between text-xs mb-1">
-                    <span class="font-medium" x-text="cpu.slot"></span>
-                    <span class="font-mono" x-text="cpu.average_pct + '%'"></span>
+                <div class="flex flex-col items-center">
+                  <div class="relative w-16 h-16">
+                    <svg class="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
+                      <circle cx="32" cy="32" r="27" fill="none" stroke-width="5"
+                        class="stroke-gray-200 dark:stroke-gray-700"
+                      />
+                      <circle cx="32" cy="32" r="27" fill="none" stroke-width="5"
+                        stroke-linecap="round"
+                        :stroke="cpu.average_pct > 80 ? '#ef4444' : cpu.average_pct > 60 ? '#eab308' : '#22c55e'"
+                        :stroke-dasharray="(Math.min(100, cpu.average_pct) / 100 * 169.6) + ' 169.6'"
+                        class="transition-all duration-700"
+                      />
+                    </svg>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                      <span class="text-sm font-bold font-mono"
+                        :class="cpu.average_pct > 80 ? 'text-red-500' : cpu.average_pct > 60 ? 'text-yellow-500' : 'text-green-500'"
+                        x-text="cpu.average_pct + '%'"
+                      ></span>
+                    </div>
                   </div>
-                  <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                    <div class="h-full rounded-full transition-all duration-500"
-                      :class="getCpuColor(cpu.average_pct)"
-                      :style="'width:' + Math.min(100, cpu.average_pct) + '%'"></div>
-                  </div>
+                  <span class="text-[10px] text-gray-500 mt-1.5 font-medium truncate max-w-[80px] text-center" x-text="cpu.slot"></span>
                 </div>
               </template>
             </div>
@@ -111,41 +691,66 @@
 
           <!-- Temperatures - Thermometer style -->
           <div>
-            <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-4">Temperature</h4>
+            <h4
+              class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-4"
+            >
+              Temperature
+            </h4>
             <div class="flex flex-wrap gap-6">
-              <template x-for="(t, i) in (currentHealth.temperatures || [])" :key="i">
+              <template
+                x-for="(t, i) in (currentHealth.temperatures || [])"
+                :key="i"
+              >
                 <div class="flex flex-col items-center">
                   <!-- Thermometer -->
                   <div class="relative w-10 flex flex-col items-center">
                     <!-- Temperature value on top -->
-                    <span class="text-sm font-bold mb-2"
+                    <span
+                      class="text-sm font-bold mb-2"
                       :class="t.act_temp > 65 ? 'text-red-600 dark:text-red-400' : t.act_temp > 50 ? 'text-orange-500' : 'text-green-600 dark:text-green-400'"
-                      x-text="t.act_temp + '\u00B0'"></span>
+                      x-text="t.act_temp + '\u00B0'"
+                    ></span>
                     <!-- Thermometer body -->
-                    <div class="relative w-5 h-28 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden border-2"
-                      :class="t.act_temp > 65 ? 'border-red-400' : t.act_temp > 50 ? 'border-orange-400' : 'border-green-400'">
+                    <div
+                      class="relative w-5 h-28 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden border-2"
+                      :class="t.act_temp > 65 ? 'border-red-400' : t.act_temp > 50 ? 'border-orange-400' : 'border-green-400'"
+                    >
                       <!-- Scale marks -->
-                      <div class="absolute inset-x-0 top-[14%] border-t border-gray-300 dark:border-gray-600 opacity-40"></div>
-                      <div class="absolute inset-x-0 top-[43%] border-t border-gray-300 dark:border-gray-600 opacity-40"></div>
-                      <div class="absolute inset-x-0 top-[71%] border-t border-gray-300 dark:border-gray-600 opacity-40"></div>
+                      <div
+                        class="absolute inset-x-0 top-[14%] border-t border-gray-300 dark:border-gray-600 opacity-40"
+                      ></div>
+                      <div
+                        class="absolute inset-x-0 top-[43%] border-t border-gray-300 dark:border-gray-600 opacity-40"
+                      ></div>
+                      <div
+                        class="absolute inset-x-0 top-[71%] border-t border-gray-300 dark:border-gray-600 opacity-40"
+                      ></div>
                       <!-- Mercury fill (from bottom) -->
-                      <div class="absolute bottom-0 inset-x-0 rounded-b-full transition-all duration-700"
+                      <div
+                        class="absolute bottom-0 inset-x-0 rounded-b-full transition-all duration-700"
                         :class="t.act_temp > 65 ? 'bg-gradient-to-t from-red-600 to-red-400' : t.act_temp > 50 ? 'bg-gradient-to-t from-orange-500 to-orange-300' : 'bg-gradient-to-t from-green-500 to-green-300'"
-                        :style="'height:' + Math.min(100, Math.max(8, (t.act_temp / 80) * 100)) + '%'">
-                      </div>
+                        :style="'height:' + Math.min(100, Math.max(8, (t.act_temp / 80) * 100)) + '%'"
+                      ></div>
                     </div>
                     <!-- Thermometer bulb -->
-                    <div class="w-8 h-8 -mt-1 rounded-full border-2 flex items-center justify-center"
-                      :class="t.act_temp > 65 ? 'bg-red-500 border-red-400' : t.act_temp > 50 ? 'bg-orange-500 border-orange-400' : 'bg-green-500 border-green-400'">
+                    <div
+                      class="w-8 h-8 -mt-1 rounded-full border-2 flex items-center justify-center"
+                      :class="t.act_temp > 65 ? 'bg-red-500 border-red-400' : t.act_temp > 50 ? 'bg-orange-500 border-orange-400' : 'bg-green-500 border-green-400'"
+                    >
                       <div class="w-4 h-4 rounded-full bg-white/30"></div>
                     </div>
                   </div>
                   <!-- Slot label -->
-                  <span class="text-xs text-gray-500 mt-2 font-medium" x-text="t.slot"></span>
+                  <span
+                    class="text-xs text-gray-500 mt-2 font-medium"
+                    x-text="t.slot"
+                  ></span>
                   <!-- Danger zone labels -->
-                  <span class="text-[10px] mt-0.5"
+                  <span
+                    class="text-[10px] mt-0.5"
                     :class="t.act_temp > 65 ? 'text-red-500 font-bold' : t.act_temp > 50 ? 'text-orange-500' : 'text-green-500'"
-                    x-text="t.act_temp > 65 ? 'CRITICAL' : t.act_temp > 50 ? 'WARM' : 'NORMAL'"></span>
+                    x-text="t.act_temp > 65 ? 'CRITICAL' : t.act_temp > 50 ? 'WARM' : 'NORMAL'"
+                  ></span>
                 </div>
               </template>
             </div>
@@ -159,48 +764,61 @@
   <div x-show="tab === 'powers' && !loading" x-cloak>
     <!-- Device filter + search -->
     <div class="flex flex-wrap gap-4 mb-4">
-      <select x-model="powerDevice" @change="powerPage = 1; fetchReadingsPage(); $nextTick(() => renderPowerChart())"
-        class="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm">
+      <select
+        x-model="powerDevice"
+        @change="powerPage = 1; fetchReadingsPage(); $nextTick(() => renderPowerChart())"
+        class="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+      >
         <option value="">All Devices</option>
         <template x-for="d in powerDevices" :key="d">
           <option :value="d" x-text="d"></option>
         </template>
       </select>
-      <input type="text" x-model.debounce.300ms="powerSearch" @input="powerPage = 1; fetchReadingsPage()"
+      <input
+        type="text"
+        x-model.debounce.300ms="powerSearch"
+        @input="powerPage = 1; fetchReadingsPage()"
         placeholder="Search ONT index or description..."
-        class="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm w-56">
+        class="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm w-56"
+      />
     </div>
 
-    <!-- Charts row -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-      <!-- Bar chart -->
-      <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-        <h3 class="text-sm font-semibold mb-3 text-gray-600 dark:text-gray-400">Weak ONTs per Device</h3>
-        <canvas id="powerChart" height="200"></canvas>
-      </div>
-      <!-- Pie chart (when device selected) -->
-      <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-        <h3 class="text-sm font-semibold mb-3 text-gray-600 dark:text-gray-400"
-          x-text="powerDevice ? 'ONT Power Distribution: ' + powerDevice : 'Select a device to see ONT breakdown'"></h3>
-        <template x-if="!powerDevice">
-          <div class="flex items-center justify-center h-48 text-gray-400 text-sm">
-            <div class="text-center">
-              <svg class="w-12 h-12 mx-auto mb-2 opacity-30" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0013.5 3v7.5z"/></svg>
-              Select a device from the dropdown
-            </div>
-          </div>
-        </template>
-        <template x-if="powerDevice">
-          <canvas id="pieChart" height="200"></canvas>
-        </template>
-      </div>
+    <!-- Charts -->
+    <div class="mb-6">
+      <template x-if="!powerDevice">
+        <div
+          class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5"
+        >
+          <h3
+            class="text-sm font-semibold mb-3 text-gray-600 dark:text-gray-400"
+          >
+            Weak ONTs per Device
+          </h3>
+          <canvas id="powerBarChart" height="120"></canvas>
+        </div>
+      </template>
+      <template x-if="powerDevice">
+        <div
+          class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 max-w-xl mx-auto"
+        >
+          <h3
+            class="text-sm font-semibold mb-3 text-gray-600 dark:text-gray-400"
+            x-text="'ONT Power Distribution: ' + powerDevice"
+          ></h3>
+          <canvas id="powerPieChart" height="210"></canvas>
+        </div>
+      </template>
     </div>
 
     <!-- Paginated table -->
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+    <div
+      class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden"
+    >
       <template x-if="tableLoading">
         <div class="flex items-center justify-center py-10">
-          <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+          <div
+            class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"
+          ></div>
           <span class="ml-2 text-gray-500 text-sm">Loading...</span>
         </div>
       </template>
@@ -210,42 +828,99 @@
             <table class="w-full text-sm">
               <thead>
                 <tr class="bg-gray-50 dark:bg-gray-800/50">
-                  <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">ONT Index</th>
-                  <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">OLT Rx (dBm)</th>
-                  <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Desc 1</th>
-                  <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Desc 2</th>
-                  <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Device</th>
-                  <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Site</th>
-                  <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Host</th>
+                  <th
+                    class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400"
+                  >
+                    ONT Index
+                  </th>
+                  <th
+                    class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400"
+                  >
+                    OLT Rx (dBm)
+                  </th>
+                  <th
+                    class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400"
+                  >
+                    Desc 1
+                  </th>
+                  <th
+                    class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400"
+                  >
+                    Desc 2
+                  </th>
+                  <th
+                    class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400"
+                  >
+                    Device
+                  </th>
+                  <th
+                    class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400"
+                  >
+                    Site
+                  </th>
+                  <th
+                    class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400"
+                  >
+                    Host
+                  </th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                 <template x-for="r in tableRows" :key="r.ID">
                   <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
-                    <td class="px-4 py-2.5 font-mono text-xs" x-text="r.ont_idx"></td>
+                    <td
+                      class="px-4 py-2.5 font-mono text-xs"
+                      x-text="r.ont_idx"
+                    ></td>
                     <td class="px-4 py-2.5">
-                      <span class="font-mono text-xs px-2 py-0.5 rounded-full"
+                      <span
+                        class="font-mono text-xs px-2 py-0.5 rounded-full"
                         :class="r.olt_rx < -24 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : r.olt_rx < -22 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'"
-                        x-text="r.olt_rx.toFixed(1)"></span>
+                        x-text="r.olt_rx.toFixed(1)"
+                      ></span>
                     </td>
-                    <td class="px-4 py-2.5 text-xs" x-text="r.desc1 || '—'"></td>
-                    <td class="px-4 py-2.5 text-xs" x-text="r.desc2 || '—'"></td>
+                    <td
+                      class="px-4 py-2.5 text-xs"
+                      x-text="r.desc1 || '—'"
+                    ></td>
+                    <td
+                      class="px-4 py-2.5 text-xs"
+                      x-text="r.desc2 || '—'"
+                    ></td>
                     <td class="px-4 py-2.5 text-xs" x-text="r.device"></td>
                     <td class="px-4 py-2.5 text-xs" x-text="r.site"></td>
-                    <td class="px-4 py-2.5 font-mono text-xs" x-text="r.host"></td>
+                    <td
+                      class="px-4 py-2.5 font-mono text-xs"
+                      x-text="r.host"
+                    ></td>
                   </tr>
                 </template>
               </tbody>
             </table>
           </div>
           <!-- Pagination controls -->
-          <div class="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-800">
-            <span class="text-sm text-gray-500" x-text="tableTotal + ' total ONTs \u00B7 Page ' + powerPage + ' of ' + tableTotalPages"></span>
+          <div
+            class="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-800"
+          >
+            <span
+              class="text-sm text-gray-500"
+              x-text="tableTotal + ' total ONTs \u00B7 Page ' + powerPage + ' of ' + tableTotalPages"
+            ></span>
             <div class="flex gap-2">
-              <button @click="powerPage = Math.max(1, powerPage - 1); fetchReadingsPage()" :disabled="powerPage <= 1"
-                class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-800">Prev</button>
-              <button @click="powerPage = Math.min(tableTotalPages, powerPage + 1); fetchReadingsPage()" :disabled="powerPage >= tableTotalPages"
-                class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-800">Next</button>
+              <button
+                @click="powerPage = Math.max(1, powerPage - 1); fetchReadingsPage()"
+                :disabled="powerPage <= 1"
+                class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                Prev
+              </button>
+              <button
+                @click="powerPage = Math.min(tableTotalPages, powerPage + 1); fetchReadingsPage()"
+                :disabled="powerPage >= tableTotalPages"
+                class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                Next
+              </button>
             </div>
           </div>
         </div>
@@ -257,8 +932,10 @@
   <div x-show="tab === 'ports' && !loading" x-cloak>
     <!-- Device filter -->
     <div class="mb-4">
-      <select x-model="portDevice"
-        class="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm">
+      <select
+        x-model="portDevice"
+        class="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+      >
         <option value="">All Devices</option>
         <template x-for="d in portDevices" :key="d">
           <option :value="d" x-text="d"></option>
@@ -273,58 +950,89 @@
     <!-- Legend -->
     <div class="flex flex-wrap gap-4 mb-4 text-xs text-gray-500">
       <div class="flex items-center gap-1.5">
-        <span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span> act-up
+        <span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span>
+        act-up
       </div>
       <div class="flex items-center gap-1.5">
-        <span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span> act-down
+        <span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span>
+        act-down
       </div>
       <div class="flex items-center gap-1.5">
-        <span class="w-3 h-3 rounded-full bg-gray-400 inline-block"></span> inact-down
+        <span class="w-3 h-3 rounded-full bg-gray-400 inline-block"></span>
+        inact-down
       </div>
       <div class="flex items-center gap-1.5">
-        <span class="w-3 h-3 rounded-full bg-yellow-500 inline-block"></span> inact-up
+        <span class="w-3 h-3 rounded-full bg-yellow-500 inline-block"></span>
+        inact-up
       </div>
     </div>
 
     <!-- Device groups -->
     <div class="space-y-4">
       <template x-for="group in portGroups" :key="group.device">
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+        <div
+          class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5"
+        >
           <div class="flex items-center justify-between mb-4">
             <div>
               <h3 class="font-semibold text-sm" x-text="group.device"></h3>
-              <p class="text-xs text-gray-500" x-text="group.host + ' \u00B7 ' + group.site"></p>
+              <p
+                class="text-xs text-gray-500"
+                x-text="group.host + ' \u00B7 ' + group.site"
+              ></p>
             </div>
             <div class="flex gap-2">
-              <span class="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+              <span
+                class="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
                 x-text="group.ports.filter(p => p.port_state === 'act-down' || p.paired_state === 'act-down').length + ' act-down'"
-                x-show="group.ports.filter(p => p.port_state === 'act-down' || p.paired_state === 'act-down').length > 0"></span>
-              <span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                x-show="group.ports.filter(p => p.port_state === 'act-down' || p.paired_state === 'act-down').length > 0"
+              ></span>
+              <span
+                class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
                 x-text="group.ports.filter(p => p.port_state === 'inact-down' || p.paired_state === 'inact-down').length + ' inact-down'"
-                x-show="group.ports.filter(p => p.port_state === 'inact-down' || p.paired_state === 'inact-down').length > 0"></span>
+                x-show="group.ports.filter(p => p.port_state === 'inact-down' || p.paired_state === 'inact-down').length > 0"
+              ></span>
             </div>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <template x-for="p in group.ports" :key="p.port">
-              <div class="flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors"
-                :class="portCardClass(p)">
+              <div
+                class="flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors"
+                :class="portCardClass(p)"
+              >
                 <!-- Port name -->
-                <span class="font-mono text-xs font-semibold min-w-[80px]" x-text="p.port"></span>
+                <span
+                  class="font-mono text-xs font-semibold min-w-[80px]"
+                  x-text="p.port"
+                ></span>
                 <!-- Port state dot -->
                 <div class="flex flex-col items-center gap-0.5">
-                  <span class="w-3.5 h-3.5 rounded-full transition-colors"
-                    :class="stateColor(p.port_state)"></span>
-                  <span class="text-[9px] text-gray-400" x-text="p.port_state"></span>
+                  <span
+                    class="w-3.5 h-3.5 rounded-full transition-colors"
+                    :class="stateColor(p.port_state)"
+                  ></span>
+                  <span
+                    class="text-[9px] text-gray-400"
+                    x-text="p.port_state"
+                  ></span>
                 </div>
                 <!-- Paired state dot (ring style) -->
                 <div class="flex flex-col items-center gap-0.5">
-                  <span class="w-3.5 h-3.5 rounded-full border-[2.5px] transition-colors"
-                    :class="stateBorderColor(p.paired_state)"></span>
-                  <span class="text-[9px] text-gray-400" x-text="p.paired_state"></span>
+                  <span
+                    class="w-3.5 h-3.5 rounded-full border-[2.5px] transition-colors"
+                    :class="stateBorderColor(p.paired_state)"
+                  ></span>
+                  <span
+                    class="text-[9px] text-gray-400"
+                    x-text="p.paired_state"
+                  ></span>
                 </div>
                 <!-- SWO info -->
                 <template x-if="p.swo_reason">
-                  <span class="ml-auto text-[10px] text-gray-400 font-mono" x-text="p.swo_reason + ' (' + p.num_swo + ')'"></span>
+                  <span
+                    class="ml-auto text-[10px] text-gray-400 font-mono"
+                    x-text="p.swo_reason + ' (' + p.num_swo + ')'"
+                  ></span>
                 </template>
               </div>
             </template>
@@ -333,197 +1041,1036 @@
       </template>
     </div>
   </div>
+
+  <!-- ==================== INVENTORY TAB ==================== -->
+  <div x-show="tab === 'inventory' && !loading" x-cloak>
+    <!-- Device filter -->
+    <div class="mb-6">
+      <select
+        x-model="inventoryDevice"
+        @change="$nextTick(() => renderInventoryCharts())"
+        class="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+      >
+        <option value="">All Devices</option>
+        <template x-for="d in inventoryDevices" :key="d">
+          <option :value="d" x-text="d"></option>
+        </template>
+      </select>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div
+        class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 flex flex-col items-center"
+      >
+        <h3
+          class="text-sm font-semibold mb-3 text-gray-600 dark:text-gray-400 self-start"
+        >
+          Vendor Usage
+        </h3>
+        <div class="w-full max-w-3xl">
+          <canvas id="inventoryVendorChart" height="350"></canvas>
+        </div>
+      </div>
+      <div
+        class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 flex flex-col items-center"
+      >
+        <h3
+          class="text-sm font-semibold mb-3 text-gray-600 dark:text-gray-400 self-start"
+        >
+          ONT Models
+        </h3>
+        <div class="w-full max-w-2xl">
+          <canvas id="inventoryModelChart" height="350"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tables -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <!-- Vendor Table -->
+      <div
+        class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col h-full"
+      >
+        <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+          <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            Vendor Usage Details
+          </h3>
+        </div>
+        <div class="overflow-x-auto flex-1">
+          <table class="w-full text-sm text-left">
+            <thead
+              class="bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400"
+            >
+              <tr>
+                <th class="px-5 py-3 font-semibold">Vendor</th>
+                <th class="px-5 py-3 font-semibold text-right">Count</th>
+                <th class="px-5 py-3 font-semibold text-right">Percentage</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+              <template
+                x-for="v in getInventoryTableData().vendors"
+                :key="v.vendor"
+              >
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                  <td
+                    class="px-5 py-2.5 font-medium text-gray-800 dark:text-gray-200"
+                    x-text="v.vendor"
+                  ></td>
+                  <td
+                    class="px-5 py-2.5 text-right font-mono text-gray-600 dark:text-gray-400"
+                    x-text="v.count"
+                  ></td>
+                  <td
+                    class="px-5 py-2.5 text-right font-mono text-gray-500"
+                    x-text="((v.count / getInventoryTableData().total) * 100).toFixed(1) + '%'"
+                  ></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Models Table -->
+      <div
+        class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col h-full max-h-[500px]"
+      >
+        <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+          <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            ONT Models Details
+          </h3>
+        </div>
+        <div class="overflow-y-auto flex-1">
+          <table class="w-full text-sm text-left relative">
+            <thead
+              class="bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 sticky top-0 shadow-sm z-10"
+            >
+              <tr>
+                <th class="px-5 py-3 font-semibold">Model</th>
+                <th class="px-5 py-3 font-semibold text-right">Count</th>
+                <th class="px-5 py-3 font-semibold text-right">Percentage</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+              <template
+                x-for="m in getInventoryTableData().models"
+                :key="m.equip_id"
+              >
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                  <td
+                    class="px-5 py-2.5 font-mono text-gray-800 dark:text-gray-200"
+                    x-text="m.equip_id"
+                  ></td>
+                  <td
+                    class="px-5 py-2.5 text-right font-mono text-gray-600 dark:text-gray-400"
+                    x-text="m.count"
+                  ></td>
+                  <td
+                    class="px-5 py-2.5 text-right font-mono text-gray-500"
+                    x-text="((m.count / getInventoryTableData().total) * 100).toFixed(1) + '%'"
+                  ></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
-function dashboardPage() {
-  return {
-    tab: 'health',
-    loading: true,
-    healthData: [],
-    healthIdx: 0,
-    powerSummary: [],
-    downPorts: [],
-    powerDevice: '',
-    powerSearch: '',
-    portDevice: '',
-    powerChartInstance: null,
-    pieChartInstance: null,
-    tableRows: [],
-    tableTotal: 0,
-    tableTotalPages: 1,
-    powerPage: 1,
-    tableLoading: false,
+  function dashboardPage() {
+    return {
+      tab: "health",
+      loading: true,
+      healthData: [],
+      healthIdx: 0,
+      powerSummary: [],
+      downPorts: [],
+      powerDevice: "",
+      powerSearch: "",
+      portDevice: "",
+      powerChartInstance: null,
+      pieChartInstance: null,
+      tableRows: [],
+      tableTotal: 0,
+      tableTotalPages: 1,
+      powerPage: 1,
+      tableLoading: false,
 
-    async init() {
-      const [hRes, sRes, portRes] = await Promise.all([
-        fetch('/api/health'),
-        fetch('/api/power/summary'),
-        fetch('/api/ports/down')
-      ]);
-      this.healthData = await hRes.json() || [];
-      this.powerSummary = await sRes.json() || [];
-      this.downPorts = await portRes.json() || [];
-      this.loading = false;
+      scanRunning: false,
 
-      this.fetchReadingsPage();
-    },
+      inventorySummary: null,
+      inventoryOLTs: [],
+      inventoryDevice: "",
+      inventoryVendorChartInst: null,
+      inventoryModelChartInst: null,
 
-    get currentHealth() {
-      return this.healthData[this.healthIdx] || {};
-    },
+      calOpen: false,
+      calYear: new Date().getFullYear(),
+      calMonth: new Date().getMonth(),
+      calHealthDays: {},
+      calPortDays: {},
+      calSelectedDate: null,
+      calDayDetail: { health: [], ports: [] },
+      calDayLoading: false,
+      calLoading: false,
+      calExpandedGroup: null,
+      calExpandedHost: null,
 
-    getCpuColor(load) {
-      if (load > 80) return 'bg-red-500';
-      if (load > 60) return 'bg-yellow-500';
-      return 'bg-green-500';
-    },
+      calRoundTime(d) {
+        var r = new Date(d)
+        r.setMinutes(Math.floor(r.getMinutes() / 5) * 5, 0, 0)
+        return r
+      },
 
-    stateColor(s) {
-      if (s === 'act-up') return 'bg-green-500 shadow-sm shadow-green-500/50';
-      if (s === 'act-down') return 'bg-red-500 shadow-sm shadow-red-500/50';
-      if (s === 'inact-down') return 'bg-gray-400 shadow-sm shadow-gray-400/30';
-      if (s === 'inact-up') return 'bg-yellow-500 shadow-sm shadow-yellow-500/50';
-      return 'bg-gray-400';
-    },
-    stateBorderColor(s) {
-      if (s === 'act-up') return 'border-green-500 shadow-sm shadow-green-500/50';
-      if (s === 'act-down') return 'border-red-500 shadow-sm shadow-red-500/50';
-      if (s === 'inact-down') return 'border-gray-400 shadow-sm shadow-gray-400/30';
-      if (s === 'inact-up') return 'border-yellow-500 shadow-sm shadow-yellow-500/50';
-      return 'border-gray-400';
-    },
-    portCardClass(p) {
-      if (p.port_state === 'act-down' || p.paired_state === 'act-down')
-        return 'border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-900/10';
-      if (p.port_state === 'inact-down' || p.paired_state === 'inact-down')
-        return 'border-gray-300 dark:border-gray-700 bg-gray-100/50 dark:bg-gray-800/30';
-      if (p.port_state === 'inact-up' || p.paired_state === 'inact-up')
-        return 'border-yellow-200 dark:border-yellow-900/50 bg-yellow-50/50 dark:bg-yellow-900/10';
-      return 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50';
-    },
-
-    // Powers
-    get powerDevices() {
-      return [...new Set(this.powerSummary.map(s => s.device))].sort();
-    },
-
-    async fetchReadingsPage() {
-      this.tableLoading = true;
-      const params = new URLSearchParams({ page: this.powerPage, per_page: 50 });
-      if (this.powerDevice) params.set('device', this.powerDevice);
-      if (this.powerSearch) params.set('search', this.powerSearch);
-      try {
-        const res = await fetch('/api/power/readings?' + params);
-        const json = await res.json();
-        this.tableRows = json.data || [];
-        this.tableTotal = json.total || 0;
-        this.tableTotalPages = json.total_pages || 1;
-        this.powerPage = json.page || 1;
-      } catch (e) {
-        this.tableRows = [];
-      }
-      this.tableLoading = false;
-    },
-
-    renderPowerChart() {
-      const canvas = document.getElementById('powerChart');
-      if (!canvas) return;
-      if (this.powerChartInstance) this.powerChartInstance.destroy();
-
-      const labels = this.powerSummary.filter(s => s.weak_count > 0).map(s => s.device);
-      const data = this.powerSummary.filter(s => s.weak_count > 0).map(s => s.weak_count);
-
-      const isDark = document.documentElement.classList.contains('dark');
-      this.powerChartInstance = new Chart(canvas, {
-        type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'Weak ONTs',
-            data: data,
-            backgroundColor: 'rgba(239, 68, 68, 0.7)',
-            borderColor: 'rgba(239, 68, 68, 1)',
-            borderWidth: 1,
-            borderRadius: 6
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { display: false },
-            title: { display: true, text: 'Weak Power ONTs per Device', color: isDark ? '#ccc' : '#333' }
-          },
-          scales: {
-            y: { beginAtZero: true, ticks: { color: isDark ? '#aaa' : '#555', stepSize: 1 }, grid: { color: isDark ? '#333' : '#eee' } },
-            x: {
-              ticks: { color: isDark ? '#aaa' : '#555', maxRotation: 90, font: { size: 10 },
-                callback: function(value, index) {
-                  const label = this.getLabelForValue(index);
-                  return label.length > 15 ? label.substring(0, 15) + '...' : label;
-                }
-              },
-              grid: { display: false }
+      get calTimeGroups() {
+        var self = this
+        var groups = []
+        var hMap = {}
+        ;(this.calDayDetail.health || []).forEach(function (e) {
+          var r = self.calRoundTime(e.measured_at)
+          var timeStr = r.toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+          var key = "h-" + timeStr
+          if (!hMap[key])
+            hMap[key] = {
+              key: key,
+              type: "health",
+              label: "Health",
+              time: timeStr,
+              ts: r.getTime(),
+              hosts: [],
             }
+          hMap[key].hosts.push({
+            uid: "hh-" + e.id,
+            device: e.device,
+            host: e.host,
+            data: e,
+          })
+        })
+        Object.values(hMap).forEach(function (g) {
+          groups.push(g)
+        })
+        var pMap = {}
+        ;(this.calDayDetail.ports || []).forEach(function (p) {
+          var r = self.calRoundTime(p.measured_at)
+          var timeStr = r.toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+          var tKey = "p-" + timeStr
+          if (!pMap[tKey])
+            pMap[tKey] = {
+              key: tKey,
+              type: "port",
+              label: "Port",
+              time: timeStr,
+              ts: r.getTime(),
+              hostMap: {},
+            }
+          var hKey = p.host
+          if (!pMap[tKey].hostMap[hKey])
+            pMap[tKey].hostMap[hKey] = {
+              uid: "ph-" + tKey + "-" + hKey,
+              device: p.device,
+              host: p.host,
+              ports: [],
+            }
+          pMap[tKey].hostMap[hKey].ports.push(p)
+        })
+        Object.values(pMap).forEach(function (g) {
+          g.hosts = Object.values(g.hostMap)
+          delete g.hostMap
+          groups.push(g)
+        })
+        groups.sort(function (a, b) {
+          return a.ts - b.ts
+        })
+        return groups
+      },
+
+      get calMonthLabel() {
+        var months = [
+          "January",
+          "February",
+          "March",
+          "April",
+          "May",
+          "June",
+          "July",
+          "August",
+          "September",
+          "October",
+          "November",
+          "December",
+        ]
+        return months[this.calMonth] + " " + this.calYear
+      },
+
+      get calCells() {
+        var first = new Date(this.calYear, this.calMonth, 1)
+        var last = new Date(this.calYear, this.calMonth + 1, 0)
+        var startDay = first.getDay()
+        startDay = startDay === 0 ? 6 : startDay - 1
+        var todayStr = new Date().toISOString().slice(0, 10)
+        var cells = []
+        for (var i = 0; i < startDay; i++) {
+          cells.push({
+            key: "e" + i,
+            day: null,
+            dateStr: null,
+            hasHealth: false,
+            hasPorts: false,
+            isToday: false,
+            isSelected: false,
+          })
+        }
+        for (var d = 1; d <= last.getDate(); d++) {
+          var ds =
+            this.calYear +
+            "-" +
+            String(this.calMonth + 1).padStart(2, "0") +
+            "-" +
+            String(d).padStart(2, "0")
+          cells.push({
+            key: ds,
+            day: d,
+            dateStr: ds,
+            hasHealth: !!this.calHealthDays[ds],
+            hasPorts: !!this.calPortDays[ds],
+            isToday: ds === todayStr,
+            isSelected: ds === this.calSelectedDate,
+          })
+        }
+        return cells
+      },
+
+      async loadCalendar() {
+        this.calLoading = true
+        var ms = this.calYear + "-" + String(this.calMonth + 1).padStart(2, "0")
+        try {
+          var res = await fetch("/api/history/calendar?month=" + ms)
+          var data = await res.json()
+          this.calHealthDays = {}
+          this.calPortDays = {}
+          ;(data.health_days || []).forEach(
+            function (d) {
+              this.calHealthDays[d.date] = d.count
+            }.bind(this),
+          )
+          ;(data.port_days || []).forEach(
+            function (d) {
+              this.calPortDays[d.date] = d.down_count
+            }.bind(this),
+          )
+        } catch (e) {
+          console.error("[calendar]", e)
+        }
+        this.calLoading = false
+      },
+
+      calPrevMonth() {
+        if (this.calMonth === 0) {
+          this.calMonth = 11
+          this.calYear--
+        } else this.calMonth--
+        this.calSelectedDate = null
+        this.calDayDetail = { health: [], ports: [] }
+        this.loadCalendar()
+      },
+
+      calNextMonth() {
+        if (this.calMonth === 11) {
+          this.calMonth = 0
+          this.calYear++
+        } else this.calMonth++
+        this.calSelectedDate = null
+        this.calDayDetail = { health: [], ports: [] }
+        this.loadCalendar()
+      },
+
+      async selectCalDay(dateStr) {
+        this.calSelectedDate = dateStr
+        this.calExpandedGroup = null
+        this.calExpandedHost = null
+        this.calDayLoading = true
+        try {
+          var res = await fetch("/api/history/day?date=" + dateStr)
+          this.calDayDetail = await res.json()
+        } catch (e) {
+          this.calDayDetail = { health: [], ports: [] }
+        }
+        this.calDayLoading = false
+      },
+
+      get calSelectedDateLabel() {
+        if (!this.calSelectedDate) return ""
+        var d = new Date(this.calSelectedDate + "T00:00:00")
+        return d.toLocaleDateString("en-US", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })
+      },
+
+      async runScanNow() {
+        const endpoints = { health: '/api/scan/health', powers: '/api/scan/power', ports: '/api/scan/ports', inventory: '/api/scan/inventory' }
+        const ep = endpoints[this.tab]
+        if (!ep) return
+        this.scanRunning = true
+        try {
+          await fetch(ep, { method: 'POST' })
+        } catch (e) {
+          console.error('[scan]', e)
+        }
+        setTimeout(() => { this.scanRunning = false }, 3000)
+      },
+
+      async exportExcel() {
+        const wb = XLSX.utils.book_new()
+        const today = new Date().toISOString().slice(0, 10)
+
+        if (this.tab === 'health') {
+          const rows = this.healthData.map(h => ({
+            Device: h.device, Host: h.host, Site: h.site, Uptime: h.uptime,
+            ...(h.cpu_loads || []).reduce((acc, c, i) => { acc['CPU_' + c.slot] = c.average_pct + '%'; return acc }, {}),
+            ...(h.temperatures || []).reduce((acc, t, i) => { acc['Temp_' + t.slot] = t.act_temp + '\u00B0C'; return acc }, {})
+          }))
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Health')
+          XLSX.writeFile(wb, 'Health_' + today + '.xlsx')
+        }
+
+        if (this.tab === 'powers') {
+          const params = new URLSearchParams({ export: 'true' })
+          if (this.powerDevice) params.set('device', this.powerDevice)
+          if (this.powerSearch) params.set('search', this.powerSearch)
+          try {
+            const res = await fetch('/api/power/readings?' + params)
+            const json = await res.json()
+            const allRows = json.data || []
+            const rows = allRows.map(r => ({
+              ONT_Index: r.ont_idx, OLT_Rx_dBm: r.olt_rx, Desc1: r.desc1, Desc2: r.desc2,
+              Device: r.device, Site: r.site, Host: r.host
+            }))
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length ? rows : [{}]), 'Powers')
+          } catch(e) {
+            console.error('[export powers]', e)
+          }
+          try {
+            const sumRes = await fetch('/api/power/summary')
+            const summaryData = await sumRes.json()
+            const summaryRows = (summaryData || []).map(s => ({
+              Device: s.device, Host: s.host, Site: s.site, Total: s.total, Weak: s.weak_count
+            }))
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows.length ? summaryRows : [{}]), 'Summary')
+          } catch(e) {
+            console.error('[export summary]', e)
+          }
+          const filename = this.powerDevice ? 'Powers_' + this.powerDevice + '_' + today + '.xlsx' : 'Powers_All_' + today + '.xlsx'
+          XLSX.writeFile(wb, filename)
+        }
+
+        if (this.tab === 'ports') {
+          const rows = this.filteredPorts.map(p => ({
+            Device: p.device, Host: p.host, Site: p.site, Port: p.port,
+            Port_State: p.port_state, Paired_State: p.paired_state,
+            SWO_Reason: p.swo_reason, Num_SWO: p.num_swo
+          }))
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Port Protection')
+          XLSX.writeFile(wb, 'Port_Protection_' + today + '.xlsx')
+        }
+
+        if (this.tab === 'inventory') {
+          const vendorMap = {
+            'G1425GE':'Nokia ONT','G1425GB':'Nokia ONT','XS-010X-Q':'Nokia ONT','I240WA':'Nokia ONT',
+            'G-010G-R':'Nokia ONU','OG-976V':'ORFA','OG-976V2':'ORFA',
+            'NEXXT G8421H':'HWTC','HG8145V6':'HWTC','EG8145V5':'HWTC','EG8021V5':'HWTC',
+            'GP1702-1Gv2':'HWTC','HG8120C':'HWTC','HG8145C':'HWTC','HG8245C':'HWTC',
+            'HG8245Q2':'HWTC','HG8321V':'HWTC','HG8346M':'HWTC','HG8340M':'HWTC',
+            'HS8125C':'HWTC','HS8145C5':'HWTC','HS8546V':'HWTC','EG8041X6-10':'HWTC',
+            'K662D':'HWTC','JZ8600':'HWTC','SA1456C':'HWTC','OG-978VX':'HWTC','540M':'HWTC',
+            'EG8141A5':'HWTC','HG8245':'HWTC','HG8342R':'HWTC','HG8546M':'HWTC',
+            'OG-92SR':'HWTC','5850ON':'HWTC','HG8245A':'HWTC','HG8310M':'HWTC',
+            'HG8546M-RMS':'HWTC','HS8145V5':'HWTC','HG8020C':'HWTC','HG8240':'HWTC',
+            'HG8321R':'HWTC','HG8540M':'HWTC','HS8545M':'HWTC','EG8120L':'HWTC',
+            'HG8240R':'HWTC','HG8245H':'HWTC','HG8541M':'HWTC','HS8145C':'HWTC',
+            'P4021A':'HWTC','HG8346R':'HWTC','HS8545M5':'HWTC',
+            'GP1702-1G':'BDCM','GP1704-2F-E':'BDCM','GP1705-2G':'BDCM','GP1706-4G':'BDCM','GP1706-4GV':'BDCM'
+          }
+          const getVendor = (id) => vendorMap[id] || vendorMap[id.toUpperCase()] || 'Unknown'
+          const pct = (n, t) => t > 0 ? ((n / t) * 100).toFixed(1) + '%' : '0%'
+
+          try {
+            const [sumRes, oltsRes] = await Promise.all([
+              fetch('/api/inventory/summary'),
+              fetch('/api/inventory/olts')
+            ])
+            const summary = await sumRes.json()
+            const allOlts = (await oltsRes.json()) || []
+
+            if (!this.inventoryDevice) {
+              const total = summary?.total || 1
+
+              // Sheet 1: Full inventory - every model in every OLT
+              const fullRows = allOlts.flatMap(o => {
+                return (o.counts || []).map(c => ({
+                  Device: o.device, Host: o.host, Site: o.site,
+                  Model: c.equip_id, Vendor: getVendor(c.equip_id),
+                  Count: c.count, Percentage: pct(c.count, o.total || 1)
+                }))
+              })
+              XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(fullRows.length ? fullRows : [{}]), 'Full Inventory')
+
+              // Sheet 2: Vendor Usage (bar chart data)
+              const vendorRows = (summary?.vendor_counts || []).map(v => ({
+                Vendor: v.vendor, Total_Count: v.count, Percentage: pct(v.count, total)
+              }))
+              XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(vendorRows.length ? vendorRows : [{}]), 'Vendor Usage')
+
+              // Sheet 3: ONT Models (pie chart data)
+              const modelRows = (summary?.counts || []).map(m => ({
+                Model: m.equip_id, Vendor: getVendor(m.equip_id),
+                Total_Count: m.count, Percentage: pct(m.count, total)
+              }))
+              XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(modelRows.length ? modelRows : [{}]), 'ONT Models')
+
+              // Sheet 4: Per-OLT vendor breakdown
+              const oltVendorRows = allOlts.flatMap(o => {
+                return (o.vendor_counts || []).map(v => ({
+                  Device: o.device, Host: o.host, Site: o.site,
+                  Vendor: v.vendor, Count: v.count,
+                  OLT_Total: o.total, Percentage: pct(v.count, o.total || 1)
+                }))
+              })
+              XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(oltVendorRows.length ? oltVendorRows : [{}]), 'Per OLT Vendors')
+
+              // Sheet 5: OLT summary - one row per OLT with vendor columns
+              const oltSummaryRows = allOlts.map(o => ({
+                Device: o.device, Host: o.host, Site: o.site, Total_ONTs: o.total,
+                ...(o.vendor_counts || []).reduce((acc, v) => { acc[v.vendor] = v.count; return acc }, {})
+              }))
+              XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(oltSummaryRows.length ? oltSummaryRows : [{}]), 'OLT Summary')
+
+              XLSX.writeFile(wb, 'Inventory_All_' + today + '.xlsx')
+            } else {
+              const oltData = allOlts.find(o => o.device === this.inventoryDevice)
+              if (oltData) {
+                const total = oltData.total || 1
+
+                // Sheet 1: Full model inventory for this OLT
+                const modelRows = (oltData.counts || []).map(m => ({
+                  Model: m.equip_id, Vendor: getVendor(m.equip_id),
+                  Count: m.count, Percentage: pct(m.count, total)
+                }))
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(modelRows.length ? modelRows : [{}]), 'ONT Models')
+
+                // Sheet 2: Vendor breakdown for this OLT
+                const vendorRows = (oltData.vendor_counts || []).map(v => ({
+                  Vendor: v.vendor, Count: v.count, Percentage: pct(v.count, total)
+                }))
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(vendorRows.length ? vendorRows : [{}]), 'Vendor Usage')
+
+                // Sheet 3: Summary info
+                const infoRow = [{
+                  Device: oltData.device, Host: oltData.host, Site: oltData.site,
+                  Total_ONTs: total, Models_Count: (oltData.counts || []).length,
+                  Vendors_Count: (oltData.vendor_counts || []).length
+                }]
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(infoRow), 'OLT Info')
+
+                XLSX.writeFile(wb, 'Inventory_' + this.inventoryDevice + '_' + today + '.xlsx')
+              }
+            }
+          } catch(e) {
+            console.error('[export inventory]', e)
           }
         }
-      });
+      },
 
-      this.renderPieChart();
-    },
+      async init() {
+        var params = new URLSearchParams(window.location.search)
+        if (params.get("tab")) this.tab = params.get("tab")
+        if (params.get("device") && this.tab === "ports")
+          this.portDevice = params.get("device")
 
-    renderPieChart() {
-      if (this.pieChartInstance) { this.pieChartInstance.destroy(); this.pieChartInstance = null; }
-      if (!this.powerDevice) return;
+        await this.fetchAll()
 
-      const pieCanvas = document.getElementById('pieChart');
-      if (!pieCanvas) return;
-
-      const s = this.powerSummary.find(s => s.device === this.powerDevice);
-      if (!s) return;
-      const weakCount = s.weak_count;
-      const normalCount = s.total - weakCount;
-
-      const isDark = document.documentElement.classList.contains('dark');
-      this.pieChartInstance = new Chart(pieCanvas, {
-        type: 'pie',
-        data: {
-          labels: ['Normal Power (' + normalCount + ')', 'Weak Power (' + weakCount + ')'],
-          datasets: [{
-            data: [normalCount, weakCount],
-            backgroundColor: ['rgba(34, 197, 94, 0.7)', 'rgba(239, 68, 68, 0.7)'],
-            borderColor: [isDark ? '#1f2937' : '#ffffff', isDark ? '#1f2937' : '#ffffff'],
-            borderWidth: 2
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { position: 'bottom', labels: { color: isDark ? '#ccc' : '#333', padding: 16 } },
-            title: { display: true, text: s.total + ' total ONTs', color: isDark ? '#999' : '#666', font: { size: 12, weight: 'normal' } }
-          }
+        if (params.get("host") && this.tab === "health") {
+          var targetHost = params.get("host")
+          var idx = this.healthData.findIndex(function (h) {
+            return h.host === targetHost
+          })
+          if (idx >= 0) this.healthIdx = idx
         }
-      });
-    },
 
-    // Ports
-    get portDevices() {
-      return [...new Set(this.downPorts.map(p => p.device))].sort();
-    },
-    get filteredPorts() {
-      if (!this.portDevice) return this.downPorts;
-      return this.downPorts.filter(p => p.device === this.portDevice);
-    },
-    get portGroups() {
-      const map = {};
-      this.filteredPorts.forEach(p => {
-        const key = p.device + '|' + p.host;
-        if (!map[key]) map[key] = { device: p.device, host: p.host, site: p.site, ports: [] };
-        map[key].ports.push(p);
-      });
-      return Object.values(map);
+        if (this.tab === "powers") this.$nextTick(() => this.renderPowerChart())
+        if (this.tab === "inventory")
+          this.$nextTick(() => this.renderInventoryCharts())
+
+        window.addEventListener("ws-update", (e) => {
+          var type = e.detail.type
+          if (type === "health_update") this.refreshHealth()
+          if (type === "power_update") this.refreshPower()
+          if (type === "port_update") this.refreshPorts()
+          if (type === "inventory_update") this.refreshInventory()
+        })
+      },
+
+      async fetchAll() {
+        const [hRes, sRes, portRes, invSumRes, invOltRes] = await Promise.all([
+          fetch("/api/health"),
+          fetch("/api/power/summary"),
+          fetch("/api/ports/down"),
+          fetch("/api/inventory/summary").catch(() => ({ json: () => null })),
+          fetch("/api/inventory/olts").catch(() => ({ json: () => [] })),
+        ])
+        this.healthData = (await hRes.json()) || []
+        this.powerSummary = (await sRes.json()) || []
+        this.downPorts = (await portRes.json()) || []
+
+        try {
+          this.inventorySummary = await invSumRes.json()
+        } catch (e) {
+          this.inventorySummary = null
+        }
+        try {
+          this.inventoryOLTs = await invOltRes.json()
+        } catch (e) {
+          this.inventoryOLTs = []
+        }
+        if (!this.inventoryOLTs) this.inventoryOLTs = []
+
+        this.loading = false
+        this.fetchReadingsPage()
+      },
+
+      async refreshHealth() {
+        try {
+          var res = await fetch("/api/health")
+          this.healthData = (await res.json()) || []
+        } catch (e) {}
+      },
+
+      async refreshPower() {
+        try {
+          var res = await fetch("/api/power/summary")
+          this.powerSummary = (await res.json()) || []
+          this.fetchReadingsPage()
+          if (this.tab === "powers")
+            this.$nextTick(() => this.renderPowerChart())
+        } catch (e) {}
+      },
+
+      async refreshPorts() {
+        try {
+          var res = await fetch("/api/ports/down")
+          this.downPorts = (await res.json()) || []
+        } catch (e) {}
+      },
+
+      async refreshInventory() {
+        try {
+          const [invSumRes, invOltRes] = await Promise.all([
+            fetch("/api/inventory/summary"),
+            fetch("/api/inventory/olts"),
+          ])
+          this.inventorySummary = await invSumRes.json()
+          this.inventoryOLTs = await invOltRes.json()
+          if (!this.inventoryOLTs) this.inventoryOLTs = []
+          if (this.tab === "inventory") {
+            this.$nextTick(() => this.renderInventoryCharts())
+          }
+        } catch (e) {}
+      },
+
+      get currentHealth() {
+        return this.healthData[this.healthIdx] || {}
+      },
+
+      getCpuColor(load) {
+        if (load > 80) return "bg-red-500"
+        if (load > 60) return "bg-yellow-500"
+        return "bg-green-500"
+      },
+
+      stateColor(s) {
+        if (s === "act-up") return "bg-green-500 shadow-sm shadow-green-500/50"
+        if (s === "act-down") return "bg-red-500 shadow-sm shadow-red-500/50"
+        if (s === "inact-down")
+          return "bg-gray-400 shadow-sm shadow-gray-400/30"
+        if (s === "inact-up")
+          return "bg-yellow-500 shadow-sm shadow-yellow-500/50"
+        return "bg-gray-400"
+      },
+      stateBorderColor(s) {
+        if (s === "act-up")
+          return "border-green-500 shadow-sm shadow-green-500/50"
+        if (s === "act-down")
+          return "border-red-500 shadow-sm shadow-red-500/50"
+        if (s === "inact-down")
+          return "border-gray-400 shadow-sm shadow-gray-400/30"
+        if (s === "inact-up")
+          return "border-yellow-500 shadow-sm shadow-yellow-500/50"
+        return "border-gray-400"
+      },
+      portCardClass(p) {
+        if (p.port_state === "act-down" || p.paired_state === "act-down")
+          return "border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-900/10"
+        if (p.port_state === "inact-down" || p.paired_state === "inact-down")
+          return "border-gray-300 dark:border-gray-700 bg-gray-100/50 dark:bg-gray-800/30"
+        if (p.port_state === "inact-up" || p.paired_state === "inact-up")
+          return "border-yellow-200 dark:border-yellow-900/50 bg-yellow-50/50 dark:bg-yellow-900/10"
+        return "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50"
+      },
+
+      // Powers
+      get powerDevices() {
+        return [...new Set(this.powerSummary.map((s) => s.device))].sort()
+      },
+
+      async fetchReadingsPage() {
+        this.tableLoading = true
+        const params = new URLSearchParams({
+          page: this.powerPage,
+          per_page: 50,
+        })
+        if (this.powerDevice) params.set("device", this.powerDevice)
+        if (this.powerSearch) params.set("search", this.powerSearch)
+        try {
+          const res = await fetch("/api/power/readings?" + params)
+          const json = await res.json()
+          this.tableRows = json.data || []
+          this.tableTotal = json.total || 0
+          this.tableTotalPages = json.total_pages || 1
+          this.powerPage = json.page || 1
+        } catch (e) {
+          this.tableRows = []
+        }
+        this.tableLoading = false
+      },
+
+      renderPowerChart() {
+        if (this.powerChartInstance) {
+          this.powerChartInstance.destroy()
+          this.powerChartInstance = null
+        }
+        if (this.pieChartInstance) {
+          this.pieChartInstance.destroy()
+          this.pieChartInstance = null
+        }
+
+        const isDark = document.documentElement.classList.contains("dark")
+        if (this.powerDevice) {
+          this.$nextTick(() => {
+            const pieCanvas = document.getElementById("powerPieChart")
+            if (!pieCanvas) return
+            const s = this.powerSummary.find(
+              (s) => s.device === this.powerDevice,
+            )
+            if (!s) return
+            const weakCount = s.weak_count
+            const normalCount = s.total - weakCount
+            this.pieChartInstance = new Chart(pieCanvas, {
+              type: "pie",
+              data: {
+                labels: [
+                  "Normal (" + normalCount + ")",
+                  "Weak (" + weakCount + ")",
+                ],
+                datasets: [
+                  {
+                    data: [normalCount, weakCount],
+                    backgroundColor: [
+                      "rgba(34, 197, 94, 0.8)",
+                      "rgba(239, 68, 68, 0.8)",
+                    ],
+                    hoverBackgroundColor: [
+                      "rgba(34, 197, 94, 1)",
+                      "rgba(239, 68, 68, 1)",
+                    ],
+                    borderColor: isDark ? "#111827" : "#ffffff",
+                    borderWidth: 3,
+                    hoverOffset: 8,
+                  },
+                ],
+              },
+              options: {
+                responsive: true,
+                animation: {
+                  animateRotate: true,
+                  animateScale: true,
+                  duration: 600,
+                  easing: "easeOutQuart",
+                },
+                plugins: {
+                  legend: {
+                    position: "bottom",
+                    labels: {
+                      color: isDark ? "#ccc" : "#333",
+                      padding: 16,
+                      font: { size: 12 },
+                      usePointStyle: true,
+                      pointStyle: "circle",
+                    },
+                  },
+                  title: {
+                    display: true,
+                    text: s.total + " total ONTs",
+                    color: isDark ? "#999" : "#666",
+                    font: { size: 13, weight: "500" },
+                  },
+                },
+              },
+            })
+          })
+          return
+        }
+
+        this.$nextTick(() => {
+          const barCanvas = document.getElementById("powerBarChart")
+          if (!barCanvas) return
+
+          const labels = this.powerSummary
+            .filter((s) => s.weak_count > 0)
+            .map((s) => s.device)
+          const data = this.powerSummary
+            .filter((s) => s.weak_count > 0)
+            .map((s) => s.weak_count)
+
+          this.powerChartInstance = new Chart(barCanvas, {
+            type: "bar",
+            data: {
+              labels: labels,
+              datasets: [
+                {
+                  label: "Weak ONTs",
+                  data: data,
+                  backgroundColor: "rgba(239, 68, 68, 0.7)",
+                  borderColor: "rgba(239, 68, 68, 1)",
+                  borderWidth: 1,
+                  borderRadius: 6,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              animation: { duration: 600, easing: "easeOutQuart" },
+              plugins: {
+                legend: { display: false },
+                title: {
+                  display: true,
+                  text: "Weak Power ONTs per Device",
+                  color: isDark ? "#ccc" : "#333",
+                },
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ticks: { color: isDark ? "#aaa" : "#555", stepSize: 1 },
+                  grid: { color: isDark ? "#333" : "#eee" },
+                },
+                x: {
+                  ticks: {
+                    color: isDark ? "#aaa" : "#555",
+                    maxRotation: 90,
+                    font: { size: 10 },
+                    callback: function (value, index) {
+                      const label = this.getLabelForValue(index)
+                      return label.length > 15
+                        ? label.substring(0, 15) + "…"
+                        : label
+                    },
+                  },
+                  grid: { display: false },
+                },
+              },
+            },
+          })
+        })
+      },
+
+      // Inventory
+      get inventoryDevices() {
+        return [...new Set(this.inventoryOLTs.map((o) => o.device))].sort()
+      },
+
+      getInventoryTableData() {
+        let data = this.inventoryDevice
+          ? this.inventoryOLTs.find((o) => o.device === this.inventoryDevice)
+          : this.inventorySummary
+
+        if (!data) return { vendors: [], models: [], total: 1 }
+
+        let vendors = [...(data.vendor_counts || [])].sort(
+          (a, b) => b.count - a.count,
+        )
+        let models = [...(data.counts || [])].sort((a, b) => b.count - a.count)
+
+        return {
+          vendors: vendors,
+          models: models,
+          total: data.total || 1,
+        }
+      },
+
+      renderInventoryCharts() {
+        if (this.inventoryVendorChartInst) {
+          this.inventoryVendorChartInst.destroy()
+          this.inventoryVendorChartInst = null
+        }
+        if (this.inventoryModelChartInst) {
+          this.inventoryModelChartInst.destroy()
+          this.inventoryModelChartInst = null
+        }
+
+        const isDark = document.documentElement.classList.contains("dark")
+        const vendorCanvas = document.getElementById("inventoryVendorChart")
+        const modelCanvas = document.getElementById("inventoryModelChart")
+
+        if (!vendorCanvas || !modelCanvas) return
+
+        let targetData = null
+        if (!this.inventoryDevice) {
+          targetData = this.inventorySummary
+        } else {
+          targetData = this.inventoryOLTs.find(
+            (o) => o.device === this.inventoryDevice,
+          )
+        }
+
+        if (!targetData) return
+
+        const vendorLabels = (targetData.vendor_counts || []).map(
+          (v) => v.vendor,
+        )
+        const vendorCounts = (targetData.vendor_counts || []).map(
+          (v) => v.count,
+        )
+
+        const modelLabels = (targetData.counts || []).map((c) => c.equip_id)
+        const modelCounts = (targetData.counts || []).map((c) => c.count)
+
+        // Vendor Bar Chart
+        this.inventoryVendorChartInst = new Chart(vendorCanvas, {
+          type: "bar",
+          data: {
+            labels: vendorLabels,
+            datasets: [
+              {
+                label: "Count",
+                data: vendorCounts,
+                backgroundColor: "rgba(59, 130, 246, 0.7)",
+                borderColor: "rgba(59, 130, 246, 1)",
+                borderWidth: 1,
+                borderRadius: 6,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: { color: isDark ? "#aaa" : "#555" },
+                grid: { color: isDark ? "#333" : "#eee" },
+              },
+              x: {
+                ticks: { color: isDark ? "#aaa" : "#555" },
+                grid: { display: false },
+              },
+            },
+          },
+        })
+
+        const colors = [
+          "rgba(59, 130, 246, 0.8)",
+          "rgba(16, 185, 129, 0.8)",
+          "rgba(245, 158, 11, 0.8)",
+          "rgba(239, 68, 68, 0.8)",
+          "rgba(139, 92, 246, 0.8)",
+          "rgba(236, 72, 153, 0.8)",
+          "rgba(99, 102, 241, 0.8)",
+          "rgba(14, 165, 233, 0.8)",
+          "rgba(20, 184, 166, 0.8)",
+        ]
+        const hoverColors = colors.map((c) => c.replace("0.8", "1"))
+
+        const pieColors = modelLabels.map((_, i) => colors[i % colors.length])
+        const pieHoverColors = modelLabels.map(
+          (_, i) => hoverColors[i % hoverColors.length],
+        )
+
+        // Model Pie Chart
+        this.inventoryModelChartInst = new Chart(modelCanvas, {
+          type: "pie",
+          data: {
+            labels: modelLabels.map((l, i) => l + " (" + modelCounts[i] + ")"),
+            datasets: [
+              {
+                data: modelCounts,
+                backgroundColor: pieColors,
+                hoverBackgroundColor: pieHoverColors,
+                borderColor: isDark ? "#111827" : "#ffffff",
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: "right",
+                labels: {
+                  color: isDark ? "#ccc" : "#333",
+                  usePointStyle: true,
+                  font: { size: 10 },
+                  boxWidth: 8,
+                },
+              },
+              title: {
+                display: true,
+                text: targetData.total + " Total ONTs",
+                color: isDark ? "#999" : "#666",
+              },
+            },
+          },
+        })
+      },
+
+      // Ports
+      get portDevices() {
+        return [...new Set(this.downPorts.map((p) => p.device))].sort()
+      },
+      get filteredPorts() {
+        if (!this.portDevice) return this.downPorts
+        return this.downPorts.filter((p) => p.device === this.portDevice)
+      },
+      get portGroups() {
+        const map = {}
+        this.filteredPorts.forEach((p) => {
+          const key = p.device + "|" + p.host
+          if (!map[key])
+            map[key] = {
+              device: p.device,
+              host: p.host,
+              site: p.site,
+              ports: [],
+            }
+          map[key].ports.push(p)
+        })
+        return Object.values(map)
+      },
     }
   }
-}
 </script>
 {{end}}

@@ -13,6 +13,7 @@
   </script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <style>
     [x-cloak] { display: none !important; }
     .sidebar-link.active { background-color: rgb(59 130 246 / 0.15); color: rgb(59 130 246); }
@@ -94,8 +95,62 @@
   </aside>
 
   <!-- Main content -->
-  <main class="ml-64 flex-1 min-h-screen">
-    <div class="p-6">
+  <main class="ml-64 flex-1 min-h-screen flex flex-col">
+    <!-- Top bar with notifications -->
+    <div x-data="notificationManager()" x-init="init()" class="sticky top-0 z-20 bg-gray-50/80 dark:bg-gray-950/80 backdrop-blur-sm border-b border-gray-200/60 dark:border-gray-800/60">
+      <div class="flex items-center justify-end px-6 h-12">
+        <div class="relative">
+          <button @click="open = !open" class="relative p-2 rounded-lg hover:bg-gray-200/70 dark:hover:bg-gray-800/70 transition-colors">
+            <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/>
+            </svg>
+            <span x-show="unreadCount > 0" x-transition
+              class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center px-1 text-[10px] font-bold text-white bg-red-500 rounded-full"
+              x-text="unreadCount > 9 ? '9+' : unreadCount"></span>
+          </button>
+
+          <!-- Notification dropdown -->
+          <div x-show="open" @click.away="open = false"
+            x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95 -translate-y-1" x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+            class="absolute right-0 top-full mt-2 w-[400px] bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden" x-cloak>
+
+            <!-- Header -->
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+              <h3 class="text-sm font-semibold">Notifications</h3>
+              <div class="flex items-center gap-2">
+                <button @click="markAllRead()" x-show="unreadCount > 0" class="text-[11px] text-blue-600 dark:text-blue-400 hover:underline">Mark all read</button>
+                <button @click="clearAll()" x-show="notifications.length > 0" class="text-[11px] text-gray-400 hover:text-red-500 hover:underline">Clear all</button>
+              </div>
+            </div>
+
+            <!-- List -->
+            <div class="max-h-[420px] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
+              <template x-for="n in notifications" :key="n.id">
+                <a :href="n.link" @click="markRead(n.id)" class="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                  :class="!n.read && 'bg-blue-50/50 dark:bg-blue-950/20'">
+                  <span class="w-2 h-2 mt-1.5 rounded-full shrink-0" :class="ntColor(n.type)"></span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium truncate" x-text="n.title"></p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate" x-text="n.message"></p>
+                    <p class="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5" x-text="timeAgo(n.time)"></p>
+                  </div>
+                  <svg class="w-4 h-4 text-gray-300 dark:text-gray-600 shrink-0 mt-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                </a>
+              </template>
+              <template x-if="notifications.length === 0">
+                <div class="flex flex-col items-center justify-center py-10 text-gray-400 dark:text-gray-600">
+                  <svg class="w-8 h-8 mb-2 opacity-40" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/></svg>
+                  <p class="text-sm">No notifications yet</p>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex-1 p-6">
       {{template "content" .}}
     </div>
   </main>
@@ -111,12 +166,167 @@
       }
     }
 
+    function notificationManager() {
+      return {
+        open: false,
+        notifications: JSON.parse(localStorage.getItem('devops_notifs') || '[]'),
+
+        get unreadCount() {
+          return this.notifications.filter(function(n) { return !n.read; }).length;
+        },
+
+        init() {
+          var self = this;
+          window.addEventListener('ws-update', function(e) {
+            var type = e.detail.type;
+            if (type === 'power_update') self.checkPowerAlerts();
+            if (type === 'health_update') self.checkHealthAlerts();
+            if (type === 'port_update') self.checkPortAlerts();
+          });
+        },
+
+        async checkPortAlerts() {
+          try {
+            var res = await fetch('/api/ports/down');
+            var ports = (await res.json()) || [];
+            var actDown = ports.filter(function(p) { return p.port_state === 'act-down'; });
+            if (actDown.length === 0) {
+              this.addNotif('info', 'Port Scan Complete', 'No act-down ports detected', '/dashboard?tab=ports');
+              return;
+            }
+            var byHost = {};
+            actDown.forEach(function(p) {
+              if (!byHost[p.host]) byHost[p.host] = { device: p.device, host: p.host, count: 0 };
+              byHost[p.host].count++;
+            });
+            var self = this;
+            Object.values(byHost).forEach(function(h) {
+              self.addNotif('port_alert', 'Ports Down: ' + h.device, h.count + ' act-down port' + (h.count !== 1 ? 's' : '') + ' on ' + h.host, '/dashboard?tab=ports&device=' + encodeURIComponent(h.device));
+            });
+          } catch (e) {}
+        },
+
+        async checkPowerAlerts() {
+          try {
+            var res = await fetch('/api/power/summary');
+            var summary = (await res.json()) || [];
+            var weakHosts = summary.filter(function(s) { return s.weak_count > 0; });
+            var self = this;
+            if (weakHosts.length > 0) {
+              weakHosts.forEach(function(h) {
+                self.addNotif('power_alert', 'Weak Power: ' + h.device, h.weak_count + ' weak ONTs on ' + h.host, '/dashboard?tab=powers&device=' + encodeURIComponent(h.device));
+              });
+            } else {
+              this.addNotif('info', 'Power Scan Complete', 'All power readings normal', '/dashboard?tab=powers');
+            }
+          } catch (e) {}
+        },
+
+        async checkHealthAlerts() {
+          try {
+            var res = await fetch('/api/health');
+            var health = (await res.json()) || [];
+            var self = this;
+            var hasAlert = false;
+            health.forEach(function(h) {
+              var temps = h.temperatures || [];
+              var hotSlot = temps.reduce(function(max, t) { return (t.act_temp || 0) > max.val ? { val: t.act_temp, slot: t.slot } : max; }, { val: 0, slot: '' });
+              var cpus = h.cpu_loads || [];
+              var hotCpu = cpus.reduce(function(max, c) { return (c.average_pct || 0) > max.val ? { val: c.average_pct, slot: c.slot } : max; }, { val: 0, slot: '' });
+              if (hotSlot.val > 65) {
+                self.addNotif('temp_alert', 'High Temp: ' + h.device, hotSlot.val + '\u00B0C on slot ' + hotSlot.slot + ' (' + h.host + ')', '/dashboard?tab=health&host=' + encodeURIComponent(h.host));
+                hasAlert = true;
+              } else if (hotSlot.val > 55) {
+                self.addNotif('temp_warn', 'Warm Temp: ' + h.device, hotSlot.val + '\u00B0C on slot ' + hotSlot.slot + ' (' + h.host + ')', '/dashboard?tab=health&host=' + encodeURIComponent(h.host));
+                hasAlert = true;
+              }
+              if (hotCpu.val > 80) {
+                self.addNotif('cpu_alert', 'High CPU: ' + h.device, hotCpu.val + '% on slot ' + hotCpu.slot + ' (' + h.host + ')', '/dashboard?tab=health&host=' + encodeURIComponent(h.host));
+                hasAlert = true;
+              }
+            });
+            if (!hasAlert) {
+              this.addNotif('info', 'Health Scan Complete', 'All systems normal', '/dashboard?tab=health');
+            }
+          } catch (e) {}
+        },
+
+        addNotif(type, title, message, link) {
+          var dominated = this.notifications.find(function(n) { return n.title === title && (Date.now() - n.time) < 120000; });
+          if (dominated) return;
+          this.notifications.unshift({ id: Date.now() + Math.random(), type: type, title: title, message: message, link: link || '/alerts', time: Date.now(), read: false });
+          if (this.notifications.length > 50) this.notifications = this.notifications.slice(0, 50);
+          this.save();
+        },
+
+        markRead(id) {
+          var n = this.notifications.find(function(n) { return n.id === id; });
+          if (n) n.read = true;
+          this.save();
+        },
+
+        markAllRead() {
+          this.notifications.forEach(function(n) { n.read = true; });
+          this.save();
+        },
+
+        clearAll() {
+          this.notifications = [];
+          this.save();
+        },
+
+        save() {
+          localStorage.setItem('devops_notifs', JSON.stringify(this.notifications));
+        },
+
+        ntColor(type) {
+          if (type === 'power_alert') return 'bg-red-500';
+          if (type === 'port_alert') return 'bg-red-500';
+          if (type === 'temp_alert') return 'bg-red-500';
+          if (type === 'temp_warn') return 'bg-orange-500';
+          if (type === 'cpu_alert') return 'bg-yellow-500';
+          return 'bg-blue-400';
+        },
+
+        timeAgo(ts) {
+          var diff = Math.floor((Date.now() - ts) / 1000);
+          if (diff < 60) return 'just now';
+          if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+          if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+          return Math.floor(diff / 86400) + 'd ago';
+        }
+      };
+    }
+
     async function logout() {
       try {
         await fetch('/api/auth/logout', { method: 'POST' });
       } catch (e) {}
       window.location.href = '/login';
     }
+    (function() {
+      var ws;
+      var reconnectDelay = 1000;
+
+      function connect() {
+        ws = new WebSocket(
+          (location.protocol === "https:" ? "wss://" : "ws://") + location.host + '/ws'
+        )
+        ws.onmessage = function(event) {
+          var msg = JSON.parse(event.data)
+          window.dispatchEvent(new CustomEvent('ws-update', {detail: msg}))
+        }
+        ws.onclose = function() {
+          console.log('[ws] closed, reconnecting in', reconnectDelay, 'ms')
+          setTimeout(connect, reconnectDelay);
+          reconnectDelay = Math.min(reconnectDelay * 2, 30000)
+        }
+        ws.onerror = function() {
+          ws.close()
+        }
+      }
+      connect()
+    })()
   </script>
 </body>
 </html>

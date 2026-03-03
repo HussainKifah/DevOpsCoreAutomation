@@ -5,9 +5,7 @@
   <!-- Loading -->
   <template x-if="loading">
     <div class="flex items-center justify-center py-20">
-      <div
-        class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"
-      ></div>
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
       <span class="ml-3 text-gray-500">Loading alerts...</span>
     </div>
   </template>
@@ -16,186 +14,101 @@
     <div>
       <!-- Summary cards -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div
-          class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5"
-        >
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
           <div class="flex items-center gap-3">
-            <div
-              class="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center"
-            >
-              <svg
-                class="w-5 h-5 text-red-600 dark:text-red-400"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.5"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"
-                />
+            <div class="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+              <svg class="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/>
               </svg>
             </div>
             <div>
-              <p class="text-2xl font-bold" x-text="weakPowers.length"></p>
-              <p class="text-xs text-gray-500">Weak Power ONTs</p>
+              <p class="text-2xl font-bold" x-text="powerByHost.length"></p>
+              <p class="text-xs text-gray-500">Hosts with Weak Power</p>
             </div>
           </div>
         </div>
-        <div
-          class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5"
-        >
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
           <div class="flex items-center gap-3">
-            <div
-              class="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center"
-            >
-              <svg
-                class="w-5 h-5 text-orange-600 dark:text-orange-400"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.5"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-                />
+            <div class="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+              <svg class="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
               </svg>
             </div>
             <div>
-              <p class="text-2xl font-bold" x-text="downPorts.length"></p>
-              <p class="text-xs text-gray-500">Down Ports</p>
+              <p class="text-2xl font-bold" x-text="portsByHost.length"></p>
+              <p class="text-xs text-gray-500">Hosts with Down Ports</p>
             </div>
           </div>
         </div>
-        <div
-          class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5"
-        >
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
           <div class="flex items-center gap-3">
-            <div
-              class="w-10 h-10 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center"
-            >
-              <svg
-                class="w-5 h-5 text-yellow-600 dark:text-yellow-400"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.5"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z"
-                />
+            <div class="w-10 h-10 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
+              <svg class="w-5 h-5 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z"/>
               </svg>
             </div>
             <div>
-              <p class="text-2xl font-bold" x-text="healthSummary.filter(o => o.status !== 'NORMAL').length + ' / ' + healthSummary.length"></p>
+              <p class="text-2xl font-bold" x-text="healthAlertCount + ' / ' + healthSummary.length"></p>
               <p class="text-xs text-gray-500">Health Alerts</p>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Power Alerts -->
+      <!-- Power Alerts (grouped by host) -->
       <div class="mb-8">
         <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
           <span class="w-2 h-2 rounded-full bg-red-500"></span> Power Alerts
         </h2>
-        <template x-if="weakPowers.length === 0">
-          <p
-            class="text-gray-500 text-sm py-4 px-5 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800"
-          >
+        <template x-if="powerByHost.length === 0">
+          <p class="text-gray-500 text-sm py-4 px-5 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
             No weak power alerts.
           </p>
         </template>
         <div class="space-y-2">
-          <template
-            x-for="a in weakPowers.slice(0, showAllPower ? undefined : 10)"
-            :key="a.ID"
-          >
-            <div
-              class="flex items-center gap-4 px-4 py-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800"
-            >
-              <span
-                class="flex-shrink-0 px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                >CRITICAL</span
-              >
+          <template x-for="h in powerByHost" :key="h.host">
+            <a :href="'/dashboard?tab=powers&device=' + encodeURIComponent(h.device)"
+              class="flex items-center gap-4 px-4 py-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-red-300 dark:hover:border-red-800 transition-colors group cursor-pointer">
+              <span class="flex-shrink-0 px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">CRITICAL</span>
               <div class="flex-1 min-w-0">
-                <p
-                  class="text-sm font-medium truncate"
-                  x-text="a.device + ' - ' + a.ont_idx"
-                ></p>
-                <p
-                  class="text-xs text-gray-500"
-                  x-text="a.site + ' &middot; ' + a.host"
-                ></p>
+                <p class="text-sm font-medium truncate" x-text="h.device"></p>
+                <p class="text-xs text-gray-500" x-text="h.site + ' \u00B7 ' + h.host"></p>
               </div>
-              <span
-                class="text-sm font-mono font-bold text-red-600 dark:text-red-400"
-                x-text="a.olt_rx.toFixed(1) + ' dBm'"
-              ></span>
-            </div>
-          </template>
-          <template x-if="weakPowers.length > 10">
-            <button
-              @click="showAllPower = !showAllPower"
-              class="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-              x-text="showAllPower ? 'Show less' : 'Show all ' + weakPowers.length + ' alerts'"
-            ></button>
+              <div class="text-right">
+                <span class="text-lg font-bold text-red-600 dark:text-red-400" x-text="h.count"></span>
+                <p class="text-[10px] text-gray-400">weak ONTs</p>
+              </div>
+              <svg class="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-red-400 transition-colors shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+            </a>
           </template>
         </div>
       </div>
 
-      <!-- Port Alerts -->
+      <!-- Port Alerts (grouped by host) -->
       <div class="mb-8">
         <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-orange-500"></span> Port
-          Protection Alerts
+          <span class="w-2 h-2 rounded-full bg-orange-500"></span> Port Protection Alerts
         </h2>
-        <template x-if="downPorts.length === 0">
-          <p
-            class="text-gray-500 text-sm py-4 px-5 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800"
-          >
+        <template x-if="portsByHost.length === 0">
+          <p class="text-gray-500 text-sm py-4 px-5 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
             No down port alerts.
           </p>
         </template>
         <div class="space-y-2">
-          <template
-            x-for="p in downPorts.slice(0, showAllPorts ? undefined : 10)"
-            :key="p.ID"
-          >
-            <div
-              class="flex items-center gap-4 px-4 py-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800"
-            >
-              <span
-                class="flex-shrink-0 px-2 py-0.5 text-xs font-medium rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-                >WARNING</span
-              >
+          <template x-for="h in portsByHost" :key="h.host">
+            <a :href="'/dashboard?tab=ports&device=' + encodeURIComponent(h.device)"
+              class="flex items-center gap-4 px-4 py-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-orange-300 dark:hover:border-orange-800 transition-colors group cursor-pointer">
+              <span class="flex-shrink-0 px-2 py-0.5 text-xs font-medium rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">WARNING</span>
               <div class="flex-1 min-w-0">
-                <p
-                  class="text-sm font-medium truncate"
-                  x-text="p.device + ' - ' + p.port"
-                ></p>
-                <p
-                  class="text-xs text-gray-500"
-                  x-text="p.site + ' &middot; ' + p.host"
-                ></p>
+                <p class="text-sm font-medium truncate" x-text="h.device"></p>
+                <p class="text-xs text-gray-500" x-text="h.site + ' \u00B7 ' + h.host"></p>
               </div>
-              <div class="text-right text-xs">
-                <p x-text="'Port: ' + p.port_state"></p>
-                <p x-text="'Paired: ' + p.paired_state"></p>
+              <div class="text-right">
+                <span class="text-lg font-bold text-orange-600 dark:text-orange-400" x-text="h.count"></span>
+                <p class="text-[10px] text-gray-400">down ports</p>
               </div>
-            </div>
-          </template>
-          <template x-if="downPorts.length > 10">
-            <button
-              @click="showAllPorts = !showAllPorts"
-              class="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-              x-text="showAllPorts ? 'Show less' : 'Show all ' + downPorts.length + ' alerts'"
-            ></button>
+              <svg class="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-orange-400 transition-colors shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+            </a>
           </template>
         </div>
       </div>
@@ -213,16 +126,15 @@
         </template>
         <div class="space-y-2">
           <template x-for="olt in (showAllHealth ? healthSummary : healthSummary.slice(0, 10))" :key="olt.host">
-            <div class="flex items-center gap-4 px-4 py-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
-              <span
-                class="flex-shrink-0 px-2 py-0.5 text-xs font-medium rounded-full"
+            <a :href="'/dashboard?tab=health&host=' + encodeURIComponent(olt.host)"
+              class="flex items-center gap-4 px-4 py-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-800 transition-colors group cursor-pointer">
+              <span class="flex-shrink-0 px-2 py-0.5 text-xs font-medium rounded-full"
                 :class="{
                   'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400': olt.status === 'CRITICAL',
                   'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400': olt.status === 'WARNING',
                   'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400': olt.status === 'NORMAL'
                 }"
-                x-text="olt.status"
-              ></span>
+                x-text="olt.status"></span>
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium truncate" x-text="olt.device"></p>
                 <p class="text-xs text-gray-500" x-text="olt.site + ' \u00B7 ' + olt.host"></p>
@@ -235,7 +147,7 @@
                     'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400': olt.cpu <= 60
                   }">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25z"/></svg>
-                  <span x-text="olt.cpu + '%'"></span>
+                  <span x-text="olt.cpu + '% (' + olt.cpuSlot + ')'"></span>
                 </span>
                 <span class="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md"
                   :class="{
@@ -244,17 +156,16 @@
                     'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400': olt.temp <= 55
                   }">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z"/></svg>
-                  <span x-text="olt.temp + '\u00B0C'"></span>
+                  <span x-text="olt.temp + '\u00B0C (' + olt.tempSlot + ')'"></span>
                 </span>
               </div>
-            </div>
+              <svg class="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-blue-400 transition-colors shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+            </a>
           </template>
           <template x-if="healthSummary.length > 10">
-            <button
-              @click="showAllHealth = !showAllHealth"
+            <button @click="showAllHealth = !showAllHealth"
               class="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-              x-text="showAllHealth ? 'Show less' : 'Show all ' + healthSummary.length + ' OLTs'"
-            ></button>
+              x-text="showAllHealth ? 'Show less' : 'Show all ' + healthSummary.length + ' OLTs'"></button>
           </template>
         </div>
       </div>
@@ -269,32 +180,64 @@
       weakPowers: [],
       downPorts: [],
       healthData: [],
-      showAllPower: false,
-      showAllPorts: false,
       showAllHealth: false,
 
       async init() {
-        const [pRes, portRes, hRes] = await Promise.all([
+        var [pRes, portRes, hRes] = await Promise.all([
           fetch('/api/power/weak'),
           fetch('/api/ports/down'),
           fetch('/api/health')
         ]);
-        this.weakPowers = await pRes.json() || [];
-        this.downPorts = await portRes.json() || [];
-        this.healthData = await hRes.json() || [];
+        this.weakPowers = (await pRes.json()) || [];
+        this.downPorts = (await portRes.json()) || [];
+        this.healthData = (await hRes.json()) || [];
         this.loading = false;
       },
 
+      get powerByHost() {
+        var map = {};
+        this.weakPowers.forEach(function(a) {
+          var key = a.host;
+          if (!map[key]) map[key] = { device: a.device, site: a.site, host: a.host, count: 0, worstRx: 0 };
+          map[key].count++;
+          if (a.olt_rx < map[key].worstRx) map[key].worstRx = a.olt_rx;
+        });
+        return Object.values(map).sort(function(a, b) { return b.count - a.count; });
+      },
+
+      get portsByHost() {
+        var map = {};
+        this.downPorts.forEach(function(p) {
+          var key = p.host;
+          if (!map[key]) map[key] = { device: p.device, site: p.site, host: p.host, count: 0 };
+          map[key].count++;
+        });
+        return Object.values(map).sort(function(a, b) { return b.count - a.count; });
+      },
+
       get healthSummary() {
-        const sev = (cpu, temp) => (cpu > 80 || temp > 65) ? 'CRITICAL' : (cpu > 60 || temp > 55) ? 'WARNING' : 'NORMAL';
-        const order = { CRITICAL: 0, WARNING: 1, NORMAL: 2 };
-        return this.healthData.map(h => {
-          const cpu = Math.max(...(h.cpu_loads || []).map(c => c.average_pct || 0), 0);
-          const temp = Math.max(...(h.temperatures || []).map(t => t.act_temp || 0), 0);
-          return { device: h.device, site: h.site, host: h.host, cpu, temp, status: sev(cpu, temp) };
-        }).sort((a, b) => (order[a.status] ?? 2) - (order[b.status] ?? 2));
+        var sev = function(cpu, temp) { return (cpu > 80 || temp > 65) ? 'CRITICAL' : (cpu > 60 || temp > 55) ? 'WARNING' : 'NORMAL'; };
+        var order = { CRITICAL: 0, WARNING: 1, NORMAL: 2 };
+        return this.healthData.map(function(h) {
+          var cpuMax = (h.cpu_loads || []).reduce(function(max, c) {
+            return (c.average_pct || 0) > max.val ? { val: c.average_pct, slot: c.slot } : max;
+          }, { val: 0, slot: '-' });
+          var tempMax = (h.temperatures || []).reduce(function(max, t) {
+            return (t.act_temp || 0) > max.val ? { val: t.act_temp, slot: t.slot } : max;
+          }, { val: 0, slot: '-' });
+          return {
+            device: h.device, site: h.site, host: h.host,
+            cpu: cpuMax.val, cpuSlot: cpuMax.slot,
+            temp: tempMax.val, tempSlot: tempMax.slot,
+            status: sev(cpuMax.val, tempMax.val)
+          };
+        }).sort(function(a, b) { return (order[a.status] || 2) - (order[b.status] || 2); });
+      },
+
+      get healthAlertCount() {
+        return this.healthSummary.filter(function(o) { return o.status !== 'NORMAL'; }).length;
       }
-    }
+    };
   }
 </script>
 {{end}}

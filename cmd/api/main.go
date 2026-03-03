@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"runtime"
 	"syscall"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/Flafl/DevOpsCore/internal/repository"
 	"github.com/Flafl/DevOpsCore/internal/router"
 	"github.com/Flafl/DevOpsCore/internal/scheduler"
+	"github.com/Flafl/DevOpsCore/internal/shell"
 	websocket "github.com/Flafl/DevOpsCore/internal/webSocket"
 	"github.com/gin-gonic/gin"
 )
@@ -30,9 +30,12 @@ func main() {
 	powerRepo := repository.NewPowerRepository(database)
 	descRepo := repository.NewDescriptionRepository(database)
 	healthRepo := repository.NewHealthRepository(database)
+	historyRepo := repository.NewHealthHistoryRepository(database)
 	portRepo := repository.NewPortProtectionRepo(database)
+	portHistRepo := repository.NewPortHistoryRepository(database)
 	backupRepo := repository.NewBackupRepository(database)
 	userRepo := repository.NewUserRepository(database)
+	inventoryRepo := repository.NewInventoryRepo(database)
 
 	jwtManager := auth.NewJWTManager(auth.JWTconfig{
 		SecretKey:            []byte(cfg.JWTSecret),
@@ -44,26 +47,41 @@ func main() {
 	hub := websocket.NewHub()
 	go hub.Run()
 
-	sched := scheduler.New(cfg, hub, powerRepo, descRepo, healthRepo, portRepo, backupRepo)
+	sshPool := shell.NewConnectionPool(cfg.OLTUser, cfg.OLTPass)
+
+	sched := scheduler.New(cfg, hub, sshPool, powerRepo, descRepo, healthRepo, historyRepo, portRepo, portHistRepo, backupRepo, inventoryRepo)
 	sched.Start()
 
 	server := gin.Default()
 
-	_, thisFile, _, _ := runtime.Caller(0)
-	projectRoot := filepath.Join(filepath.Dir(thisFile), "..", "..")
+	projectRoot := os.Getenv("APP_ROOT")
+	if projectRoot == "" {
+		exe, err := os.Executable()
+		if err == nil {
+			projectRoot = filepath.Dir(exe)
+		}
+		if _, err := os.Stat(filepath.Join(projectRoot, "templates")); err != nil {
+			projectRoot, _ = os.Getwd()
+		}
+	}
 	server.Static("/static", filepath.Join(projectRoot, "templates", "static"))
 
 	powerH := handlers.NewPowerHandler(powerRepo)
 	descH := handlers.NewDescriptionHandler(descRepo)
 	healthH := handlers.NewHealthHandler(healthRepo)
+	healthHistoryH := handlers.NewHealthHistoryHandler(historyRepo)
 	portH := handlers.NewPortHandler(portRepo)
+	portHistoryH := handlers.NewPortHistoryHandler(portHistRepo)
+	calendarH := handlers.NewHistoryCalendarHandler(historyRepo, portHistRepo)
 	backupH := handlers.NewBackupHandler(backupRepo)
 	userH := handlers.NewUserHandler(userRepo)
 	authH := handlers.NewAuthHandler(userRepo, jwtManager)
+	inventoryH := handlers.NewInventoryHandler(inventoryRepo)
+	scanH := handlers.NewScanHandler(sched)
 
 	pageH := handlers.NewPageHandler(filepath.Join(projectRoot, "templates"))
 
-	router.Setup(server, jwtManager, hub, powerH, descH, healthH, portH, backupH, userH, authH, pageH)
+	router.Setup(server, jwtManager, hub, powerH, descH, healthH, healthHistoryH, portH, portHistoryH, calendarH, backupH, userH, authH, pageH, inventoryH, scanH)
 
 	// Graceful shutdown
 	srv := &http.Server{
@@ -81,6 +99,9 @@ func main() {
 	<-quit
 
 	log.Println("shutdown signal received, stopping...")
+
+	sched.FlushHealthBuffer()
+	sshPool.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

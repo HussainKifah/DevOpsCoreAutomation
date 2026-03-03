@@ -16,6 +16,7 @@ type DeviceInfo struct {
 type DevicePowerSummary struct {
 	Device    string `json:"device"`
 	Site      string `json:"site"`
+	Host      string `json:"host"`
 	Total     int64  `json:"total"`
 	WeakCount int64  `json:"weak_count"`
 }
@@ -97,9 +98,15 @@ func (r *powerRepository) GetPaginated(page, perPage int, device, search string)
 		return nil, err
 	}
 
-	totalPages := int((total + int64(perPage) - 1) / int64(perPage))
-	if page > totalPages && totalPages > 0 {
-		page = totalPages
+	var totalPages int
+	if perPage > 0 {
+		totalPages = int((total + int64(perPage) - 1) / int64(perPage))
+		if page > totalPages && totalPages > 0 {
+			page = totalPages
+		}
+	} else {
+		totalPages = 1
+		page = 1
 	}
 
 	// Data query — separate fresh query to avoid shared state with Count
@@ -114,8 +121,12 @@ func (r *powerRepository) GetPaginated(page, perPage int, device, search string)
 		dataQ = dataQ.Where("power_readings.ont_idx ILIKE ? OR ont_descriptions.desc1 ILIKE ? OR ont_descriptions.desc2 ILIKE ?", pattern, pattern, pattern)
 	}
 
+	if perPage > 0 {
+		dataQ = dataQ.Offset((page - 1) * perPage).Limit(perPage)
+	}
+
 	var data []PowerReadingWithDesc
-	err := dataQ.Order("power_readings.olt_rx ASC").Offset((page - 1) * perPage).Limit(perPage).Scan(&data).Error
+	err := dataQ.Order("power_readings.olt_rx ASC").Scan(&data).Error
 	if err != nil {
 		return nil, err
 	}
@@ -153,8 +164,8 @@ func (r *powerRepository) GetDevices() ([]DeviceInfo, error) {
 func (r *powerRepository) GetSummary(threshold float64) ([]DevicePowerSummary, error) {
 	var out []DevicePowerSummary
 	err := r.DB.Model(&models.PowerReading{}).
-		Select("device, site, COUNT(*) as total, SUM(CASE WHEN olt_rx < ? THEN 1 ELSE 0 END) as weak_count", threshold).
-		Group("device, site").
+		Select("device, site, host, COUNT(*) as total, SUM(CASE WHEN olt_rx < ? THEN 1 ELSE 0 END) as weak_count", threshold).
+		Group("device, site, host").
 		Order("site, device").
 		Find(&out).Error
 	return out, err

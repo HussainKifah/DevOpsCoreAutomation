@@ -30,11 +30,8 @@ type Config struct {
 }
 
 func Load() *Config {
-	// Try .env in current dir, then parent dirs (for running from cmd/api/)
 	if err := godotenv.Load(); err != nil {
-		if err2 := godotenv.Load("../../.env"); err2 != nil {
-			log.Println("WARN: no .env file found, using environment variables")
-		}
+		log.Println("INFO: no .env file found, using environment variables")
 	}
 
 	return &Config{

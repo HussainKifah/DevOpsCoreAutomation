@@ -115,7 +115,8 @@ func RoleGuard(allowedRoles ...string) gin.HandlerFunc {
 }
 
 // PageRoleGuard checks the role from JWT claims (for page routes).
-// Redirects to /dashboard if the user's role is not allowed.
+// Redirects to fallback if the user's role is not allowed.
+// Default fallback is /dashboard; pass an explicit path to override.
 func PageRoleGuard(allowedRoles ...string) gin.HandlerFunc {
 	allowed := make(map[string]bool, len(allowedRoles))
 	for _, r := range allowedRoles {
@@ -135,7 +136,13 @@ func PageRoleGuard(allowedRoles ...string) gin.HandlerFunc {
 			return
 		}
 		if !allowed[claims.Role] {
-			ctx.Redirect(http.StatusFound, "/dashboard")
+			if allowed["excess"] {
+				ctx.SetCookie("access_token", "", -1, "/", "", false, true)
+				ctx.SetCookie("refresh_token", "", -1, "/", "", false, true)
+				ctx.Redirect(http.StatusFound, "/login")
+			} else {
+				ctx.Redirect(http.StatusFound, "/dashboard")
+			}
 			ctx.Abort()
 			return
 		}

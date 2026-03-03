@@ -20,9 +20,13 @@ func Connect(cfg *config.Config) *gorm.DB {
 	}
 
 	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatalf("failed to get underlying sql.DB: %v", err)
+	}
 	sqlDB.SetMaxOpenConns(25)
-	sqlDB.SetConnMaxIdleTime(5)
-	sqlDB.SetConnMaxLifetime(5 * time.Minute)
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+	sqlDB.SetConnMaxLifetime(30 * time.Minute)
 
 	if err := db.AutoMigrate(
 		&models.PowerReading{},
@@ -31,9 +35,28 @@ func Connect(cfg *config.Config) *gorm.DB {
 		&models.PortProtectionRecord{},
 		&models.OltBackups{},
 		&models.User{},
+		&models.HealthSnapshot{},
+		&models.PortSnapshot{},
+		&models.InventorySummary{},
+		&models.OltInventory{},
 	); err != nil {
 		log.Fatalf("failed to migrate database: %v", err)
 	}
+
+	go func() {
+		indexes := []string{
+			"CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_hs_measured ON health_snapshots (measured_at)",
+			"CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_hs_host_measured ON health_snapshots (host, measured_at)",
+			"CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_ps_measured ON port_snapshots (measured_at)",
+			"CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_ps_host_measured ON port_snapshots (host, measured_at)",
+		}
+		for _, ddl := range indexes {
+			if err := db.Exec(ddl).Error; err != nil {
+				log.Printf("index warning: %v", err)
+			}
+		}
+		log.Println("database indexes ensured")
+	}()
 
 	log.Println("database connected and migrated")
 	return db

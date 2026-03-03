@@ -26,21 +26,32 @@ type Health struct {
 }
 
 var (
-	reCpu    = regexp.MustCompile(`slot\s*:\s*(\S+)\s+.*?average\(%\)\s*:\s*(\d+)`)
-	reUptime = regexp.MustCompile(`System Up Time\s*:\s*(.+?)\s*\(`)
-	reTemp   = regexp.MustCompile(`(?m)^((?:nt-[ab]|lt:\S+))\s+(\d+)\s+(\d+)\s+\d+\s+(\d+)\s+\d+\s+(\d+)`)
+	reCpu      = regexp.MustCompile(`(?s)slot\s*:\s*(\S+)\s.*?average[^:\n]*:\s*(\d+)`)
+	reCpuTable = regexp.MustCompile(`(?m)^\s*(nt-[a-z]\S*|lt:\d+/\d+/\d+)\s+\d+\s+(\d+)`)
+	reUptime   = regexp.MustCompile(`System Up Time\s*:\s*(.+?)\s*\(`)
+	reTemp     = regexp.MustCompile(`(?m)^((?:nt-[ab]|lt:\S+))\s+(\d+)\s+(\d+)\s+\d+\s+(\d+)\s+\d+\s+(\d+)`)
 )
 
 func ExtractHealth(output string) Health {
 	var h Health
 
-	// CPU loads
+	// CPU loads — try "slot : X ... average : Y" format first
 	for _, m := range reCpu.FindAllStringSubmatch(output, -1) {
 		avg, _ := strconv.Atoi(m[2])
 		h.CpuLoads = append(h.CpuLoads, CpuLoad{
 			Slot:    m[1],
 			Average: avg,
 		})
+	}
+	// Fallback: table format "nt-a  <current>  <average>" (FX-16 style)
+	if len(h.CpuLoads) == 0 {
+		for _, m := range reCpuTable.FindAllStringSubmatch(output, -1) {
+			avg, _ := strconv.Atoi(m[2])
+			h.CpuLoads = append(h.CpuLoads, CpuLoad{
+				Slot:    m[1],
+				Average: avg,
+			})
+		}
 	}
 
 	// Uptime

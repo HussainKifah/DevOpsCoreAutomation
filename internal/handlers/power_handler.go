@@ -25,7 +25,9 @@ func (h *PowerHandler) GetAll(c *gin.Context) {
 	if page < 1 {
 		page = 1
 	}
-	if perPage < 1 || perPage > 200 {
+	if c.Query("export") == "true" {
+		perPage = 0
+	} else if perPage < 1 || perPage > 200 {
 		perPage = 50
 	}
 
