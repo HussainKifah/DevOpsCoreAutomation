@@ -22,7 +22,7 @@ func main() {
 	config := &ssh.ClientConfig{
 		User: "devops",
 		Auth: []ssh.AuthMethod{
-			ssh.Password("Le@@M0DjkHIerR"),
+			ssh.Password(""),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Config: ssh.Config{
