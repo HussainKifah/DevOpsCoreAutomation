@@ -7,8 +7,16 @@ import (
 	"gorm.io/gorm"
 )
 
+type PortBatch struct {
+	Device  string
+	Site    string
+	Host    string
+	Records []models.PortProtectionRecord
+}
+
 type PortProtectionRepository interface {
 	BulkInsert(device, site, host string, records []models.PortProtectionRecord) error
+	ReplaceAll(batches []PortBatch) error
 	DeleteByHost(host string) error
 	GetAll() ([]models.PortProtectionRecord, error)
 	GetByHost(host string) ([]models.PortProtectionRecord, error)
@@ -32,6 +40,33 @@ func (r *portProtectionRepository) BulkInsert(device, site, host string, records
 		records[i].MeasuredAt = now
 	}
 	return r.DB.CreateInBatches(records, 100).Error
+}
+
+func (r *portProtectionRepository) ReplaceAll(batches []PortBatch) error {
+	if len(batches) == 0 {
+		return nil
+	}
+	return r.DB.Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		for _, b := range batches {
+			if err := tx.Where("host = ?", b.Host).Delete(&models.PortProtectionRecord{}).Error; err != nil {
+				return err
+			}
+			if len(b.Records) == 0 {
+				continue
+			}
+			for i := range b.Records {
+				b.Records[i].Device = b.Device
+				b.Records[i].Site = b.Site
+				b.Records[i].Host = b.Host
+				b.Records[i].MeasuredAt = now
+			}
+			if err := tx.CreateInBatches(b.Records, 100).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (r *portProtectionRepository) DeleteByHost(host string) error {

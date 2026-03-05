@@ -34,7 +34,7 @@ type Scheduler struct {
 
 	healthBuf   map[string]*models.HealthSnapshot
 	healthBufMu sync.Mutex
-	scanMu      sync.Mutex
+	scanSem     chan struct{}
 }
 
 func New(
@@ -63,6 +63,7 @@ func New(
 		backupRepo:     br,
 		inventoryRepo:  ir,
 		healthBuf:      make(map[string]*models.HealthSnapshot),
+		scanSem:        make(chan struct{}, 3),
 	}
 }
 
@@ -84,20 +85,20 @@ func (s *Scheduler) Start() {
 	log.Println("scheduler started")
 
 	// Run ll jobs immediately in background without blocking
-	go func() {
-		log.Println("[startup] running all jobs immediately")
-		s.runInventoryScan()
-		s.runHealthScan()
-		s.runPowerScan()
-		s.runHealthScan()
-		s.runDescScan()
-		s.runHealthScan()
-		s.runPortScan()
-		s.runHealthScan()
-		s.runBackup()
-		s.runHealthScan()
-		log.Println("[startup] initial scan complete")
-	}()
+	// go func() {
+	// 	log.Println("[startup] running all jobs immediately")
+	// 	s.runInventoryScan()
+	// 	s.runHealthScan()
+	// 	s.runPowerScan()
+	// 	s.runHealthScan()
+	// 	s.runDescScan()
+	// 	s.runHealthScan()
+	// 	s.runPortScan()
+	// 	s.runHealthScan()
+	// 	s.runBackup()
+	// 	s.runHealthScan()
+	// 	log.Println("[startup] initial scan complete")
+	// }()
 }
 
 func mustAdd(sched gocron.Scheduler, interval time.Duration, fn func(), name string) {
@@ -128,10 +129,12 @@ func mustAddCron(sched gocron.Scheduler, cron string, fn func(), name string) {
 // --- Power scan job ---
 
 func (s *Scheduler) runPowerScan() {
-	s.scanMu.Lock()
-	defer s.scanMu.Unlock()
+	s.scanSem <- struct{}{}
+	defer func() { <-s.scanSem }()
 	log.Println("[job] power-scan: starting")
 	cmd := "show equipment ont optics"
+
+	var batches []repository.PowerBatch
 
 	for r := range shell.SendCommandNokiaOLTsPooled(s.pool, cmd) {
 		if r.Err != nil {
@@ -151,13 +154,24 @@ func (s *Scheduler) runPowerScan() {
 			}
 		}
 
-		if err := s.powerRepo.DeleteByHost(r.Host); err != nil {
-			log.Printf("[job] power-scan: delete %s: %v", r.Host, err)
-		}
-		if err := s.powerRepo.BulkInsert(r.Device, r.Site, r.Host, records); err != nil {
-			log.Printf("[job] power-scan: insert %s: %v", r.Host, err)
-		}
+		batches = append(batches, repository.PowerBatch{
+			Device:  r.Device,
+			Site:    r.Site,
+			Host:    r.Host,
+			Records: records,
+		})
 	}
+
+	if len(batches) == 0 {
+		log.Println("[job] power-scan: no results")
+		return
+	}
+
+	log.Printf("[job] power-scan: collected %d OLTs, writing to DB", len(batches))
+	if err := s.powerRepo.ReplaceAll(batches); err != nil {
+		log.Printf("[job] power-scan: replace all failed: %v", err)
+	}
+
 	s.notify("power_update")
 	log.Println("[job] power-scan: done")
 }
@@ -165,10 +179,12 @@ func (s *Scheduler) runPowerScan() {
 // --- Description scan job ---
 
 func (s *Scheduler) runDescScan() {
-	s.scanMu.Lock()
-	defer s.scanMu.Unlock()
+	s.scanSem <- struct{}{}
+	defer func() { <-s.scanSem }()
 	log.Println("[job] desc-scan: starting")
 	cmd := "show equipment ont status pon"
+
+	var batches []repository.DescBatch
 
 	for r := range shell.SendCommandNokiaOLTsPooled(s.pool, cmd) {
 		if r.Err != nil {
@@ -189,13 +205,24 @@ func (s *Scheduler) runDescScan() {
 			}
 		}
 
-		if err := s.descRepo.DeleteByHost(r.Host); err != nil {
-			log.Printf("[job] desc-scan: delete %s: %v", r.Host, err)
-		}
-		if err := s.descRepo.BulkInsert(r.Device, r.Site, r.Host, records); err != nil {
-			log.Printf("[job] desc-scan: insert %s: %v", r.Host, err)
-		}
+		batches = append(batches, repository.DescBatch{
+			Device:  r.Device,
+			Site:    r.Site,
+			Host:    r.Host,
+			Records: records,
+		})
 	}
+
+	if len(batches) == 0 {
+		log.Println("[job] desc-scan: no results")
+		return
+	}
+
+	log.Printf("[job] desc-scan: collected %d OLTs, writing to DB", len(batches))
+	if err := s.descRepo.ReplaceAll(batches); err != nil {
+		log.Printf("[job] desc-scan: replace all failed: %v", err)
+	}
+
 	s.notify("desc_update")
 	log.Println("[job] desc-scan: done")
 }
@@ -203,14 +230,20 @@ func (s *Scheduler) runDescScan() {
 // --- Health scan job ---
 
 func (s *Scheduler) runHealthScan() {
-	s.scanMu.Lock()
-	defer s.scanMu.Unlock()
+	s.scanSem <- struct{}{}
+	defer func() { <-s.scanSem }()
 	log.Println("[job] health-scan: starting")
 	cmds := []string{
 		"show system cpu-load detail",
 		"show core1-uptime",
 		"show equipment temperature",
 	}
+
+	type healthResult struct {
+		record *models.OltHealth
+		snap   *models.HealthSnapshot
+	}
+	var collected []healthResult
 
 	for r := range shell.SendCommandNokiaOLTsPooled(s.pool, cmds...) {
 		if r.Err != nil {
@@ -227,43 +260,70 @@ func (s *Scheduler) runHealthScan() {
 		json.Unmarshal(cpuJSON, &cpuSlice)
 		json.Unmarshal(tempJSON, &tempSlice)
 
-		record := &models.OltHealth{
-			Device:       r.Device,
-			Site:         r.Site,
-			Host:         r.Host,
-			Uptime:       h.Uptime,
-			CpuLoads:     cpuSlice,
-			Temperatures: tempSlice,
-			MeasuredAt:   time.Now(),
-		}
-
-		if err := s.healthRepo.Upsert(record); err != nil {
-			log.Printf("[job] health-scan: upsert %s: %v", r.Host, err)
-		}
-
-		snap := &models.HealthSnapshot{
-			Device:       r.Device,
-			Site:         r.Site,
-			Host:         r.Host,
-			Uptime:       h.Uptime,
-			CpuLoads:     cpuSlice,
-			Temperatures: tempSlice,
-			MeasuredAt:   time.Now(),
-		}
-
-		s.healthBufMu.Lock()
-		prev, hasPrev := s.healthBuf[r.Host]
-		if !hasPrev {
-			s.healthBuf[r.Host] = snap
-		} else {
-			averaged := averageSnapshots(prev, snap)
-			if err := s.healthHistRepo.Insert(averaged); err != nil {
-				log.Printf("[job] health-scan: history insert %s: %v", r.Host, err)
+		uptime := h.Uptime
+		if uptime == "" {
+			if existing, err := s.healthRepo.GetByHost(r.Host); err == nil && existing != nil {
+				uptime = existing.Uptime
 			}
-			delete(s.healthBuf, r.Host)
 		}
-		s.healthBufMu.Unlock()
+
+		now := time.Now()
+		collected = append(collected, healthResult{
+			record: &models.OltHealth{
+				Device:       r.Device,
+				Site:         r.Site,
+				Host:         r.Host,
+				Uptime:       uptime,
+				CpuLoads:     cpuSlice,
+				Temperatures: tempSlice,
+				MeasuredAt:   now,
+			},
+			snap: &models.HealthSnapshot{
+				Device:       r.Device,
+				Site:         r.Site,
+				Host:         r.Host,
+				Uptime:       uptime,
+				CpuLoads:     cpuSlice,
+				Temperatures: tempSlice,
+				MeasuredAt:   now,
+			},
+		})
 	}
+
+	if len(collected) == 0 {
+		log.Println("[job] health-scan: no results")
+		return
+	}
+
+	log.Printf("[job] health-scan: collected %d OLTs, writing to DB", len(collected))
+
+	records := make([]*models.OltHealth, len(collected))
+	for i, c := range collected {
+		records[i] = c.record
+	}
+	if err := s.healthRepo.BulkUpsert(records); err != nil {
+		log.Printf("[job] health-scan: bulk upsert failed: %v", err)
+	}
+
+	s.healthBufMu.Lock()
+	var toInsert []*models.HealthSnapshot
+	for _, c := range collected {
+		prev, hasPrev := s.healthBuf[c.snap.Host]
+		if !hasPrev {
+			s.healthBuf[c.snap.Host] = c.snap
+		} else {
+			toInsert = append(toInsert, averageSnapshots(prev, c.snap))
+			delete(s.healthBuf, c.snap.Host)
+		}
+	}
+	s.healthBufMu.Unlock()
+
+	if len(toInsert) > 0 {
+		if err := s.healthHistRepo.BulkInsert(toInsert); err != nil {
+			log.Printf("[job] health-scan: history bulk insert failed: %v", err)
+		}
+	}
+
 	s.notify("health_update")
 	log.Println("[job] health-scan: done")
 }
@@ -363,11 +423,14 @@ func (s *Scheduler) runHistoryCleanup() {
 // --- Port protection scan job ---
 
 func (s *Scheduler) runPortScan() {
-	s.scanMu.Lock()
-	defer s.scanMu.Unlock()
+	s.scanSem <- struct{}{}
+	defer func() { <-s.scanSem }()
 	log.Println("[job] port-scan: starting")
 	cmd := "show port-protection"
 	now := time.Now()
+
+	var portBatches []repository.PortBatch
+	var allHistorySnaps []models.PortSnapshot
 
 	for r := range shell.SendCommandNokiaOLTsPooled(s.pool, cmd) {
 		if r.Err != nil {
@@ -377,7 +440,6 @@ func (s *Scheduler) runPortScan() {
 		ports := extractor.ExtractPortProtection(r.Data)
 
 		var filtered []models.PortProtectionRecord
-		var historySnaps []models.PortSnapshot
 		for _, p := range ports {
 			if strings.Contains(p.PortState, "down") || strings.Contains(p.PairedState, "down") {
 				filtered = append(filtered, models.PortProtectionRecord{
@@ -387,7 +449,7 @@ func (s *Scheduler) runPortScan() {
 					SwoReason:   p.SwoReason,
 					NumSwo:      p.NumSwo,
 				})
-				historySnaps = append(historySnaps, models.PortSnapshot{
+				allHistorySnaps = append(allHistorySnaps, models.PortSnapshot{
 					Device:      r.Device,
 					Site:        r.Site,
 					Host:        r.Host,
@@ -401,20 +463,30 @@ func (s *Scheduler) runPortScan() {
 			}
 		}
 
-		if err := s.portRepo.DeleteByHost(r.Host); err != nil {
-			log.Printf("[job] port-scan: delete %s: %v", r.Host, err)
-		}
-		if len(filtered) > 0 {
-			if err := s.portRepo.BulkInsert(r.Device, r.Site, r.Host, filtered); err != nil {
-				log.Printf("[job] port-scan: insert %s: %v", r.Host, err)
-			}
-		}
-		if len(historySnaps) > 0 {
-			if err := s.portHistRepo.BulkInsert(historySnaps); err != nil {
-				log.Printf("[job] port-scan: history %s: %v", r.Host, err)
-			}
+		portBatches = append(portBatches, repository.PortBatch{
+			Device:  r.Device,
+			Site:    r.Site,
+			Host:    r.Host,
+			Records: filtered,
+		})
+	}
+
+	if len(portBatches) == 0 {
+		log.Println("[job] port-scan: no results")
+		return
+	}
+
+	log.Printf("[job] port-scan: collected %d OLTs, writing to DB", len(portBatches))
+	if err := s.portRepo.ReplaceAll(portBatches); err != nil {
+		log.Printf("[job] port-scan: replace all failed: %v", err)
+	}
+
+	if len(allHistorySnaps) > 0 {
+		if err := s.portHistRepo.BulkInsert(allHistorySnaps); err != nil {
+			log.Printf("[job] port-scan: history bulk insert failed: %v", err)
 		}
 	}
+
 	s.notify("port_update")
 	log.Println("[job] port-scan: done")
 }
@@ -422,8 +494,8 @@ func (s *Scheduler) runPortScan() {
 // --- Backup job ---
 
 func (s *Scheduler) runBackup() {
-	s.scanMu.Lock()
-	defer s.scanMu.Unlock()
+	s.scanSem <- struct{}{}
+	defer func() { <-s.scanSem }()
 	log.Println("[job] backup: starting")
 	cmd := "info configure flat"
 
@@ -472,8 +544,8 @@ func (s *Scheduler) runBackup() {
 // --- Inventory scan job ---
 
 func (s *Scheduler) runInventoryScan() {
-	s.scanMu.Lock()
-	defer s.scanMu.Unlock()
+	s.scanSem <- struct{}{}
+	defer func() { <-s.scanSem }()
 	log.Println("[job] inventory-scan: starting")
 
 	cmd := "show equipment ont interface detail | match exact:equip-id | count"

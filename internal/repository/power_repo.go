@@ -41,8 +41,16 @@ type PaginatedReadings struct {
 	TotalPages int                    `json:"total_pages"`
 }
 
+type PowerBatch struct {
+	Device  string
+	Site    string
+	Host    string
+	Records []models.PowerReading
+}
+
 type PowerRepository interface {
 	BulkInsert(device, site, host string, readings []models.PowerReading) error
+	ReplaceAll(batches []PowerBatch) error
 	DeleteByHost(host string) error
 	GetAll() ([]models.PowerReading, error)
 	GetPaginated(page, perPage int, device, search string) (*PaginatedReadings, error)
@@ -68,6 +76,33 @@ func (r *powerRepository) BulkInsert(device, site, host string, readings []model
 		readings[i].MeasuredAt = now
 	}
 	return r.DB.CreateInBatches(readings, 100).Error
+}
+
+func (r *powerRepository) ReplaceAll(batches []PowerBatch) error {
+	if len(batches) == 0 {
+		return nil
+	}
+	return r.DB.Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		for _, b := range batches {
+			if err := tx.Where("host = ?", b.Host).Delete(&models.PowerReading{}).Error; err != nil {
+				return err
+			}
+			if len(b.Records) == 0 {
+				continue
+			}
+			for i := range b.Records {
+				b.Records[i].Device = b.Device
+				b.Records[i].Site = b.Site
+				b.Records[i].Host = b.Host
+				b.Records[i].MeasuredAt = now
+			}
+			if err := tx.CreateInBatches(b.Records, 100).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (r *powerRepository) DeleteByHost(host string) error {

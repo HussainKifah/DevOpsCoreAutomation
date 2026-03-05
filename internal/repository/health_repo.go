@@ -8,6 +8,7 @@ import (
 
 type HealthRepository interface {
 	Upsert(h *models.OltHealth) error
+	BulkUpsert(records []*models.OltHealth) error
 	GetAll() ([]models.OltHealth, error)
 	GetByHost(host string) (*models.OltHealth, error)
 }
@@ -25,6 +26,23 @@ func (r *healthRepository) Upsert(h *models.OltHealth) error {
 		Columns:   []clause.Column{{Name: "host"}},
 		DoUpdates: clause.AssignmentColumns([]string{"device", "site", "uptime", "cpu_loads", "temperatures", "measured_at"}),
 	}).Create(h).Error
+}
+
+func (r *healthRepository) BulkUpsert(records []*models.OltHealth) error {
+	if len(records) == 0 {
+		return nil
+	}
+	return r.DB.Transaction(func(tx *gorm.DB) error {
+		for _, h := range records {
+			if err := tx.Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "host"}},
+				DoUpdates: clause.AssignmentColumns([]string{"device", "site", "uptime", "cpu_loads", "temperatures", "measured_at"}),
+			}).Create(h).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (r *healthRepository) GetAll() ([]models.OltHealth, error) {

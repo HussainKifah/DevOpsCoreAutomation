@@ -73,10 +73,13 @@ func HwSendCommandOLT(host, user, pass string, cmds ...string) (string, error) {
 		options.WithPromptPattern(regexp.MustCompile(`(?m)[<>]\S+[<>]\s*$`)),
 		options.WithTransportType(transport.StandardTransport),
 		options.WithSSHConfigFile(""),
-		options.WithTimeoutOps(90*time.Minute),
+		options.WithTimeoutOps(200*time.Minute),
 		options.WithTermWidth(511),
 		options.WithOnOpen(func(d *generic.Driver) error {
 			_, _ = d.SendCommand("screen-length 0 temporary")
+			_, _ = d.SendCommand("enable")
+			_, _ = d.SendCommand("configure")
+
 			return nil
 		}),
 	)

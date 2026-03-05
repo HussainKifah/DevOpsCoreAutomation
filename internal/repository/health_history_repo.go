@@ -20,6 +20,7 @@ type HealthHourEntry struct {
 
 type HealthHistoryRepository interface {
 	Insert(snapshot *models.HealthSnapshot) error
+	BulkInsert(snapshots []*models.HealthSnapshot) error
 	GetByHostAndRange(host string, from, to time.Time) ([]models.HealthSnapshot, error)
 	DeleteOlderThan(cutoff time.Time) (int64, error)
 	GetCalendarDays(from, to time.Time) ([]HealthCalendarDay, error)
@@ -36,6 +37,13 @@ func NewHealthHistoryRepository(db *gorm.DB) HealthHistoryRepository {
 
 func (r *healthHistoryRepository) Insert(s *models.HealthSnapshot) error {
 	return r.DB.Create(s).Error
+}
+
+func (r *healthHistoryRepository) BulkInsert(snapshots []*models.HealthSnapshot) error {
+	if len(snapshots) == 0 {
+		return nil
+	}
+	return r.DB.CreateInBatches(snapshots, 50).Error
 }
 
 func (r *healthHistoryRepository) GetByHostAndRange(host string, from, to time.Time) ([]models.HealthSnapshot, error) {

@@ -7,8 +7,16 @@ import (
 	"gorm.io/gorm"
 )
 
+type DescBatch struct {
+	Device  string
+	Site    string
+	Host    string
+	Records []models.OntDescription
+}
+
 type DescriptionRepository interface {
 	BulkInsert(device, site, host string, descs []models.OntDescription) error
+	ReplaceAll(batches []DescBatch) error
 	DeleteByHost(host string) error
 	GetAll() ([]models.OntDescription, error)
 	GetByHost(host string) ([]models.OntDescription, error)
@@ -31,6 +39,33 @@ func (r *descriptionRepository) BulkInsert(device, site, host string, descs []mo
 		descs[i].MeasuredAt = now
 	}
 	return r.DB.CreateInBatches(descs, 100).Error
+}
+
+func (r *descriptionRepository) ReplaceAll(batches []DescBatch) error {
+	if len(batches) == 0 {
+		return nil
+	}
+	return r.DB.Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		for _, b := range batches {
+			if err := tx.Where("host = ?", b.Host).Delete(&models.OntDescription{}).Error; err != nil {
+				return err
+			}
+			if len(b.Records) == 0 {
+				continue
+			}
+			for i := range b.Records {
+				b.Records[i].Device = b.Device
+				b.Records[i].Site = b.Site
+				b.Records[i].Host = b.Host
+				b.Records[i].MeasuredAt = now
+			}
+			if err := tx.CreateInBatches(b.Records, 100).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (r *descriptionRepository) DeleteByHost(host string) error {
