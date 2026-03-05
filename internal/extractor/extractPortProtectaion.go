@@ -18,22 +18,27 @@ var rePort = regexp.MustCompile(
 	`(?m)^(pon:\S+)\s+\S+\s+(\S+)\s+(\S+)\s+(\S+)\s+(\d+)\s*$`,)
 
 
-func ExtractPortProtection (output string) []PortProtection {
+func ExtractPortProtection(output string) []PortProtection {
 	matches := rePort.FindAllStringSubmatch(output, -1)
-
 	if matches == nil {
 		return nil
 	}
 
+	// Deduplicate by Port — dirty pool buffers can repeat the same output
+	seen := map[string]bool{}
 	results := make([]PortProtection, 0, len(matches))
-	for _,m := range matches {
-		n,_ := strconv.Atoi(m[5])
+	for _, m := range matches {
+		if seen[m[1]] {
+			continue
+		}
+		seen[m[1]] = true
+		n, _ := strconv.Atoi(m[5])
 		results = append(results, PortProtection{
-			Port: m[1],
-			PortState: m[2],
+			Port:        m[1],
+			PortState:   m[2],
 			PairedState: m[3],
-			SwoReason: m[4],
-			NumSwo: n,
+			SwoReason:   m[4],
+			NumSwo:      n,
 		})
 	}
 	return results

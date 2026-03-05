@@ -63,7 +63,7 @@ func New(
 		backupRepo:     br,
 		inventoryRepo:  ir,
 		healthBuf:      make(map[string]*models.HealthSnapshot),
-		scanSem:        make(chan struct{}, 3),
+		scanSem:        make(chan struct{}, 1),
 	}
 }
 
