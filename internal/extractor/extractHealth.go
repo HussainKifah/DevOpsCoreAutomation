@@ -35,32 +35,41 @@ var (
 func ExtractHealth(output string) Health {
 	var h Health
 
-	// CPU loads — try "slot : X ... average : Y" format first
+	// CPU loads — deduplicate by Slot (pool reuse can cause duplicate output)
+	cpuSeen := map[string]bool{}
 	for _, m := range reCpu.FindAllStringSubmatch(output, -1) {
+		if cpuSeen[m[1]] {
+			continue
+		}
+		cpuSeen[m[1]] = true
 		avg, _ := strconv.Atoi(m[2])
-		h.CpuLoads = append(h.CpuLoads, CpuLoad{
-			Slot:    m[1],
-			Average: avg,
-		})
+		h.CpuLoads = append(h.CpuLoads, CpuLoad{Slot: m[1], Average: avg})
 	}
 	// Fallback: table format "nt-a  <current>  <average>" (FX-16 style)
 	if len(h.CpuLoads) == 0 {
 		for _, m := range reCpuTable.FindAllStringSubmatch(output, -1) {
+			if cpuSeen[m[1]] {
+				continue
+			}
+			cpuSeen[m[1]] = true
 			avg, _ := strconv.Atoi(m[2])
-			h.CpuLoads = append(h.CpuLoads, CpuLoad{
-				Slot:    m[1],
-				Average: avg,
-			})
+			h.CpuLoads = append(h.CpuLoads, CpuLoad{Slot: m[1], Average: avg})
 		}
 	}
 
-	// Uptime
-	if m := reUptime.FindStringSubmatch(output); m != nil {
-		h.Uptime = strings.TrimSpace(m[1])
+	// Uptime — take the LAST match so stale pool data is ignored
+	if matches := reUptime.FindAllStringSubmatch(output, -1); len(matches) > 0 {
+		h.Uptime = strings.TrimSpace(matches[len(matches)-1][1])
 	}
 
-	// Temperatures
+	// Temperatures — deduplicate by Slot+SensorID
+	tempSeen := map[string]bool{}
 	for _, m := range reTemp.FindAllStringSubmatch(output, -1) {
+		key := m[1] + ":" + m[2]
+		if tempSeen[key] {
+			continue
+		}
+		tempSeen[key] = true
 		sid, _ := strconv.Atoi(m[2])
 		act, _ := strconv.Atoi(m[3])
 		tcaH, _ := strconv.Atoi(m[4])
