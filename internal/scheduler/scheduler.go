@@ -136,9 +136,7 @@ func (s *Scheduler) runPowerScan() {
 
 	var batches []repository.PowerBatch
 
-	// Backups are large outputs; use fresh sessions instead of the pooled path
-	// to avoid saving truncated/dirty buffer fragments.
-	for r := range shell.SendCommandNokiaOLTs(s.cfg.OLTUser, s.cfg.OLTPass, cmd) {
+	for r := range shell.SendCommandNokiaOLTsPooled(s.pool, cmd) {
 		if r.Err != nil {
 			log.Printf("[job] power-scan: ERROR %s: %v", r.Host, r.Err)
 			continue
@@ -501,7 +499,7 @@ func (s *Scheduler) runBackup() {
 	log.Println("[job] backup: starting")
 	cmd := "info configure flat"
 
-	for r := range shell.SendCommandNokiaOLTsPooled(s.pool, cmd) {
+	for r := range shell.SendCommandNokiaOLTs(s.cfg.OLTUser, s.cfg.OLTPass, cmd) {
 		if r.Err != nil {
 			log.Printf("[job] backup: ERROR %s: %v", r.Host, r.Err)
 			continue
