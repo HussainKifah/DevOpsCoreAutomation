@@ -77,7 +77,7 @@ func (s *Scheduler) Start() {
 	mustAdd(sched, s.cfg.DescScanInterval, s.runDescScan, "desc-scan")
 	mustAdd(sched, s.cfg.HealthScanInterval, s.runHealthScan, "health-scan")
 	mustAdd(sched, s.cfg.PortScanInterval, s.runPortScan, "port-scan")
-	mustAddCron(sched, "0 0 * * *", s.runBackup, "backup")
+	mustAddCron(sched, "0 21 * * *", s.runBackup, "backup")
 	mustAddCron(sched, "0 1 * * *", s.runHistoryCleanup, "history-cleanup")
 	mustAddCron(sched, "0 2 1 * *", s.runInventoryScan, "inventory-scan") // Runs at 02:00 on the 1st of every month
 
