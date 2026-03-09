@@ -77,7 +77,7 @@ func (s *Scheduler) Start() {
 	mustAdd(sched, s.cfg.DescScanInterval, s.runDescScan, "desc-scan")
 	mustAdd(sched, s.cfg.HealthScanInterval, s.runHealthScan, "health-scan")
 	mustAdd(sched, s.cfg.PortScanInterval, s.runPortScan, "port-scan")
-	mustAddCron(sched, "0 21 * * *", s.runBackup, "backup")
+	mustAddCron(sched, "0 21 * * *", s.runBackup, "backup") // 9:00 PM daily (3 hours before midnight)
 	mustAddCron(sched, "0 1 * * *", s.runHistoryCleanup, "history-cleanup")
 	mustAddCron(sched, "0 2 1 * *", s.runInventoryScan, "inventory-scan") // Runs at 02:00 on the 1st of every month
 
@@ -429,6 +429,13 @@ func (s *Scheduler) runPortScan() {
 	cmd := "show port-protection"
 	now := time.Now()
 
+	nokia, _, err := shell.OLTsData()
+	if err != nil {
+		log.Printf("[job] port-scan: OLT list failed: %v", err)
+		return
+	}
+	expectedOLTs := len(nokia)
+
 	var portBatches []repository.PortBatch
 	var allHistorySnaps []models.PortSnapshot
 
@@ -476,7 +483,18 @@ func (s *Scheduler) runPortScan() {
 		return
 	}
 
-	log.Printf("[job] port-scan: collected %d OLTs, writing to DB", len(portBatches))
+	successCount := len(portBatches)
+	successRate := 1.0
+	if expectedOLTs > 0 {
+		successRate = float64(successCount) / float64(expectedOLTs)
+	}
+	if successRate < 0.75 && expectedOLTs > 5 {
+		log.Printf("[job] port-scan: only %d/%d OLTs responded (%.0f%%), skipping DB update to preserve data", successCount, expectedOLTs, successRate*100)
+		s.notify("port_update")
+		return
+	}
+
+	log.Printf("[job] port-scan: collected %d/%d OLTs, writing to DB", successCount, expectedOLTs)
 	if err := s.portRepo.ReplaceAll(portBatches); err != nil {
 		log.Printf("[job] port-scan: replace all failed: %v", err)
 	}

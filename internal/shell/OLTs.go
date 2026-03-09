@@ -2,6 +2,7 @@ package shell
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -16,21 +17,25 @@ type OLT struct {
 }
 type OLTs []OLT
 
-func OLTsData() (nokia OLTs, huawei OLTs) {
-	res, err := http.Get(os.Getenv("OLTS_API_ENV"))
+func OLTsData() (nokia OLTs, huawei OLTs, err error) {
+	apiURL := os.Getenv("OLTS_API_ENV")
+	if apiURL == "" {
+		return nil, nil, fmt.Errorf("OLTS_API_ENV not set")
+	}
+	res, err := http.Get(apiURL)
 	if err != nil {
-		panic(err)
+		return nil, nil, fmt.Errorf("fetch OLT data: %w", err)
 	}
 	defer res.Body.Close()
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		panic(err)
+		return nil, nil, fmt.Errorf("read OLT API response: %w", err)
 	}
 
 	var data OLTs
 	if err := json.Unmarshal(body, &data); err != nil {
-		panic(err)
+		return nil, nil, fmt.Errorf("parse OLT API response: %w", err)
 	}
 
 	for _, olt := range data {
@@ -48,5 +53,5 @@ func OLTsData() (nokia OLTs, huawei OLTs) {
 		}
 	}
 
-	return nokia, huawei
+	return nokia, huawei, nil
 }

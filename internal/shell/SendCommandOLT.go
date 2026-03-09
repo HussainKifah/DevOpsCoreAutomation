@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"log"
 	"regexp"
 	"sync"
 	"time"
@@ -33,7 +34,7 @@ func NkSendCommandOLT(host, user, pass string, cmds ...string) (string, error) {
 		options.WithPromptPattern(regexp.MustCompile(`(?m)(>#)\s*$`)),
 		options.WithTransportType(transport.StandardTransport),
 		options.WithSSHConfigFile(""),
-		options.WithTimeoutOps(120*time.Minute),
+		options.WithTimeoutOps(200*time.Minute),
 		options.WithTermWidth(511),
 	)
 	if err != nil {
@@ -64,7 +65,14 @@ func NkSendCommandOLT(host, user, pass string, cmds ...string) (string, error) {
 }
 
 func SendCommandNokiaOLTs(username, password string, cmds ...string) <-chan Result {
-	nokia, _ := OLTsData()
+	nokia, _, err := OLTsData()
+	if err != nil {
+		log.Printf("Failed to fetch OLT data: %v", err)
+		ch := make(chan Result, 1)
+		ch <- Result{Err: err}
+		close(ch)
+		return ch
+	}
 	results := make(chan Result, len(nokia))
 	var wg sync.WaitGroup
 

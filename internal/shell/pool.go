@@ -173,10 +173,17 @@ func (p *ConnectionPool) Close() {
 }
 
 func SendCommandNokiaOLTsPooled(pool *ConnectionPool, cmds ...string) <-chan Result {
-	nokia, _ := OLTsData()
+	nokia, _, err := OLTsData()
+	if err != nil {
+		log.Printf("Failed to fetch OLT data: %v", err)
+		ch := make(chan Result, 1)
+		ch <- Result{Err: err}
+		close(ch)
+		return ch
+	}
 	results := make(chan Result, len(nokia))
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, 33)
+	sem := make(chan struct{}, len(nokia)) // allow all OLTs to run concurrently
 
 	for _, olt := range nokia {
 		olt := olt
@@ -187,6 +194,11 @@ func SendCommandNokiaOLTsPooled(pool *ConnectionPool, cmds ...string) <-chan Res
 			defer func() { <-sem }()
 
 			data, err := pool.SendCommand(olt.Ip, cmds...)
+			if err != nil {
+				// Retry once for transient failures (no stagger - all still run in parallel)
+				time.Sleep(2 * time.Second)
+				data, err = pool.SendCommand(olt.Ip, cmds...)
+			}
 			results <- Result{Device: olt.Name, Site: olt.Site, Host: olt.Ip, Data: data, Err: err}
 		}()
 	}
