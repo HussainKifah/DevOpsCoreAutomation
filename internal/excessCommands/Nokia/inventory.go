@@ -7,7 +7,7 @@ import (
 
 type InventorySummary struct {
 	Counts      []extractor.EquipIDCount `json:"counts"`
-	VendorCount []extractor.VendorCount  `jsonl:"vender_counts"`
+	VendorCount []extractor.VendorCount  `json:"vendor_counts"`
 	Total       int                      `json:"total"`
 }
 
@@ -16,7 +16,7 @@ type OLTInventory struct {
 	Device       string                   `json:"device"`
 	Site         string                   `json:"site"`
 	Counts       []extractor.EquipIDCount `json:"counts"`
-	Vendorcounts []extractor.VendorCount  `json:"vender_counts"`
+	Vendorcounts []extractor.VendorCount  `json:"vendor_counts"`
 	Total        int                      `json:"total"`
 }
 
@@ -41,10 +41,11 @@ func TotalInventory(pool *shell.ConnectionPool) InventorySummary {
 
 	for _, id := range order {
 		c := totals[id]
-		counts = append(counts, extractor.EquipIDCount{ID: id, Count: totals[id]})
+		equipCount := extractor.EquipIDCount{ID: id, Count: totals[id]}
+		counts = append(counts, equipCount)
 		total += c
 
-		vendor := extractor.GetVender(id)
+		vendor := equipCount.VendorDisplay()
 		if vendorTotals[vendor] == 0 {
 			vendorOrder = append(vendorOrder, vendor)
 		}
@@ -69,7 +70,7 @@ func InventoryPerOLT(pool *shell.ConnectionPool) []OLTInventory {
 
 		for _, c := range counts {
 			total += c.Count
-			vendor := extractor.GetVender(c.ID)
+			vendor := c.VendorDisplay()
 			if vendorTotals[vendor] == 0 {
 				vendorOrder = append(vendorOrder, vendor)
 			}

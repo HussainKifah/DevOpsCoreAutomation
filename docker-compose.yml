@@ -21,6 +21,7 @@ services:
     restart: always
     ports:
       - "80:8080"
+      - "443:8080"
     depends_on:
       db:
         condition: service_healthy
@@ -33,9 +34,12 @@ services:
       DB_NAME: devopscore
       DB_SSLMODE: disable
       PORT: "8080"
+      TLS_CERT: ${TLS_CERT:-}
+      TLS_KEY: ${TLS_KEY:-}
       GIN_MODE: release
     volumes:
       - backups:/app/backups
+      - ./certs:/app/certs:ro
 
 volumes:
   pgdata:

@@ -89,10 +89,18 @@ func main() {
 		Handler: server,
 	}
 	go func() {
-		log.Printf("server starting on :%s", cfg.ServerPort)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server failed: %v", err)
+		if cfg.TLSCertFile != "" && cfg.TLSKeyFile != "" {
+			log.Printf("server starting HTTPs on :%s", cfg.ServerPort)
+			if err := srv.ListenAndServeTLS(cfg.TLSCertFile, cfg.TLSKeyFile); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("server failed: %v", err)
+			}
+		} else {
+			log.Printf("server starting HTTP on :%s", cfg.ServerPort)
+			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("server failed: %v", err)
+			}
 		}
+	
 	}()
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

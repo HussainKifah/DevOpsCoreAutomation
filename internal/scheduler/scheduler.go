@@ -73,32 +73,32 @@ func (s *Scheduler) Start() {
 		log.Fatalf("scheduler: %v", err)
 	}
 
-	mustAdd(sched, s.cfg.PowerScanInterval, s.runPowerScan, "power-scan")
-	mustAdd(sched, s.cfg.DescScanInterval, s.runDescScan, "desc-scan")
-	mustAdd(sched, s.cfg.HealthScanInterval, s.runHealthScan, "health-scan")
-	mustAdd(sched, s.cfg.PortScanInterval, s.runPortScan, "port-scan")
-	mustAddCron(sched, "0 21 * * *", s.runBackup, "backup") // 9:00 PM daily (3 hours before midnight)
-	mustAddCron(sched, "0 1 * * *", s.runHistoryCleanup, "history-cleanup")
-	mustAddCron(sched, "0 2 1 * *", s.runInventoryScan, "inventory-scan") // Runs at 02:00 on the 1st of every month
+	// mustAdd(sched, s.cfg.PowerScanInterval, s.runPowerScan, "power-scan")
+	// mustAdd(sched, s.cfg.DescScanInterval, s.runDescScan, "desc-scan")
+	// mustAdd(sched, s.cfg.HealthScanInterval, s.runHealthScan, "health-scan")
+	// mustAdd(sched, s.cfg.PortScanInterval, s.runPortScan, "port-scan")
+	// mustAddCron(sched, "0 21 * * *", s.runBackup, "backup") // 9:00 PM daily (3 hours before midnight)
+	// mustAddCron(sched, "0 1 * * *", s.runHistoryCleanup, "history-cleanup")
+	// mustAddCron(sched, "0 2 1 * *", s.runInventoryScan, "inventory-scan") // Runs at 02:00 on the 1st of every month
 
 	sched.Start()
 	log.Println("scheduler started")
 
 	// Run ll jobs immediately in background without blocking
-	// go func() {
-	// 	log.Println("[startup] running all jobs immediately")
-	// 	s.runInventoryScan()
-	// 	s.runHealthScan()
-	// 	s.runPowerScan()
-	// 	s.runHealthScan()
-	// 	s.runDescScan()
-	// 	s.runHealthScan()
-	// 	s.runPortScan()
-	// 	s.runHealthScan()
-	// 	s.runBackup()
-	// 	s.runHealthScan()
-	// 	log.Println("[startup] initial scan complete")
-	// }()
+	go func() {
+		log.Println("[startup] running all jobs immediately")
+		s.runInventoryScan()
+		// 	s.runHealthScan()
+		// 	s.runPowerScan()
+		// 	s.runHealthScan()
+		// 	s.runDescScan()
+		// 	s.runHealthScan()
+		// 	s.runPortScan()
+		// 	s.runHealthScan()
+		// 	s.runBackup()
+		// 	s.runHealthScan()
+		log.Println("[startup] initial scan complete")
+	}()
 }
 
 func mustAdd(sched gocron.Scheduler, interval time.Duration, fn func(), name string) {
@@ -566,9 +566,10 @@ func (s *Scheduler) runInventoryScan() {
 	defer func() { <-s.scanSem }()
 	log.Println("[job] inventory-scan: starting")
 
-	cmd := "show equipment ont interface detail | match exact:equip-id | count"
+	cmd := "show equipment ont interface detail"
 
 	totals := make(map[string]int)
+	firstVendor := make(map[string]string)
 	var order []string
 	var oltInventories []models.OltInventory
 	now := time.Now()
@@ -591,10 +592,13 @@ func (s *Scheduler) runInventoryScan() {
 			if totals[c.ID] == 0 {
 				order = append(order, c.ID)
 			}
+			if firstVendor[c.ID] == "" {
+				firstVendor[c.ID] = c.VendorDisplay()
+			}
 			totals[c.ID] += c.Count
 
 			// For this specific OLT
-			vendor := extractor.GetVender(c.ID)
+			vendor := c.VendorDisplay()
 			if vendorTotals[vendor] == 0 {
 				vendorOrder = append(vendorOrder, vendor)
 			}
@@ -606,12 +610,15 @@ func (s *Scheduler) runInventoryScan() {
 			oltVendorCounts = append(oltVendorCounts, extractor.VendorCount{Vendor: v, Count: vendorTotals[v]})
 		}
 
+		swVerCounts := extractor.CountBySwVerAct(r.Data)
+
 		oltInventories = append(oltInventories, models.OltInventory{
 			Host:         r.Host,
 			Device:       r.Device,
 			Site:         r.Site,
 			Counts:       counts,
 			VendorCounts: oltVendorCounts,
+			SwVerCounts:  swVerCounts,
 			Total:        oltTotal,
 			MeasuredAt:   now,
 		})
@@ -630,10 +637,13 @@ func (s *Scheduler) runInventoryScan() {
 
 	for _, id := range order {
 		c := totals[id]
-		globalCounts = append(globalCounts, extractor.EquipIDCount{ID: id, Count: c})
+		vendor := firstVendor[id]
+		if vendor == "" {
+			vendor = "Unknown"
+		}
+		globalCounts = append(globalCounts, extractor.EquipIDCount{ID: id, Count: c, Vendor: vendor})
 		globalTotal += c
 
-		vendor := extractor.GetVender(id)
 		if globalVendorTotals[vendor] == 0 {
 			globalVendorOrder = append(globalVendorOrder, vendor)
 		}
@@ -645,9 +655,34 @@ func (s *Scheduler) runInventoryScan() {
 		globalVendorCounts = append(globalVendorCounts, extractor.VendorCount{Vendor: v, Count: globalVendorTotals[v]})
 	}
 
+	// Aggregate software version counts from all OLTs
+	swVerTotals := make(map[string]int)
+	swVerFirst := make(map[string]*extractor.SwVerCount)
+	var swVerOrder []string
+	for _, olt := range oltInventories {
+		for _, sv := range olt.SwVerCounts {
+			if swVerTotals[sv.SwVerAct] == 0 {
+				swVerOrder = append(swVerOrder, sv.SwVerAct)
+				svCopy := sv
+				swVerFirst[sv.SwVerAct] = &svCopy
+			}
+			swVerTotals[sv.SwVerAct] += sv.Count
+		}
+	}
+	globalSwVerCounts := make([]extractor.SwVerCount, 0, len(swVerOrder))
+	for _, ver := range swVerOrder {
+		c := swVerTotals[ver]
+		r := extractor.SwVerCount{SwVerAct: ver, Count: c}
+		if f := swVerFirst[ver]; f != nil && f.Vendor != "" {
+			r.Vendor = f.Vendor
+		}
+		globalSwVerCounts = append(globalSwVerCounts, r)
+	}
+
 	summary := &models.InventorySummary{
 		Count:        globalCounts,
 		VendorCounts: globalVendorCounts,
+		SwVerCounts:  globalSwVerCounts,
 		Total:        globalTotal,
 		MeasuredAt:   now,
 	}

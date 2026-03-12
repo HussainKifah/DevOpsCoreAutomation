@@ -18,6 +18,8 @@ type Config struct {
 
 	ServerPort string
 	JWTSecret  string
+	TLSCertFile string
+	TLSKeyFile string
 
 	OLTUser string
 	OLTPass string
@@ -44,6 +46,8 @@ func Load() *Config {
 
 		ServerPort: getEnv("PORT", "8080"),
 		JWTSecret:  getEnv("JWT_SECRET", ""),
+		TLSCertFile: getEnv("TLS_CERT", ""),
+		TLSKeyFile: getEnv("TLS_KEY", ""),
 
 		OLTUser: getEnv("OLT_SSH_USER", ""),
 		OLTPass: getEnv("OLT_SSH_PASS", ""),
