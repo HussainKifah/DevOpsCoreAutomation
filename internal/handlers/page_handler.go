@@ -7,15 +7,17 @@ import (
 	"path/filepath"
 
 	auth "github.com/Flafl/DevOpsCore/internal/Auth"
+	"github.com/Flafl/DevOpsCore/internal/repository"
 	"github.com/gin-gonic/gin"
 )
 
 type PageHandler struct {
 	templates    map[string]*template.Template
 	loginTmpl    *template.Template
+	userRepo     repository.UserRepository
 }
 
-func NewPageHandler(templateDir string) *PageHandler {
+func NewPageHandler(templateDir string, userRepo repository.UserRepository) *PageHandler {
 	base := filepath.Join(templateDir, "layout", "base.html")
 	pages := map[string]string{
 		"dashboard":   filepath.Join(templateDir, "excess", "dashboard.html"),
@@ -39,7 +41,7 @@ func NewPageHandler(templateDir string) *PageHandler {
 		log.Fatalf("failed to parse login template: %v", err)
 	}
 
-	return &PageHandler{templates: tmpl, loginTmpl: loginTmpl}
+	return &PageHandler{templates: tmpl, loginTmpl: loginTmpl, userRepo: userRepo}
 }
 
 func (h *PageHandler) render(c *gin.Context, name string, data gin.H) {
@@ -58,6 +60,12 @@ func (h *PageHandler) render(c *gin.Context, name string, data gin.H) {
 			data["UserEmail"] = uc.Email
 			data["UserRole"] = uc.Role
 			data["UserID"] = uc.UserID
+			// Prefer full name for display; fallback to email if full name is empty
+			if user, err := h.userRepo.GetByID(uc.UserID); err == nil && user.Fullname != "" {
+				data["UserName"] = user.Fullname
+			} else {
+				data["UserName"] = uc.Email
+			}
 		}
 	}
 

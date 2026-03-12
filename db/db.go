@@ -39,6 +39,7 @@ func Connect(cfg *config.Config) *gorm.DB {
 		&models.PortSnapshot{},
 		&models.InventorySummary{},
 		&models.OltInventory{},
+		&models.OntInventoryItem{},
 	); err != nil {
 		log.Fatalf("failed to migrate database: %v", err)
 	}

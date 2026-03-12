@@ -11,17 +11,28 @@ type VendorCount struct {
 }
 
 var (
-	reEquipID  = regexp.MustCompile(`(?i)equip-id\s*:\s*(.*?)(?:\s{2,}|$)`)
-	reSwVerAct = regexp.MustCompile(`(?i)sw-ver-act\s*:\s*(.+?)(?:\s{2,}|$)`)
-	reVendorID = regexp.MustCompile(`(?i)vendor-id\s*:\s*(\S+)`)
-	reYpSerial = regexp.MustCompile(`(?i)yp-serial-no\s*:\s*(.+)`)
-	blockSplit = regexp.MustCompile(`(?m)^-{20,}\s*$`)
+	reEquipID   = regexp.MustCompile(`(?i)equip-id\s*:\s*(.*?)(?:\s{2,}|$)`)
+	reSwVerAct  = regexp.MustCompile(`(?i)sw-ver-act\s*:\s*(.+?)(?:\s{2,}|$)`)
+	reVendorID  = regexp.MustCompile(`(?i)vendor-id\s*:\s*(\S+)`)
+	reYpSerial  = regexp.MustCompile(`(?i)yp-serial-no\s*:\s*(.+)`)
+	reOntID     = regexp.MustCompile(`(?i)ont-id\s*:\s*(\d+(?:/\d+)+)`)
+	reOntIDAlt  = regexp.MustCompile(`(?i)equipment\s+ont\s+(?:ont-id\s+)?(\d+(?:/\d+)+)`)
+	reOntIDLoose = regexp.MustCompile(`(?i)ont-id\s*:?\s*(\d+(?:/\d+)+)`)
+	blockSplit  = regexp.MustCompile(`(?m)^-{20,}\s*$`)
 )
 
 type EquipID struct {
 	ID       string `json:"equip_id"`
+	OntIdx   string `json:"ont_idx,omitempty"`
 	Vendor   string `json:"vendor,omitempty"`
 	SwVerAct string `json:"sw_ver_act,omitempty"`
+	SerialNo string `json:"serial_no,omitempty"`
+}
+
+// OntInventoryItem holds per-ONT model and serial for devices tab.
+type OntInventoryItem struct {
+	OntIdx   string `json:"ont_idx"`
+	EquipID  string `json:"equip_id"`
 	SerialNo string `json:"serial_no,omitempty"`
 }
 type EquipIDCount struct {
@@ -85,8 +96,16 @@ func ExtractAllEquipID(output string) []EquipID {
 		if id == "" || id == "equip_id" || strings.Contains(idLower, "actual-num-slots") {
 			continue
 		}
+		ontIdx := extractField(reOntID, block)
+		if ontIdx == "" {
+			ontIdx = extractField(reOntIDAlt, block)
+		}
+		if ontIdx == "" {
+			ontIdx = extractField(reOntIDLoose, block)
+		}
 		results = append(results, EquipID{
 			ID:       id,
+			OntIdx:   ontIdx,
 			Vendor:   extractField(reVendorID, block),
 			SwVerAct: extractField(reSwVerAct, block),
 			SerialNo: extractField(reYpSerial, block),
@@ -192,6 +211,20 @@ func CountBySwVerAct(output string) []SwVerCount {
 		}
 		results = append(results, r)
 	}
-	println(results)
 	return results
+}
+
+// ExtractPerOntInventory returns per-ONT equip-id and serial for linking to power readings.
+// Uses ont-id from block when present; otherwise empty OntIdx (caller may infer from block order).
+func ExtractPerOntInventory(output string) []OntInventoryItem {
+	all := ExtractAllEquipID(output)
+	out := make([]OntInventoryItem, 0, len(all))
+	for _, e := range all {
+		out = append(out, OntInventoryItem{
+			OntIdx:   e.OntIdx,
+			EquipID:  e.ID,
+			SerialNo: e.SerialNo,
+		})
+	}
+	return out
 }

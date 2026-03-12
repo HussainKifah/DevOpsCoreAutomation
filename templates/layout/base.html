@@ -5,67 +5,112 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DevOps Core Management System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['DM Sans', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+        },
+      },
     }
   </script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <style>
+    :root {
+      --mc-bg: #0a0e1a;
+      --mc-surface: #111827;
+      --mc-card: #1a2236;
+      --mc-primary: #3b82f6;
+      --mc-success: #10b981;
+      --mc-warning: #f59e0b;
+      --mc-danger: #ef4444;
+      --mc-border: rgba(255,255,255,0.08);
+      --mc-text: #f1f5f9;
+      --mc-text-secondary: #94a3b8;
+      --mc-text-muted: #475569;
+    }
     [x-cloak] { display: none !important; }
-    .sidebar-link.active { background-color: rgb(59 130 246 / 0.15); color: rgb(59 130 246); }
-    .dark .sidebar-link.active { background-color: rgb(59 130 246 / 0.2); color: rgb(96 165 250); }
+    .dark body { background: var(--mc-bg); }
+    .sidebar-link { transition: border-color 200ms, box-shadow 200ms; }
+    .sidebar-link.active {
+      border-left: 4px solid var(--mc-primary);
+      background: rgba(59, 130, 246, 0.12);
+      color: #60a5fa;
+    }
+    .sidebar-link:hover:not(.active) { background: rgba(255,255,255,0.05); }
+    .mission-card {
+      transition: border-color 200ms, box-shadow 200ms;
+    }
+    .mission-card:hover {
+      box-shadow: 0 0 0 1px rgba(59,130,246,0.4), 0 8px 24px rgba(0,0,0,0.4);
+    }
+    .btn-press:active { transform: scale(0.98); }
+    @keyframes pulse-critical {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.85; }
+    }
+    .pulse-critical { animation: pulse-critical 2s ease-in-out infinite; }
+    .ws-pulse { animation: pulse-critical 2s ease-in-out infinite; }
   </style>
 </head>
-<body class="bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 min-h-screen flex" x-cloak>
+<body class="bg-[#0a0e1a] text-[#f1f5f9] min-h-screen flex font-sans dark" x-cloak>
 
-  <!-- Sidebar -->
-  <aside class="fixed inset-y-0 left-0 w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col z-30">
-    <!-- Logo area -->
-    <div class="h-16 flex items-center gap-3 px-5 border-b border-gray-200 dark:border-gray-800">
-      <img src="/static/logo.png" alt="FiberX" class="h-12 w-12 rounded-lg object-contain">
-      <span class="font-semibold text-sm leading-tight">DevOps Core<br><span class="text-xs font-normal text-gray-500 dark:text-gray-400">Management System</span></span>
+  <!-- Sidebar: hidden mobile, icon-only tablet (64px), full desktop (256px) -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-16 lg:w-64 bg-[#111827] border-r border-[rgba(255,255,255,0.08)] flex flex-col z-30 transition-all duration-200 hidden sm:flex">
+    <!-- Logo area with WS indicator -->
+    <div class="h-16 flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-5 border-b border-[rgba(255,255,255,0.08)]">
+      <div class="shrink-0">
+        <img src="/static/logo.png" alt="FiberX" class="h-10 w-10 lg:h-12 lg:w-12 rounded-lg object-contain">
+      </div>
+      <span class="hidden lg:inline font-semibold text-sm leading-tight text-[#f1f5f9]">DevOps Core<br><span class="text-xs font-normal text-[#94a3b8]">Management System</span></span>
     </div>
 
     <!-- Navigation -->
-    <nav class="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-      <div class="px-3 pb-2 mb-1">
-        <span class="text-xs font-semibold uppercase tracking-wider text-blue-500 dark:text-blue-400">Excess Team</span>
+    <nav class="flex-1 py-4 px-1 lg:px-3 space-y-1 overflow-y-auto flex flex-col">
+      <div class="px-3 pb-2 mb-1 hidden lg:block">
+        <span class="text-xs font-semibold uppercase tracking-[0.2em] text-[#3b82f6]">EXCESS TEAM</span>
       </div>
-      <a href="/dashboard" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors {{if eq .Page "dashboard"}}active{{end}}">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/></svg>
-        Dashboard
+      <a href="/dashboard" class="sidebar-link flex items-center justify-center lg:justify-start gap-2 lg:gap-3 px-2 lg:px-3 py-2.5 rounded-r-lg text-sm font-medium text-[#94a3b8] lg:pl-4 {{if eq .Page "dashboard"}}active{{end}}" title="Dashboard">
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/></svg>
+        <span class="hidden lg:inline">Dashboard</span>
       </a>
-      <a href="/devices" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors {{if eq .Page "devices"}}active{{end}}">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z"/></svg>
-        Devices
+      <a href="/devices" class="sidebar-link flex items-center justify-center lg:justify-start gap-2 lg:gap-3 px-2 lg:px-3 py-2.5 rounded-r-lg text-sm font-medium text-[#94a3b8] lg:pl-4 {{if eq .Page "devices"}}active{{end}}" title="Devices">
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008z"/></svg>
+        <span class="hidden lg:inline">Devices</span>
       </a>
-      <a href="/alerts" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors {{if eq .Page "alerts"}}active{{end}}">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/></svg>
-        Alerts
+      <a href="/alerts" class="sidebar-link flex items-center justify-center lg:justify-start gap-2 lg:gap-3 px-2 lg:px-3 py-2.5 rounded-r-lg text-sm font-medium text-[#94a3b8] lg:pl-4 {{if eq .Page "alerts"}}active{{end}}" title="Alerts">
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/></svg>
+        <span class="hidden lg:inline">Alerts</span>
       </a>
-      <a href="/backups" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors {{if eq .Page "backups"}}active{{end}}">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
-        Backups
+      <a href="/backups" class="sidebar-link flex items-center justify-center lg:justify-start gap-2 lg:gap-3 px-2 lg:px-3 py-2.5 rounded-r-lg text-sm font-medium text-[#94a3b8] lg:pl-4 {{if eq .Page "backups"}}active{{end}}" title="Backups">
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
+        <span class="hidden lg:inline">Backups</span>
       </a>
 
       {{if eq .UserRole "admin"}}
-      <div class="pt-4 mt-4 border-t border-gray-200 dark:border-gray-800">
-        <span class="px-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Administration</span>
+      <div class="pt-4 mt-4 border-t border-[rgba(255,255,255,0.08)]">
+        <span class="px-3 text-xs font-semibold uppercase tracking-wider text-[#475569]">Administration</span>
       </div>
-      <a href="/admin/users" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors {{if eq .Page "admin-users"}}active{{end}}">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg>
-        Admin Panel
+      <a href="/admin/users" class="sidebar-link flex items-center justify-center lg:justify-start gap-2 lg:gap-3 px-2 lg:px-3 py-2.5 rounded-r-lg text-sm font-medium text-[#94a3b8] lg:pl-4 {{if eq .Page "admin-users"}}active{{end}}" title="Admin Panel">
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg>
+        <span class="hidden lg:inline">Admin Panel</span>
       </a>
       {{end}}
     </nav>
 
     <!-- Dark mode toggle -->
-    <div class="p-3 border-t border-gray-200 dark:border-gray-800">
-      <button @click="toggle()" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+    <div class="p-3 border-t border-[rgba(255,255,255,0.08)]">
+      <button @click="toggle()" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[#94a3b8] hover:bg-white/5 transition-colors btn-press">
         <template x-if="dark">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z"/></svg>
         </template>
@@ -77,69 +122,98 @@
     </div>
 
     <!-- User info & Logout -->
-    <div class="p-3 border-t border-gray-200 dark:border-gray-800">
+    <div class="p-3 border-t border-[rgba(255,255,255,0.08)]">
       <div class="flex items-center gap-3 px-3 py-2">
-        <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
-          {{if .UserEmail}}{{slice .UserEmail 0 1}}{{end}}
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0
+          {{if eq .UserRole "admin"}}bg-gradient-to-br from-purple-600 to-purple-800{{end}}
+          {{if eq .UserRole "excess"}}bg-gradient-to-br from-blue-600 to-blue-800{{end}}
+          {{if eq .UserRole "noc"}}bg-gradient-to-br from-orange-500 to-orange-700{{end}}
+          {{if eq .UserRole "ip"}}bg-gradient-to-br from-teal-500 to-teal-700{{end}}
+          {{if and (ne .UserRole "admin") (ne .UserRole "excess") (ne .UserRole "noc") (ne .UserRole "ip")}}bg-gradient-to-br from-blue-600 to-blue-800{{end}}">
+          {{$display := or .UserName .UserEmail}}{{if $display}}{{slice $display 0 1}}{{end}}
         </div>
         <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{.UserEmail}}</p>
-          <p class="text-xs text-gray-500 dark:text-gray-400 capitalize">{{.UserRole}}</p>
+          <p class="text-sm font-medium text-[#f1f5f9] truncate">{{or .UserName .UserEmail}}</p>
+          <p class="text-xs text-[#94a3b8] capitalize">{{.UserRole}}</p>
         </div>
       </div>
-      <button onclick="logout()" class="mt-1 w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+      <button onclick="logout()" class="mt-1 w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[#ef4444] hover:bg-red-500/10 transition-colors btn-press">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"/></svg>
         Logout
       </button>
     </div>
   </aside>
 
+  <!-- Mobile bottom nav -->
+  <nav class="fixed bottom-0 left-0 right-0 sm:hidden h-16 bg-[#111827] border-t border-[rgba(255,255,255,0.08)] flex items-center justify-around z-30">
+    <a href="/dashboard" class="flex flex-col items-center gap-1 py-2 px-4 {{if eq .Page "dashboard"}}text-[#3b82f6]{{else}}text-[#94a3b8]{{end}}">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/></svg>
+      <span class="text-[10px]">Dashboard</span>
+    </a>
+    <a href="/devices" class="flex flex-col items-center gap-1 py-2 px-4 {{if eq .Page "devices"}}text-[#3b82f6]{{else}}text-[#94a3b8]{{end}}">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008z"/></svg>
+      <span class="text-[10px]">Devices</span>
+    </a>
+    <a href="/alerts" class="flex flex-col items-center gap-1 py-2 px-4 {{if eq .Page "alerts"}}text-[#3b82f6]{{else}}text-[#94a3b8]{{end}}">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/></svg>
+      <span class="text-[10px]">Alerts</span>
+    </a>
+    <a href="/backups" class="flex flex-col items-center gap-1 py-2 px-4 {{if eq .Page "backups"}}text-[#3b82f6]{{else}}text-[#94a3b8]{{end}}">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
+      <span class="text-[10px]">Backups</span>
+    </a>
+  </nav>
+
   <!-- Main content -->
-  <main class="ml-64 flex-1 min-h-screen flex flex-col">
-    <!-- Top bar with notifications -->
-    <div x-data="notificationManager()" x-init="init()" class="sticky top-0 z-20 bg-gray-50/80 dark:bg-gray-950/80 backdrop-blur-sm border-b border-gray-200/60 dark:border-gray-800/60">
-      <div class="flex items-center justify-end px-6 h-12">
+  <main class="ml-0 sm:ml-16 lg:ml-64 pb-16 sm:pb-0 flex-1 min-h-screen flex flex-col">
+    <!-- Top bar with WS status & notifications -->
+    <div x-data="notificationManager()" x-init="init()" class="sticky top-0 z-20 bg-[#0a0e1a]/90 backdrop-blur-sm border-b border-[rgba(255,255,255,0.08)]">
+      <div class="flex items-center justify-between px-6 h-12">
+        <!-- WebSocket Live Indicator (single place) -->
+        <div id="ws-status" class="flex items-center gap-2 text-xs font-medium">
+          <span id="ws-dot-top" class="w-2 h-2 rounded-full bg-[#ef4444] ws-pulse"></span>
+          <span id="ws-label">● OFFLINE</span>
+          <span id="ws-retry" class="text-[#94a3b8] hidden"></span>
+        </div>
         <div class="relative">
-          <button @click="open = !open" class="relative p-2 rounded-lg hover:bg-gray-200/70 dark:hover:bg-gray-800/70 transition-colors">
-            <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <button @click="open = !open" class="relative p-2 rounded-lg hover:bg-white/5 transition-colors">
+            <svg class="w-5 h-5 text-[#94a3b8]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/>
             </svg>
             <span x-show="unreadCount > 0" x-transition
-              class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center px-1 text-[10px] font-bold text-white bg-red-500 rounded-full"
+              class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center px-1 text-[10px] font-bold text-white bg-[#ef4444] rounded-full"
               x-text="unreadCount > 9 ? '9+' : unreadCount"></span>
           </button>
 
-          <!-- Notification dropdown -->
+          <!-- Notification dropdown - slide down + fade -->
           <div x-show="open" @click.away="open = false"
-            x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95 -translate-y-1" x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-            x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
-            class="absolute right-0 top-full mt-2 w-[400px] bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden" x-cloak>
+            x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-2"
+            class="absolute right-0 top-full mt-2 w-[400px] bg-[#1a2236] rounded-xl shadow-2xl border border-[rgba(255,255,255,0.08)] overflow-hidden" x-cloak>
 
-            <!-- Header -->
-            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
-              <h3 class="text-sm font-semibold">Notifications</h3>
+            <div class="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.08)]">
+              <h3 class="text-sm font-semibold text-[#f1f5f9]">Notifications</h3>
               <div class="flex items-center gap-2">
-                <button @click="markAllRead()" x-show="unreadCount > 0" class="text-[11px] text-blue-600 dark:text-blue-400 hover:underline">Mark all read</button>
-                <button @click="clearAll()" x-show="notifications.length > 0" class="text-[11px] text-gray-400 hover:text-red-500 hover:underline">Clear all</button>
+                <button @click="markAllRead()" x-show="unreadCount > 0" class="text-[11px] text-[#3b82f6] hover:underline">Mark all read</button>
+                <button @click="clearAll()" x-show="notifications.length > 0" class="text-[11px] text-[#94a3b8] hover:text-[#ef4444] hover:underline">Clear all</button>
               </div>
             </div>
 
-            <!-- List -->
-            <div class="max-h-[420px] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
+            <div class="max-h-[420px] overflow-y-auto divide-y divide-[rgba(255,255,255,0.08)]">
               <template x-for="n in notifications" :key="n.id">
-                <a :href="n.link" @click="markRead(n.id)" class="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-                  :class="!n.read && 'bg-blue-50/50 dark:bg-blue-950/20'">
+                <a :href="n.link" @click="markRead(n.id)" class="flex items-start gap-3 px-4 py-3 hover:bg-white/5 transition-colors"
+                  :class="!n.read && 'bg-[#3b82f6]/10'">
                   <span class="w-2 h-2 mt-1.5 rounded-full shrink-0" :class="ntColor(n.type)"></span>
                   <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium truncate" x-text="n.title"></p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate" x-text="n.message"></p>
-                    <p class="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5" x-text="timeAgo(n.time)"></p>
+                    <p class="text-sm font-medium truncate text-[#f1f5f9]" x-text="n.title"></p>
+                    <p class="text-xs text-[#94a3b8] truncate" x-text="n.message"></p>
+                    <p class="text-[10px] text-[#475569] mt-0.5" x-text="timeAgo(n.time)"></p>
                   </div>
-                  <svg class="w-4 h-4 text-gray-300 dark:text-gray-600 shrink-0 mt-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                  <svg class="w-4 h-4 text-[#475569] shrink-0 mt-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
                 </a>
               </template>
               <template x-if="notifications.length === 0">
-                <div class="flex flex-col items-center justify-center py-10 text-gray-400 dark:text-gray-600">
+                <div class="flex flex-col items-center justify-center py-10 text-[#94a3b8]">
                   <svg class="w-8 h-8 mb-2 opacity-40" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/></svg>
                   <p class="text-sm">No notifications yet</p>
                 </div>
@@ -150,7 +224,7 @@
       </div>
     </div>
 
-    <div class="flex-1 p-6">
+    <div class="flex-1 p-6" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
       {{template "content" .}}
     </div>
   </main>
@@ -170,11 +244,9 @@
       return {
         open: false,
         notifications: JSON.parse(localStorage.getItem('devops_notifs') || '[]'),
-
         get unreadCount() {
           return this.notifications.filter(function(n) { return !n.read; }).length;
         },
-
         init() {
           var self = this;
           window.addEventListener('ws-update', function(e) {
@@ -184,7 +256,6 @@
             if (type === 'port_update') self.checkPortAlerts();
           });
         },
-
         async checkPortAlerts() {
           try {
             var res = await fetch('/api/ports/down');
@@ -205,7 +276,6 @@
             });
           } catch (e) {}
         },
-
         async checkPowerAlerts() {
           try {
             var res = await fetch('/api/power/summary');
@@ -221,7 +291,6 @@
             }
           } catch (e) {}
         },
-
         async checkHealthAlerts() {
           try {
             var res = await fetch('/api/health');
@@ -250,7 +319,6 @@
             }
           } catch (e) {}
         },
-
         addNotif(type, title, message, link) {
           var dominated = this.notifications.find(function(n) { return n.title === title && (Date.now() - n.time) < 120000; });
           if (dominated) return;
@@ -258,36 +326,30 @@
           if (this.notifications.length > 50) this.notifications = this.notifications.slice(0, 50);
           this.save();
         },
-
         markRead(id) {
           var n = this.notifications.find(function(n) { return n.id === id; });
           if (n) n.read = true;
           this.save();
         },
-
         markAllRead() {
           this.notifications.forEach(function(n) { n.read = true; });
           this.save();
         },
-
         clearAll() {
           this.notifications = [];
           this.save();
         },
-
         save() {
           localStorage.setItem('devops_notifs', JSON.stringify(this.notifications));
         },
-
         ntColor(type) {
-          if (type === 'power_alert') return 'bg-red-500';
-          if (type === 'port_alert') return 'bg-red-500';
-          if (type === 'temp_alert') return 'bg-red-500';
-          if (type === 'temp_warn') return 'bg-orange-500';
-          if (type === 'cpu_alert') return 'bg-yellow-500';
-          return 'bg-blue-400';
+          if (type === 'power_alert') return 'bg-[#ef4444]';
+          if (type === 'port_alert') return 'bg-[#ef4444]';
+          if (type === 'temp_alert') return 'bg-[#ef4444]';
+          if (type === 'temp_warn') return 'bg-[#f59e0b]';
+          if (type === 'cpu_alert') return 'bg-[#f59e0b]';
+          return 'bg-[#3b82f6]';
         },
-
         timeAgo(ts) {
           var diff = Math.floor((Date.now() - ts) / 1000);
           if (diff < 60) return 'just now';
@@ -304,29 +366,57 @@
       } catch (e) {}
       window.location.href = '/login';
     }
+
     (function() {
       var ws;
       var reconnectDelay = 1000;
+      var reconnectAttempts = 0;
 
-      function connect() {
-        ws = new WebSocket(
-          (location.protocol === "https:" ? "wss://" : "ws://") + location.host + '/ws'
-        )
-        ws.onmessage = function(event) {
-          var msg = JSON.parse(event.data)
-          window.dispatchEvent(new CustomEvent('ws-update', {detail: msg}))
+      function updateWsUI(connected) {
+        var dot = document.getElementById('ws-dot');
+        var dotTop = document.getElementById('ws-dot-top');
+        var label = document.getElementById('ws-label');
+        var retry = document.getElementById('ws-retry');
+        if (dot) {
+          dot.className = 'absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ' + (connected ? 'bg-[#10b981]' : 'bg-[#ef4444] ws-pulse');
+          dot.title = connected ? 'Connected' : 'Disconnected';
         }
-        ws.onclose = function() {
-          console.log('[ws] closed, reconnecting in', reconnectDelay, 'ms')
-          setTimeout(connect, reconnectDelay);
-          reconnectDelay = Math.min(reconnectDelay * 2, 30000)
+        if (dotTop) {
+          dotTop.className = 'w-2 h-2 rounded-full ' + (connected ? 'bg-[#10b981]' : 'bg-[#ef4444] ws-pulse');
         }
-        ws.onerror = function() {
-          ws.close()
+        if (label) {
+          label.textContent = connected ? '● LIVE' : '● OFFLINE';
+          label.className = 'text-xs font-medium ' + (connected ? 'text-[#10b981]' : 'text-[#ef4444]');
+        }
+        if (retry) {
+          retry.textContent = connected ? '' : ' (retry ' + reconnectAttempts + ')';
+          retry.classList.toggle('hidden', connected || reconnectAttempts === 0);
         }
       }
-      connect()
-    })()
+
+      function connect() {
+        ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + '/ws');
+        ws.onopen = function() {
+          reconnectAttempts = 0;
+          reconnectDelay = 1000;
+          updateWsUI(true);
+        };
+        ws.onmessage = function(event) {
+          var msg = JSON.parse(event.data);
+          window.dispatchEvent(new CustomEvent('ws-update', {detail: msg}));
+        };
+        ws.onclose = function() {
+          reconnectAttempts++;
+          updateWsUI(false);
+          var retry = document.getElementById('ws-retry');
+          if (retry) { retry.textContent = ' (retry ' + reconnectAttempts + ')'; retry.classList.remove('hidden'); }
+          setTimeout(connect, reconnectDelay);
+          reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+        };
+        ws.onerror = function() { ws.close(); };
+      }
+      connect();
+    })();
   </script>
 </body>
 </html>

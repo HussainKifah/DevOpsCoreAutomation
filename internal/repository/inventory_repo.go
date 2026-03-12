@@ -8,6 +8,7 @@ import (
 type InventoryRepository interface {
 	SaveSummary(summary *models.InventorySummary) error
 	SaveOltInventory(inventories []models.OltInventory) error
+	ReplaceOntInventoryByHost(host string, items []models.OntInventoryItem) error
 	GetLatestSummary() (*models.InventorySummary, error)
 	GetLatestOltInventories() ([]models.OltInventory, error)
 	GetOltInventoryHistory(host string, limit int) ([]models.OltInventory, error)
@@ -30,6 +31,24 @@ func (r *InventoryRepo) SaveOltInventory(inventories []models.OltInventory) erro
 		return nil
 	}
 	return r.db.Create(&inventories).Error
+}
+
+func (r *InventoryRepo) ReplaceOntInventoryByHost(host string, items []models.OntInventoryItem) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("host = ?", host).Delete(&models.OntInventoryItem{}).Error; err != nil {
+			return err
+		}
+		var valid []models.OntInventoryItem
+		for _, it := range items {
+			if it.OntIdx != "" {
+				valid = append(valid, models.OntInventoryItem{Host: host, OntIdx: it.OntIdx, EquipID: it.EquipID, SerialNo: it.SerialNo})
+			}
+		}
+		if len(valid) == 0 {
+			return nil
+		}
+		return tx.CreateInBatches(valid, 200).Error
+	})
 }
 
 func (r *InventoryRepo) GetLatestSummary() (*models.InventorySummary, error) {

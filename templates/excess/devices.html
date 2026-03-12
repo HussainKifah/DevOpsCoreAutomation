@@ -1,85 +1,128 @@
 {{define "content"}}
 <div x-data="devicesPage()" x-init="init()">
-  <h1 class="text-2xl font-bold mb-6">Devices</h1>
+  <h1 class="text-2xl font-bold text-[#f1f5f9] mb-6">Devices</h1>
 
-  <!-- Filters -->
-  <div class="flex flex-wrap gap-4 mb-6">
-    <div class="w-64">
-      <label class="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-400">OLT Device</label>
+  <!-- Sticky filter bar -->
+  <div class="sticky top-12 z-10 -mx-6 px-6 py-3 bg-[#0a0e1a]/95 backdrop-blur-sm border-b border-[rgba(255,255,255,0.08)] mb-6 flex flex-wrap items-end gap-4">
+    <div class="w-56">
+      <label class="block text-sm font-medium mb-1 text-[#94a3b8]">OLT Device</label>
       <select x-model="selectedDevice" @change="page = 1; fetchPage()"
-        class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] text-[#f1f5f9] px-3 py-2 text-sm focus:ring-2 focus:ring-[#3b82f6] focus:border-[#3b82f6]">
         <option value="">All Devices</option>
         <template x-for="d in uniqueDevices" :key="d">
           <option :value="d" x-text="d"></option>
         </template>
       </select>
     </div>
-    <div class="w-64">
-      <label class="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-400">Search ONT</label>
+    <div class="w-56">
+      <label class="block text-sm font-medium mb-1 text-[#94a3b8]">Search ONT</label>
       <input type="text" x-model.debounce.300ms="search" @input="page = 1; fetchPage()"
         placeholder="Search ONT index or description..."
-        class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] text-[#f1f5f9] placeholder-[#475569] px-3 py-2 text-sm focus:ring-2 focus:ring-[#3b82f6] focus:border-[#3b82f6]">
     </div>
-    <div class="flex items-end">
-      <span class="text-sm text-gray-500 dark:text-gray-400" x-text="total + ' ONTs'"></span>
-    </div>
+    <span class="text-sm text-[#94a3b8] font-mono" x-text="total + ' ONTs'"></span>
   </div>
 
-  <!-- Loading -->
+  <!-- Loading: skeleton -->
   <template x-if="loading">
-    <div class="flex items-center justify-center py-20">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-      <span class="ml-3 text-gray-500">Loading data...</span>
+    <div class="space-y-4 py-6">
+      <div class="h-12 w-full rounded-xl bg-[#1a2236] animate-pulse"></div>
+      <div class="h-64 rounded-xl bg-[#1a2236] animate-pulse"></div>
     </div>
   </template>
 
   <!-- Table -->
   <template x-if="!loading">
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+    <div class="mission-card bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] overflow-hidden">
+      <!-- Pagination: TOP of table -->
+      <div class="flex flex-wrap items-center justify-between gap-4 px-4 py-3 border-b border-[rgba(255,255,255,0.08)]">
+        <span class="text-sm text-[#94a3b8]" x-text="total + ' ONTs'"></span>
+        <div class="flex items-center gap-3">
+          <button @click="page = Math.max(1, page - 1); fetchPage()" :disabled="page <= 1"
+            class="px-3 py-1.5 text-sm rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] disabled:opacity-40 hover:bg-[#1a2236] active:scale-[0.98] transition-all">Prev</button>
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-[#94a3b8]">Page</span>
+            <input type="number" min="1" :max="totalPages" x-model="pageInput"
+              @keydown.enter="goToPage()"
+              @blur="goToPage()"
+              class="w-14 px-2 py-1.5 text-sm text-center rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] font-mono focus:ring-2 focus:ring-[#3b82f6] focus:border-[#3b82f6]">
+            <span class="text-sm text-[#94a3b8]" x-text="'of ' + totalPages"></span>
+          </div>
+          <button @click="page = Math.min(totalPages, page + 1); fetchPage()" :disabled="page >= totalPages"
+            class="px-3 py-1.5 text-sm rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] disabled:opacity-40 hover:bg-[#1a2236] active:scale-[0.98] transition-all">Next</button>
+        </div>
+      </div>
+
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
-            <tr class="bg-gray-50 dark:bg-gray-800/50">
-              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">ONT Index</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">OLT Rx (dBm)</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Desc 1</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Desc 2</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Device</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Site</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Host</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Measured At</th>
+            <tr class="bg-[#111827]">
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('ont_idx')">
+                <span class="inline-flex items-center gap-1">ONT Index <span class="text-[#3b82f6]" x-show="sortColumn === 'ont_idx'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('olt_rx')">
+                <span class="inline-flex items-center gap-1">OLT Rx (dBm) <span class="text-[#3b82f6]" x-show="sortColumn === 'olt_rx'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] w-12">Signal</th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('equip_id')">
+                <span class="inline-flex items-center gap-1">Model <span class="text-[#3b82f6]" x-show="sortColumn === 'equip_id'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('serial_no')">
+                <span class="inline-flex items-center gap-1">Serial <span class="text-[#3b82f6]" x-show="sortColumn === 'serial_no'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('desc1')">
+                <span class="inline-flex items-center gap-1">Desc 1 <span class="text-[#3b82f6]" x-show="sortColumn === 'desc1'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('desc2')">
+                <span class="inline-flex items-center gap-1">Desc 2 <span class="text-[#3b82f6]" x-show="sortColumn === 'desc2'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('device')">
+                <span class="inline-flex items-center gap-1">Device <span class="text-[#3b82f6]" x-show="sortColumn === 'device'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('site')">
+                <span class="inline-flex items-center gap-1">Site <span class="text-[#3b82f6]" x-show="sortColumn === 'site'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('host')">
+                <span class="inline-flex items-center gap-1">Host <span class="text-[#3b82f6]" x-show="sortColumn === 'host'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('measured_at')">
+                <span class="inline-flex items-center gap-1">Measured At <span class="text-[#3b82f6]" x-show="sortColumn === 'measured_at'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+          <tbody class="divide-y divide-[rgba(255,255,255,0.08)]">
             <template x-for="r in readings" :key="r.ID">
-              <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
-                <td class="px-4 py-2.5 font-mono text-xs" x-text="r.ont_idx"></td>
+              <tr class="transition-colors duration-200"
+                :class="{
+                  'bg-[#10b981]/10 hover:bg-[#10b981]/15': r.olt_rx >= -20,
+                  'bg-[#f59e0b]/10 hover:bg-[#f59e0b]/15': r.olt_rx >= -24 && r.olt_rx < -20,
+                  'bg-[#ef4444]/10 hover:bg-[#ef4444]/15': r.olt_rx < -24
+                }">
+                <td class="px-4 py-2.5 font-mono text-xs text-[#f1f5f9]" x-text="r.ont_idx"></td>
                 <td class="px-4 py-2.5">
                   <span class="font-mono text-xs px-2 py-0.5 rounded-full"
-                    :class="r.olt_rx < -25 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : r.olt_rx < -24 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'"
+                    :class="r.olt_rx < -24 ? 'bg-[#ef4444]/20 text-[#ef4444]' : r.olt_rx < -20 ? 'bg-[#f59e0b]/20 text-[#f59e0b]' : 'bg-[#10b981]/20 text-[#10b981]'"
                     x-text="r.olt_rx.toFixed(1)"></span>
                 </td>
-                <td class="px-4 py-2.5 text-xs" x-text="r.desc1 || '—'"></td>
-                <td class="px-4 py-2.5 text-xs" x-text="r.desc2 || '—'"></td>
-                <td class="px-4 py-2.5 text-xs" x-text="r.device"></td>
-                <td class="px-4 py-2.5 text-xs" x-text="r.site"></td>
-                <td class="px-4 py-2.5 font-mono text-xs" x-text="r.host"></td>
-                <td class="px-4 py-2.5 text-xs text-gray-500" x-text="new Date(r.measured_at).toLocaleString()"></td>
+                <td class="px-4 py-2.5">
+                  <div class="flex items-end gap-0.5 w-8 h-5" title="Signal strength">
+                    <span class="w-1.5 h-2 rounded-sm" :class="r.olt_rx >= -20 ? 'bg-[#10b981]' : 'bg-[#475569]'"></span>
+                    <span class="w-1.5 h-3 rounded-sm" :class="r.olt_rx >= -22 ? 'bg-[#10b981]' : r.olt_rx >= -24 ? 'bg-[#f59e0b]' : 'bg-[#475569]'"></span>
+                    <span class="w-1.5 h-4 rounded-sm" :class="r.olt_rx >= -24 ? (r.olt_rx >= -20 ? 'bg-[#10b981]' : 'bg-[#f59e0b]') : 'bg-[#ef4444]'"></span>
+                  </div>
+                </td>
+                <td class="px-4 py-2.5 font-mono text-xs text-[#f1f5f9]" x-text="r.equip_id || '—'"></td>
+                <td class="px-4 py-2.5 font-mono text-xs text-[#94a3b8]" x-text="r.serial_no || '—'"></td>
+                <td class="px-4 py-2.5 text-xs text-[#94a3b8]" x-text="r.desc1 || '—'"></td>
+                <td class="px-4 py-2.5 text-xs text-[#94a3b8]" x-text="r.desc2 || '—'"></td>
+                <td class="px-4 py-2.5 text-xs text-[#f1f5f9]" x-text="r.device"></td>
+                <td class="px-4 py-2.5 text-xs text-[#94a3b8]" x-text="r.site"></td>
+                <td class="px-4 py-2.5 font-mono text-xs text-[#94a3b8]" x-text="r.host"></td>
+                <td class="px-4 py-2.5 text-xs text-[#475569]" x-text="new Date(r.measured_at).toLocaleString()"></td>
               </tr>
             </template>
           </tbody>
         </table>
-      </div>
-
-      <!-- Pagination -->
-      <div class="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-800">
-        <span class="text-sm text-gray-500" x-text="'Page ' + page + ' of ' + totalPages + ' \u00B7 ' + total + ' ONTs'"></span>
-        <div class="flex gap-2">
-          <button @click="page = Math.max(1, page - 1); fetchPage()" :disabled="page <= 1"
-            class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-800">Prev</button>
-          <button @click="page = Math.min(totalPages, page + 1); fetchPage()" :disabled="page >= totalPages"
-            class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-800">Next</button>
-        </div>
       </div>
     </div>
   </template>
@@ -94,8 +137,32 @@ function devicesPage() {
     search: '',
     loading: true,
     page: 1,
+    pageInput: '1',
     total: 0,
     totalPages: 1,
+    sortColumn: 'olt_rx',
+    sortDir: 'asc',
+
+    sortBy(col) {
+      if (this.sortColumn === col) {
+        this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        this.sortColumn = col;
+        this.sortDir = 'asc';
+      }
+      this.page = 1;
+      this.fetchPage();
+    },
+
+    goToPage() {
+      var p = parseInt(this.pageInput, 10);
+      if (!isNaN(p) && p >= 1 && p <= this.totalPages) {
+        this.page = p;
+        this.fetchPage();
+      } else {
+        this.pageInput = String(this.page);
+      }
+    },
 
     async init() {
       const devRes = await fetch('/api/devices');
@@ -109,7 +176,12 @@ function devicesPage() {
     },
 
     async fetchPage() {
-      const params = new URLSearchParams({ page: this.page, per_page: 50 });
+      const params = new URLSearchParams({
+        page: this.page,
+        per_page: 50,
+        sort_by: this.sortColumn,
+        sort_order: this.sortDir
+      });
       if (this.selectedDevice) params.set('device', this.selectedDevice);
       if (this.search) params.set('search', this.search);
       const res = await fetch('/api/power/readings?' + params);
@@ -118,6 +190,7 @@ function devicesPage() {
       this.total = json.total || 0;
       this.totalPages = json.total_pages || 1;
       this.page = json.page || 1;
+      this.pageInput = String(this.page);
     }
   }
 }

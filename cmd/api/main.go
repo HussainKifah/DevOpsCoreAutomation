@@ -79,7 +79,7 @@ func main() {
 	inventoryH := handlers.NewInventoryHandler(inventoryRepo)
 	scanH := handlers.NewScanHandler(sched)
 
-	pageH := handlers.NewPageHandler(filepath.Join(projectRoot, "templates"))
+	pageH := handlers.NewPageHandler(filepath.Join(projectRoot, "templates"), userRepo)
 
 	router.Setup(server, jwtManager, hub, powerH, descH, healthH, healthHistoryH, portH, portHistoryH, calendarH, backupH, userH, authH, pageH, inventoryH, scanH)
 
@@ -89,18 +89,22 @@ func main() {
 		Handler: server,
 	}
 	go func() {
+		addr := ":" + cfg.ServerPort
 		if cfg.TLSCertFile != "" && cfg.TLSKeyFile != "" {
-			log.Printf("server starting HTTPs on :%s", cfg.ServerPort)
+			log.Printf("server starting HTTPS on %s", addr)
 			if err := srv.ListenAndServeTLS(cfg.TLSCertFile, cfg.TLSKeyFile); err != nil && err != http.ErrServerClosed {
 				log.Fatalf("server failed: %v", err)
 			}
 		} else {
-			log.Printf("server starting HTTP on :%s", cfg.ServerPort)
+
+			log.Printf("server starting HTTP on %s", addr)
 			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Fatalf("server failed: %v", err)
+
 			}
+
+
 		}
-	
 	}()
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

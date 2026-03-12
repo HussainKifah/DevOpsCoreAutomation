@@ -4,48 +4,126 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login — DevOps Core</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    tailwind.config = { darkMode: 'class' }
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { fontFamily: { sans: ['DM Sans', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] } } },
+    }
   </script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  <style>[x-cloak] { display: none !important; }</style>
+  <style>
+    [x-cloak] { display: none !important; }
+    .login-topo { position: relative; overflow: hidden; }
+    .login-topo::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(16, 185, 129, 0.1) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .node {
+      position: absolute;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: rgba(59, 130, 246, 0.6);
+      animation: node-float 8s ease-in-out infinite;
+    }
+    .node:nth-child(1) { left: 15%; top: 20%; animation-delay: 0s; }
+    .node:nth-child(2) { left: 85%; top: 25%; animation-delay: 1s; }
+    .node:nth-child(3) { left: 50%; top: 45%; animation-delay: 2s; background: rgba(16, 185, 129, 0.5); }
+    .node:nth-child(4) { left: 25%; top: 70%; animation-delay: 0.5s; }
+    .node:nth-child(5) { left: 75%; top: 65%; animation-delay: 1.5s; }
+    .node:nth-child(6) { left: 40%; top: 15%; animation-delay: 2.5s; background: rgba(139, 92, 246, 0.4); }
+    .node:nth-child(7) { left: 60%; top: 85%; animation-delay: 0.8s; }
+    @keyframes node-float {
+      0%, 100% { transform: translate(0, 0); opacity: 0.8; }
+      25% { transform: translate(4px, -6px); opacity: 1; }
+      50% { transform: translate(-3px, 4px); opacity: 0.9; }
+      75% { transform: translate(5px, 2px); opacity: 1; }
+    }
+    .line {
+      position: absolute;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.2), transparent);
+      transform-origin: left center;
+      animation: line-pulse 4s ease-in-out infinite;
+    }
+    .line-1 { left: 15%; top: 23%; width: 35%; transform: rotate(-15deg); }
+    .line-2 { left: 50%; top: 48%; width: 25%; transform: rotate(25deg); animation-delay: 0.5s; }
+    .line-3 { left: 40%; top: 18%; width: 20%; transform: rotate(-5deg); animation-delay: 1s; }
+    @keyframes line-pulse {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 0.8; }
+    }
+    .glass { background: rgba(17, 24, 39, 0.7); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.08); }
+    .btn-press:active { transform: scale(0.98); }
+  </style>
 </head>
-<body class="bg-gray-50 dark:bg-gray-950 min-h-screen flex items-center justify-center transition-colors" x-cloak>
+<body class="bg-[#0a0e1a] min-h-screen flex font-sans" x-cloak>
 
-  <div class="w-full max-w-md mx-4">
-    <!-- Card -->
-    <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 p-8">
-      <!-- Logo -->
-      <div class="flex flex-col items-center mb-8">
-        <img src="/static/logo.png" alt="FiberX" class="h-16 mb-4">
-        <h1 class="text-xl font-bold text-gray-900 dark:text-white">DevOps Core</h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Sign in to your account</p>
+  <!-- Split layout: left = animated topology, right = form -->
+  <div class="flex-1 hidden lg:flex login-topo relative">
+    <!-- Animated nodes -->
+    <div class="node"></div>
+    <div class="node"></div>
+    <div class="node"></div>
+    <div class="node"></div>
+    <div class="node"></div>
+    <div class="node"></div>
+    <div class="node"></div>
+    <div class="line line-1"></div>
+    <div class="line line-2"></div>
+    <div class="line line-3"></div>
+    <!-- Center content -->
+    <div class="absolute inset-0 flex flex-col items-center justify-center p-8">
+      <img src="/static/logo.png" alt="DevOps Core" class="h-20 mb-4 opacity-90">
+      <h2 class="text-2xl font-bold text-[#f1f5f9] text-center">DevOps Core</h2>
+      <p class="text-[#94a3b8] text-sm mt-2 text-center max-w-sm">Nokia OLT Network Monitoring Platform</p>
+    </div>
+  </div>
+
+  <!-- Right panel: login form -->
+  <div class="w-full lg:w-[420px] flex flex-col justify-center p-8 lg:p-12">
+    <div class="glass rounded-2xl p-8 shadow-2xl">
+      <!-- Mobile logo (shown only on small screens) -->
+      <div class="lg:hidden flex flex-col items-center mb-6">
+        <img src="/static/logo.png" alt="DevOps Core" class="h-14 mb-3">
+        <h1 class="text-lg font-bold text-[#f1f5f9]">DevOps Core</h1>
       </div>
+
+      <h2 class="text-xl font-bold text-[#f1f5f9] mb-1 hidden lg:block">Sign in</h2>
+      <p class="text-sm text-[#94a3b8] mb-6 hidden lg:block">Enter your credentials to access the platform</p>
 
       <!-- Error -->
       <template x-if="error">
-        <div class="mb-4 px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-          <p class="text-sm text-red-700 dark:text-red-400" x-text="error"></p>
+        <div class="mb-4 px-4 py-3 rounded-lg bg-[#ef4444]/20 border border-[#ef4444]/40">
+          <p class="text-sm text-[#ef4444]" x-text="error"></p>
         </div>
       </template>
 
       <!-- Form -->
       <form @submit.prevent="login()" class="space-y-5">
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email</label>
+          <label class="block text-sm font-medium text-[#94a3b8] mb-1.5">Email</label>
           <input type="email" x-model="email" required autofocus
-            class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+            class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827]/80 text-[#f1f5f9] px-4 py-2.5 text-sm placeholder-[#475569] focus:ring-2 focus:ring-[#3b82f6] focus:border-transparent outline-none transition-all"
             placeholder="you@example.com">
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Password</label>
+          <label class="block text-sm font-medium text-[#94a3b8] mb-1.5">Password</label>
           <div class="relative">
             <input :type="showPass ? 'text' : 'password'" x-model="password" required
-              class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+              class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827]/80 text-[#f1f5f9] px-4 py-2.5 text-sm placeholder-[#475569] focus:ring-2 focus:ring-[#3b82f6] focus:border-transparent outline-none transition-all"
               placeholder="Enter your password">
-            <button type="button" @click="showPass = !showPass" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+            <button type="button" @click="showPass = !showPass" class="absolute right-3 top-1/2 -translate-y-1/2 text-[#475569] hover:text-[#94a3b8] transition-colors">
               <svg x-show="!showPass" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
               <svg x-show="showPass" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/></svg>
             </button>
@@ -53,7 +131,7 @@
         </div>
 
         <button type="submit" :disabled="loading"
-          class="w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-2.5 text-sm font-semibold text-white transition-colors">
+          class="w-full flex items-center justify-center gap-2 rounded-lg bg-[#3b82f6] hover:bg-[#2563eb] disabled:opacity-50 px-4 py-2.5 text-sm font-semibold text-white transition-colors btn-press">
           <svg x-show="loading" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
           <span x-text="loading ? 'Signing in...' : 'Sign in'"></span>
         </button>
@@ -61,8 +139,8 @@
     </div>
 
     <!-- Dark mode toggle -->
-    <div class="flex justify-center mt-4">
-      <button @click="toggleDark()" class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex items-center gap-1.5 transition-colors">
+    <div class="flex justify-center mt-6">
+      <button @click="toggleDark()" class="text-xs text-[#94a3b8] hover:text-[#f1f5f9] flex items-center gap-1.5 transition-colors">
         <template x-if="dark">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z"/></svg>
         </template>

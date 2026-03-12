@@ -31,6 +31,8 @@ type PowerReadingWithDesc struct {
 	MeasuredAt time.Time `json:"measured_at"`
 	Desc1      string    `json:"desc1"`
 	Desc2      string    `json:"desc2"`
+	EquipID    string    `json:"equip_id,omitempty"`
+	SerialNo   string    `json:"serial_no,omitempty"`
 }
 
 type PaginatedReadings struct {
@@ -53,11 +55,12 @@ type PowerRepository interface {
 	ReplaceAll(batches []PowerBatch) error
 	DeleteByHost(host string) error
 	GetAll() ([]models.PowerReading, error)
-	GetPaginated(page, perPage int, device, search string) (*PaginatedReadings, error)
+	GetPaginated(page, perPage int, device, search, sortBy, sortOrder string) (*PaginatedReadings, error)
 	GetByHost(host string) ([]models.PowerReading, error)
 	GetWeak(threshold float64) ([]models.PowerReading, error)
 	GetDevices() ([]DeviceInfo, error)
 	GetSummary(threshold float64) ([]DevicePowerSummary, error)
+	GetOntIndicesByHost(host string) ([]string, error)
 }
 type powerRepository struct {
 	DB *gorm.DB
@@ -115,8 +118,9 @@ func (r *powerRepository) GetAll() ([]models.PowerReading, error) {
 	return out, err
 }
 
-func (r *powerRepository) GetPaginated(page, perPage int, device, search string) (*PaginatedReadings, error) {
+func (r *powerRepository) GetPaginated(page, perPage int, device, search, sortBy, sortOrder string) (*PaginatedReadings, error) {
 	descJoin := "LEFT JOIN ont_descriptions ON power_readings.ont_idx = ont_descriptions.ont_idx AND power_readings.host = ont_descriptions.host AND ont_descriptions.deleted_at IS NULL"
+	invJoin := "LEFT JOIN ont_inventory_items ON power_readings.ont_idx = ont_inventory_items.ont_idx AND power_readings.host = ont_inventory_items.host AND ont_inventory_items.deleted_at IS NULL"
 
 	// Count query — Model() handles soft delete automatically
 	countQ := r.DB.Model(&models.PowerReading{}).Joins(descJoin)
@@ -146,8 +150,8 @@ func (r *powerRepository) GetPaginated(page, perPage int, device, search string)
 
 	// Data query — separate fresh query to avoid shared state with Count
 	dataQ := r.DB.Model(&models.PowerReading{}).
-		Select("power_readings.id, power_readings.device, power_readings.site, power_readings.host, power_readings.ont_idx, power_readings.olt_rx, power_readings.measured_at, COALESCE(ont_descriptions.desc1, '') as desc1, COALESCE(ont_descriptions.desc2, '') as desc2").
-		Joins(descJoin)
+		Select("power_readings.id, power_readings.device, power_readings.site, power_readings.host, power_readings.ont_idx, power_readings.olt_rx, power_readings.measured_at, COALESCE(ont_descriptions.desc1, '') as desc1, COALESCE(ont_descriptions.desc2, '') as desc2, COALESCE(ont_inventory_items.equip_id, '') as equip_id, COALESCE(ont_inventory_items.serial_no, '') as serial_no").
+		Joins(descJoin).Joins(invJoin)
 	if device != "" {
 		dataQ = dataQ.Where("power_readings.device = ?", device)
 	}
@@ -160,8 +164,40 @@ func (r *powerRepository) GetPaginated(page, perPage int, device, search string)
 		dataQ = dataQ.Offset((page - 1) * perPage).Limit(perPage)
 	}
 
+	// Whitelist sort columns for SQL safety
+	orderCol := "power_readings.olt_rx"
+	if sortBy != "" {
+		switch sortBy {
+		case "ont_idx":
+			orderCol = "power_readings.ont_idx"
+		case "olt_rx":
+			orderCol = "power_readings.olt_rx"
+		case "device":
+			orderCol = "power_readings.device"
+		case "site":
+			orderCol = "power_readings.site"
+		case "host":
+			orderCol = "power_readings.host"
+		case "measured_at":
+			orderCol = "power_readings.measured_at"
+		case "desc1":
+			orderCol = "ont_descriptions.desc1"
+		case "desc2":
+			orderCol = "ont_descriptions.desc2"
+		case "equip_id":
+			orderCol = "ont_inventory_items.equip_id"
+		case "serial_no":
+			orderCol = "ont_inventory_items.serial_no"
+		}
+	}
+	dir := "ASC"
+	if sortOrder == "desc" {
+		dir = "DESC"
+	}
+	orderClause := orderCol + " " + dir
+
 	var data []PowerReadingWithDesc
-	err := dataQ.Order("power_readings.olt_rx ASC").Scan(&data).Error
+	err := dataQ.Order(orderClause).Scan(&data).Error
 	if err != nil {
 		return nil, err
 	}
@@ -204,4 +240,24 @@ func (r *powerRepository) GetSummary(threshold float64) ([]DevicePowerSummary, e
 		Order("site, device").
 		Find(&out).Error
 	return out, err
+}
+
+func (r *powerRepository) GetOntIndicesByHost(host string) ([]string, error) {
+	var rows []struct {
+		OntIdx string
+	}
+	err := r.DB.Model(&models.PowerReading{}).
+		Select("ont_idx").
+		Where("host = ?", host).
+		Order("ont_idx").
+		Distinct("ont_idx").
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, row.OntIdx)
+	}
+	return out, nil
 }

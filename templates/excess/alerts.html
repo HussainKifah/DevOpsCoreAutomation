@@ -1,177 +1,206 @@
 {{define "content"}}
 <div x-data="alertsPage()" x-init="init()">
-  <h1 class="text-2xl font-bold mb-6">Alerts</h1>
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-[#f1f5f9]">Alerts</h1>
+    <!-- View toggle: Cards vs List -->
+    <div class="flex rounded-lg border border-[rgba(255,255,255,0.08)] p-0.5 bg-[#1a2236]">
+      <button @click="alertView = 'cards'"
+        :class="alertView === 'cards' ? 'bg-[#3b82f6] text-white' : 'text-[#94a3b8] hover:text-[#f1f5f9]'"
+        class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors">Cards</button>
+      <button @click="alertView = 'list'"
+        :class="alertView === 'list' ? 'bg-[#3b82f6] text-white' : 'text-[#94a3b8] hover:text-[#f1f5f9]'"
+        class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors">List</button>
+    </div>
+  </div>
 
-  <!-- Loading -->
+  <!-- Loading: skeleton -->
   <template x-if="loading">
-    <div class="flex items-center justify-center py-20">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-      <span class="ml-3 text-gray-500">Loading alerts...</span>
+    <div class="space-y-4 py-6">
+      <div class="h-8 w-48 rounded-lg bg-[#1a2236] animate-pulse"></div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="h-24 rounded-xl bg-[#1a2236] animate-pulse"></div>
+        <div class="h-24 rounded-xl bg-[#1a2236] animate-pulse"></div>
+        <div class="h-24 rounded-xl bg-[#1a2236] animate-pulse"></div>
+      </div>
     </div>
   </template>
 
   <template x-if="!loading">
     <div>
-      <!-- Summary cards -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-              <svg class="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/>
-              </svg>
+      <!-- All Clear empty state -->
+      <template x-if="powerByHost.length === 0 && portsByHost.length === 0 && healthAlertCount === 0">
+        <div class="flex flex-col items-center justify-center py-20 text-center">
+          <svg class="w-16 h-16 text-[#10b981] mb-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="animation: checkDraw 1s ease-out forwards;">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="50" stroke-dashoffset="0" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <p class="text-xl font-semibold text-[#f1f5f9]">All Clear</p>
+          <p class="text-sm text-[#94a3b8] mt-1">No active alerts. All systems nominal.</p>
+        </div>
+      </template>
+
+      <template x-if="powerByHost.length > 0 || portsByHost.length > 0 || healthAlertCount > 0">
+        <div>
+          <!-- CARDS VIEW: Three columns -->
+          <div x-show="alertView === 'cards'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Power Alerts: -30 and below = CRITICAL, rest = WARNING -->
+            <div class="mission-card bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] overflow-hidden">
+              <div class="px-5 py-4 border-b border-[rgba(255,255,255,0.08)] flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-[#ef4444]"></span>
+                <h2 class="text-sm font-semibold text-[#f1f5f9]">Power</h2>
+                <span class="ml-auto text-xs font-mono text-[#94a3b8]" x-text="powerByHost.length + ' hosts'"></span>
+              </div>
+              <div class="max-h-[420px] overflow-y-auto p-3 space-y-2">
+                <template x-if="powerByHost.length === 0">
+                  <p class="text-sm text-[#94a3b8] py-4 text-center">No weak power alerts.</p>
+                </template>
+                <template x-for="h in powerByHost" :key="h.host">
+                  <a :href="'/dashboard?tab=powers&device=' + encodeURIComponent(h.device)"
+                    class="flex items-center gap-3 px-4 py-3 rounded-lg bg-[#111827] hover:bg-[#1a2236] transition-colors group cursor-pointer"
+                    :class="(h.worstRx <= -30 ? 'border-l-4 border-[#ef4444]' : 'border-l-4 border-[#f59e0b]') + (h.worstRx <= -30 ? ' pulse-critical' : '')">
+                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded-full"
+                      :class="h.worstRx <= -30 ? 'bg-[#ef4444]/20 text-[#ef4444]' : 'bg-[#f59e0b]/20 text-[#f59e0b]'">
+                      <span class="w-1.5 h-1.5 rounded-full" :class="h.worstRx <= -30 ? 'bg-[#ef4444]' : 'bg-[#f59e0b]'"></span>
+                      <span x-text="h.worstRx <= -30 ? 'CRITICAL' : 'WARNING'"></span>
+                    </span>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-medium truncate text-[#f1f5f9]" x-text="h.device"></p>
+                      <p class="text-xs text-[#94a3b8] truncate" x-text="h.site + ' \u00B7 ' + h.host + (h.worstRx ? ' \u00B7 ' + h.worstRx.toFixed(1) + ' dBm' : '')"></p>
+                    </div>
+                    <span class="text-lg font-bold font-mono" :class="h.worstRx <= -30 ? 'text-[#ef4444]' : 'text-[#f59e0b]'" x-text="h.count"></span>
+                    <svg class="w-4 h-4 text-[#475569] group-hover:text-[#3b82f6] transition-colors" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                  </a>
+                </template>
+              </div>
             </div>
-            <div>
-              <p class="text-2xl font-bold" x-text="powerByHost.length"></p>
-              <p class="text-xs text-gray-500">Hosts with Weak Power</p>
+
+            <!-- Port Alerts: act-down = CRITICAL, inact only = WARNING -->
+            <div class="mission-card bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] overflow-hidden">
+              <div class="px-5 py-4 border-b border-[rgba(255,255,255,0.08)] flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-[#f59e0b]"></span>
+                <h2 class="text-sm font-semibold text-[#f1f5f9]">Ports</h2>
+                <span class="ml-auto text-xs font-mono text-[#94a3b8]" x-text="portsByHost.length + ' hosts'"></span>
+              </div>
+              <div class="max-h-[420px] overflow-y-auto p-3 space-y-2">
+                <template x-if="portsByHost.length === 0">
+                  <p class="text-sm text-[#94a3b8] py-4 text-center">No down port alerts.</p>
+                </template>
+                <template x-for="h in portsByHost" :key="h.host">
+                  <a :href="'/dashboard?tab=ports&device=' + encodeURIComponent(h.device)"
+                    class="flex items-center gap-3 px-4 py-3 rounded-lg bg-[#111827] hover:bg-[#1a2236] transition-colors group cursor-pointer"
+                    :class="(h.actDownCount > 0 ? 'border-l-4 border-[#ef4444]' : 'border-l-4 border-[#f59e0b]') + (h.actDownCount > 0 ? ' pulse-critical' : '')">
+                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded-full"
+                      :class="h.actDownCount > 0 ? 'bg-[#ef4444]/20 text-[#ef4444]' : 'bg-[#f59e0b]/20 text-[#f59e0b]'">
+                      <span class="w-1.5 h-1.5 rounded-full" :class="h.actDownCount > 0 ? 'bg-[#ef4444]' : 'bg-[#f59e0b]'"></span>
+                      <span x-text="h.actDownCount > 0 ? 'CRITICAL' : 'WARNING'"></span>
+                    </span>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-medium truncate text-[#f1f5f9]" x-text="h.device"></p>
+                      <p class="text-xs text-[#94a3b8] truncate" x-text="h.site + ' \u00B7 ' + h.host"></p>
+                    </div>
+                    <span class="text-lg font-bold font-mono" :class="h.actDownCount > 0 ? 'text-[#ef4444]' : 'text-[#f59e0b]'" x-text="h.count"></span>
+                    <svg class="w-4 h-4 text-[#475569] group-hover:text-[#3b82f6] transition-colors" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                  </a>
+                </template>
+              </div>
+            </div>
+
+            <!-- Health Status -->
+            <div class="mission-card bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] overflow-hidden">
+              <div class="px-5 py-4 border-b border-[rgba(255,255,255,0.08)] flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-[#10b981]"></span>
+                <h2 class="text-sm font-semibold text-[#f1f5f9]">Health</h2>
+                <span class="ml-auto text-xs font-mono text-[#94a3b8]" x-text="healthAlertCount + ' / ' + healthSummary.length"></span>
+              </div>
+              <div class="max-h-[420px] overflow-y-auto p-3 space-y-2">
+                <template x-if="healthSummary.length === 0">
+                  <p class="text-sm text-[#94a3b8] py-4 text-center">No health data yet.</p>
+                </template>
+                <template x-for="olt in (showAllHealth ? healthSummary : healthSummary.slice(0, 10))" :key="olt.host">
+                  <a :href="'/dashboard?tab=health&host=' + encodeURIComponent(olt.host)"
+                    class="flex items-center gap-3 px-4 py-3 rounded-lg bg-[#111827] hover:bg-[#1a2236] transition-colors group cursor-pointer"
+                    :class="{
+                      'border-l-4 border-[#ef4444] pulse-critical': olt.status === 'CRITICAL',
+                      'border-l-4 border-[#f59e0b]': olt.status === 'WARNING',
+                      'border-l-4 border-[#10b981]': olt.status === 'NORMAL'
+                    }">
+                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded-full"
+                      :class="{
+                        'bg-[#ef4444]/20 text-[#ef4444]': olt.status === 'CRITICAL',
+                        'bg-[#f59e0b]/20 text-[#f59e0b]': olt.status === 'WARNING',
+                        'bg-[#10b981]/20 text-[#10b981]': olt.status === 'NORMAL'
+                      }">
+                      <span class="w-1.5 h-1.5 rounded-full"
+                        :class="olt.status === 'CRITICAL' ? 'bg-[#ef4444]' : olt.status === 'WARNING' ? 'bg-[#f59e0b]' : 'bg-[#10b981]'"></span>
+                      <span x-text="olt.status"></span>
+                    </span>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-medium truncate text-[#f1f5f9]" x-text="olt.device"></p>
+                      <p class="text-xs text-[#94a3b8] truncate" x-text="olt.site + ' \u00B7 ' + olt.host"></p>
+                    </div>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                      <span class="text-xs font-mono px-2 py-0.5 rounded" :class="olt.cpu > 80 ? 'bg-[#ef4444]/20 text-[#ef4444]' : olt.cpu > 60 ? 'bg-[#f59e0b]/20 text-[#f59e0b]' : 'bg-[#475569]/30 text-[#94a3b8]'" x-text="olt.cpu + '%'"></span>
+                      <span class="text-xs font-mono px-2 py-0.5 rounded" :class="olt.temp > 65 ? 'bg-[#ef4444]/20 text-[#ef4444]' : olt.temp > 55 ? 'bg-[#f59e0b]/20 text-[#f59e0b]' : 'bg-[#475569]/30 text-[#94a3b8]'" x-text="olt.temp + '\u00B0'"></span>
+                    </div>
+                    <svg class="w-4 h-4 text-[#475569] group-hover:text-[#3b82f6] transition-colors" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                  </a>
+                </template>
+                <template x-if="healthSummary.length > 10">
+                  <button @click="showAllHealth = !showAllHealth" class="w-full py-2 text-sm text-[#3b82f6] hover:text-[#60a5fa]" x-text="showAllHealth ? 'Show less' : 'Show all ' + healthSummary.length + ' OLTs'"></button>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <!-- LIST VIEW: Unified feed sorted by severity -->
+          <div x-show="alertView === 'list'" class="space-y-2">
+            <div class="mission-card bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] overflow-hidden">
+              <div class="px-5 py-4 border-b border-[rgba(255,255,255,0.08)]">
+                <h2 class="text-sm font-semibold text-[#f1f5f9]">Alert Feed</h2>
+                <p class="text-xs text-[#94a3b8] mt-0.5">All alerts in one list, sorted by severity</p>
+              </div>
+              <div class="max-h-[540px] overflow-y-auto divide-y divide-[rgba(255,255,255,0.06)]">
+                <template x-for="a in alertFeed" :key="a.type + '-' + a.host">
+                  <a :href="a.link"
+                    class="flex items-center gap-4 px-5 py-3 hover:bg-[#111827] transition-colors group cursor-pointer"
+                    :class="{
+                      'border-l-4 border-[#ef4444]': a.severity === 'CRITICAL',
+                      'border-l-4 border-[#f59e0b]': a.severity === 'WARNING',
+                      'border-l-4 border-[#10b981]': a.severity === 'NORMAL',
+                      'pulse-critical': a.severity === 'CRITICAL'
+                    }">
+                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded-full shrink-0"
+                      :class="{
+                        'bg-[#ef4444]/20 text-[#ef4444]': a.severity === 'CRITICAL',
+                        'bg-[#f59e0b]/20 text-[#f59e0b]': a.severity === 'WARNING',
+                        'bg-[#10b981]/20 text-[#10b981]': a.severity === 'NORMAL'
+                      }">
+                      <span class="w-1.5 h-1.5 rounded-full" :class="a.severity === 'CRITICAL' ? 'bg-[#ef4444]' : a.severity === 'WARNING' ? 'bg-[#f59e0b]' : 'bg-[#10b981]'"></span>
+                      <span x-text="a.severity"></span>
+                    </span>
+                    <span class="text-[10px] font-medium uppercase tracking-wider text-[#475569] shrink-0 w-16" x-text="a.type"></span>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-medium truncate text-[#f1f5f9]" x-text="a.device"></p>
+                      <p class="text-xs text-[#94a3b8] truncate" x-text="a.site + ' \u00B7 ' + a.host"></p>
+                    </div>
+                    <span class="text-sm font-mono font-bold shrink-0" :class="a.severity === 'CRITICAL' ? 'text-[#ef4444]' : a.severity === 'WARNING' ? 'text-[#f59e0b]' : 'text-[#10b981]'" x-text="a.detail"></span>
+                    <svg class="w-4 h-4 text-[#475569] group-hover:text-[#3b82f6] shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                  </a>
+                </template>
+              </div>
             </div>
           </div>
         </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-              <svg class="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
-              </svg>
-            </div>
-            <div>
-              <p class="text-2xl font-bold" x-text="portsByHost.length"></p>
-              <p class="text-xs text-gray-500">Hosts with Down Ports</p>
-            </div>
-          </div>
-        </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
-              <svg class="w-5 h-5 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z"/>
-              </svg>
-            </div>
-            <div>
-              <p class="text-2xl font-bold" x-text="healthAlertCount + ' / ' + healthSummary.length"></p>
-              <p class="text-xs text-gray-500">Health Alerts</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Power Alerts (grouped by host) -->
-      <div class="mb-8">
-        <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-red-500"></span> Power Alerts
-        </h2>
-        <template x-if="powerByHost.length === 0">
-          <p class="text-gray-500 text-sm py-4 px-5 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
-            No weak power alerts.
-          </p>
-        </template>
-        <div class="space-y-2">
-          <template x-for="h in powerByHost" :key="h.host">
-            <a :href="'/dashboard?tab=powers&device=' + encodeURIComponent(h.device)"
-              class="flex items-center gap-4 px-4 py-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-red-300 dark:hover:border-red-800 transition-colors group cursor-pointer">
-              <span class="flex-shrink-0 px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">CRITICAL</span>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium truncate" x-text="h.device"></p>
-                <p class="text-xs text-gray-500" x-text="h.site + ' \u00B7 ' + h.host"></p>
-              </div>
-              <div class="text-right">
-                <span class="text-lg font-bold text-red-600 dark:text-red-400" x-text="h.count"></span>
-                <p class="text-[10px] text-gray-400">weak ONTs</p>
-              </div>
-              <svg class="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-red-400 transition-colors shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
-            </a>
-          </template>
-        </div>
-      </div>
-
-      <!-- Port Alerts (grouped by host) -->
-      <div class="mb-8">
-        <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-orange-500"></span> Port Protection Alerts
-        </h2>
-        <template x-if="portsByHost.length === 0">
-          <p class="text-gray-500 text-sm py-4 px-5 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
-            No down port alerts.
-          </p>
-        </template>
-        <div class="space-y-2">
-          <template x-for="h in portsByHost" :key="h.host">
-            <a :href="'/dashboard?tab=ports&device=' + encodeURIComponent(h.device)"
-              class="flex items-center gap-4 px-4 py-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-orange-300 dark:hover:border-orange-800 transition-colors group cursor-pointer">
-              <span class="flex-shrink-0 px-2 py-0.5 text-xs font-medium rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">WARNING</span>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium truncate" x-text="h.device"></p>
-                <p class="text-xs text-gray-500" x-text="h.site + ' \u00B7 ' + h.host"></p>
-              </div>
-              <div class="text-right">
-                <span class="text-lg font-bold text-orange-600 dark:text-orange-400" x-text="h.count"></span>
-                <p class="text-[10px] text-gray-400">down ports</p>
-              </div>
-              <svg class="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-orange-400 transition-colors shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
-            </a>
-          </template>
-        </div>
-      </div>
-
-      <!-- Health Status -->
-      <div class="mb-8">
-        <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-yellow-500"></span> Health Status
-          <span class="text-xs font-normal text-gray-500" x-text="'(' + healthSummary.length + ' OLTs)'"></span>
-        </h2>
-        <template x-if="healthSummary.length === 0">
-          <p class="text-gray-500 text-sm py-4 px-5 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
-            No health data available yet.
-          </p>
-        </template>
-        <div class="space-y-2">
-          <template x-for="olt in (showAllHealth ? healthSummary : healthSummary.slice(0, 10))" :key="olt.host">
-            <a :href="'/dashboard?tab=health&host=' + encodeURIComponent(olt.host)"
-              class="flex items-center gap-4 px-4 py-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-800 transition-colors group cursor-pointer">
-              <span class="flex-shrink-0 px-2 py-0.5 text-xs font-medium rounded-full"
-                :class="{
-                  'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400': olt.status === 'CRITICAL',
-                  'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400': olt.status === 'WARNING',
-                  'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400': olt.status === 'NORMAL'
-                }"
-                x-text="olt.status"></span>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium truncate" x-text="olt.device"></p>
-                <p class="text-xs text-gray-500" x-text="olt.site + ' \u00B7 ' + olt.host"></p>
-              </div>
-              <div class="flex items-center gap-3">
-                <span class="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md"
-                  :class="{
-                    'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400': olt.cpu > 80,
-                    'bg-yellow-50 text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-400': olt.cpu > 60 && olt.cpu <= 80,
-                    'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400': olt.cpu <= 60
-                  }">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25z"/></svg>
-                  <span x-text="olt.cpu + '% (' + olt.cpuSlot + ')'"></span>
-                </span>
-                <span class="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md"
-                  :class="{
-                    'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400': olt.temp > 65,
-                    'bg-yellow-50 text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-400': olt.temp > 55 && olt.temp <= 65,
-                    'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400': olt.temp <= 55
-                  }">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z"/></svg>
-                  <span x-text="olt.temp + '\u00B0C (' + olt.tempSlot + ')'"></span>
-                </span>
-              </div>
-              <svg class="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-blue-400 transition-colors shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
-            </a>
-          </template>
-          <template x-if="healthSummary.length > 10">
-            <button @click="showAllHealth = !showAllHealth"
-              class="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-              x-text="showAllHealth ? 'Show less' : 'Show all ' + healthSummary.length + ' OLTs'"></button>
-          </template>
-        </div>
-      </div>
+      </template>
     </div>
   </template>
 </div>
+
+<style>
+  @keyframes checkDraw {
+    from { stroke-dashoffset: 50; opacity: 0.5; }
+    to { stroke-dashoffset: 0; opacity: 1; }
+  }
+</style>
 
 <script>
   function alertsPage() {
@@ -181,6 +210,7 @@
       downPorts: [],
       healthData: [],
       showAllHealth: false,
+      alertView: 'cards',
 
       async init() {
         var [pRes, portRes, hRes] = await Promise.all([
@@ -194,23 +224,26 @@
         this.loading = false;
       },
 
+      // Power: worstRx <= -30 = CRITICAL, else WARNING
       get powerByHost() {
         var map = {};
         this.weakPowers.forEach(function(a) {
           var key = a.host;
           if (!map[key]) map[key] = { device: a.device, site: a.site, host: a.host, count: 0, worstRx: 0 };
           map[key].count++;
-          if (a.olt_rx < map[key].worstRx) map[key].worstRx = a.olt_rx;
+          if ((a.olt_rx || 0) < (map[key].worstRx || 0)) map[key].worstRx = a.olt_rx;
         });
         return Object.values(map).sort(function(a, b) { return b.count - a.count; });
       },
 
+      // Ports: act-down = CRITICAL, inact only = WARNING
       get portsByHost() {
         var map = {};
         this.downPorts.forEach(function(p) {
           var key = p.host;
-          if (!map[key]) map[key] = { device: p.device, site: p.site, host: p.host, count: 0 };
+          if (!map[key]) map[key] = { device: p.device, site: p.site, host: p.host, count: 0, actDownCount: 0 };
           map[key].count++;
+          if (p.port_state === 'act-down' || p.paired_state === 'act-down') map[key].actDownCount++;
         });
         return Object.values(map).sort(function(a, b) { return b.count - a.count; });
       },
@@ -236,6 +269,48 @@
 
       get healthAlertCount() {
         return this.healthSummary.filter(function(o) { return o.status !== 'NORMAL'; }).length;
+      },
+
+      // Unified feed for List view: Critical first, then Warning, then Normal
+      get alertFeed() {
+        var feed = [];
+        var self = this;
+        this.powerByHost.forEach(function(h) {
+          feed.push({
+            type: 'Power',
+            severity: (h.worstRx || 0) <= -30 ? 'CRITICAL' : 'WARNING',
+            device: h.device, site: h.site, host: h.host,
+            detail: h.count + ' weak',
+            link: '/dashboard?tab=powers&device=' + encodeURIComponent(h.device)
+          });
+        });
+        this.portsByHost.forEach(function(h) {
+          feed.push({
+            type: 'Port',
+            severity: h.actDownCount > 0 ? 'CRITICAL' : 'WARNING',
+            device: h.device, site: h.site, host: h.host,
+            detail: h.count + ' down',
+            link: '/dashboard?tab=ports&device=' + encodeURIComponent(h.device)
+          });
+        });
+        this.healthSummary.forEach(function(o) {
+          if (o.status !== 'NORMAL') {
+            feed.push({
+              type: 'Health',
+              severity: o.status,
+              device: o.device, site: o.site, host: o.host,
+              detail: o.cpu + '% / ' + o.temp + '\u00B0',
+              link: '/dashboard?tab=health&host=' + encodeURIComponent(o.host)
+            });
+          }
+        });
+        var order = { CRITICAL: 0, WARNING: 1, NORMAL: 2 };
+        feed.sort(function(a, b) {
+          var diff = (order[a.severity] || 2) - (order[b.severity] || 2);
+          if (diff !== 0) return diff;
+          return (a.device || '').localeCompare(b.device || '');
+        });
+        return feed;
       }
     };
   }

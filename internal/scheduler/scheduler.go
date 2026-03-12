@@ -73,32 +73,32 @@ func (s *Scheduler) Start() {
 		log.Fatalf("scheduler: %v", err)
 	}
 
-	// mustAdd(sched, s.cfg.PowerScanInterval, s.runPowerScan, "power-scan")
-	// mustAdd(sched, s.cfg.DescScanInterval, s.runDescScan, "desc-scan")
-	// mustAdd(sched, s.cfg.HealthScanInterval, s.runHealthScan, "health-scan")
-	// mustAdd(sched, s.cfg.PortScanInterval, s.runPortScan, "port-scan")
-	// mustAddCron(sched, "0 21 * * *", s.runBackup, "backup") // 9:00 PM daily (3 hours before midnight)
-	// mustAddCron(sched, "0 1 * * *", s.runHistoryCleanup, "history-cleanup")
-	// mustAddCron(sched, "0 2 1 * *", s.runInventoryScan, "inventory-scan") // Runs at 02:00 on the 1st of every month
+	 mustAdd(sched, s.cfg.PowerScanInterval, s.runPowerScan, "power-scan")
+	 mustAdd(sched, s.cfg.DescScanInterval, s.runDescScan, "desc-scan")
+	 mustAdd(sched, s.cfg.HealthScanInterval, s.runHealthScan, "health-scan")
+	 mustAdd(sched, s.cfg.PortScanInterval, s.runPortScan, "port-scan")
+	 mustAddCron(sched, "0 21 * * *", s.runBackup, "backup") // 9:00 PM daily (3 hours before midnight)
+	 mustAddCron(sched, "0 1 * * *", s.runHistoryCleanup, "history-cleanup")
+	 mustAddCron(sched, "0 2 1 * *", s.runInventoryScan, "inventory-scan") // Runs at 02:00 on the 1st of every month
 
 	sched.Start()
 	log.Println("scheduler started")
 
 	// Run ll jobs immediately in background without blocking
-	go func() {
-		log.Println("[startup] running all jobs immediately")
-		s.runInventoryScan()
+	//go func() {
+	//	log.Println("[startup] running all jobs immediately")
+		// s.runPowerScan()
+		// s.runInventoryScan()
 		// 	s.runHealthScan()
-		// 	s.runPowerScan()
 		// 	s.runHealthScan()
-		// 	s.runDescScan()
+		// s.runDescScan()
 		// 	s.runHealthScan()
 		// 	s.runPortScan()
 		// 	s.runHealthScan()
 		// 	s.runBackup()
 		// 	s.runHealthScan()
-		log.Println("[startup] initial scan complete")
-	}()
+	//	log.Println("[startup] initial scan complete")
+	//}()
 }
 
 func mustAdd(sched gocron.Scheduler, interval time.Duration, fn func(), name string) {
@@ -611,6 +611,42 @@ func (s *Scheduler) runInventoryScan() {
 		}
 
 		swVerCounts := extractor.CountBySwVerAct(r.Data)
+
+		// Save per-ONT model/serial for devices tab
+		perOnt := extractor.ExtractPerOntInventory(r.Data)
+		var ontItems []models.OntInventoryItem
+		needFallback := false
+		for _, p := range perOnt {
+			if p.OntIdx != "" {
+				ontItems = append(ontItems, models.OntInventoryItem{OntIdx: p.OntIdx, EquipID: p.EquipID, SerialNo: p.SerialNo})
+			} else {
+				needFallback = true
+				ontItems = append(ontItems, models.OntInventoryItem{OntIdx: "", EquipID: p.EquipID, SerialNo: p.SerialNo})
+			}
+		}
+		// Fallback: when ont-id is missing from Nokia output, match by position using ont_idx from power readings
+		if needFallback && len(ontItems) > 0 {
+			ontIdxList, err := s.powerRepo.GetOntIndicesByHost(r.Host)
+			if err == nil && len(ontIdxList) > 0 {
+				for i := range ontItems {
+					if ontItems[i].OntIdx == "" && i < len(ontIdxList) {
+						ontItems[i].OntIdx = ontIdxList[i]
+					}
+				}
+			}
+		}
+		// Store only items with valid ont_idx
+		var toStore []models.OntInventoryItem
+		for _, it := range ontItems {
+			if it.OntIdx != "" {
+				toStore = append(toStore, it)
+			}
+		}
+		if len(toStore) > 0 {
+			if err := s.inventoryRepo.ReplaceOntInventoryByHost(r.Host, toStore); err != nil {
+				log.Printf("[job] inventory-scan: per-ONT inventory for %s: %v", r.Host, err)
+			}
+		}
 
 		oltInventories = append(oltInventories, models.OltInventory{
 			Host:         r.Host,
