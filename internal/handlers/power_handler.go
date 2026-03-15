@@ -21,7 +21,7 @@ func (h *PowerHandler) GetAll(c *gin.Context) {
 	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "50"))
 	device := c.Query("device")
 	search := c.Query("search")
-	sortBy := c.DefaultQuery("sort_by", "olt_rx")
+	sortBy := c.DefaultQuery("sort_by", "ont_rx")
 	sortOrder := c.DefaultQuery("sort_order", "asc")
 	if sortOrder != "desc" {
 		sortOrder = "asc"

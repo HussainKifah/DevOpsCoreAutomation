@@ -9,6 +9,7 @@ import (
 type OntPower struct {
 	OntIdx string
 	OltRx  float64
+	OntRx  float64
 }
 
 func ExtractOntIdxBelowOltRx(output string, threshold float64) []string {
@@ -57,13 +58,17 @@ func ExtractAllOntPower(output string) []OntPower {
 			continue
 		}
 		ontIdx := fields[0]
-		oltRxStr := fields[1]
 
-		oltRx, ok := parseFloat(oltRxStr)
+		// field[1] = rx-signal-level (ONT Rx), field[6] = olt-rx-sig-level (OLT Rx)
+		ontRx, ok := parseFloat(fields[1])
 		if !ok {
 			continue
 		}
-		out = append(out, OntPower{OntIdx: ontIdx, OltRx: oltRx})
+		var oltRx float64
+		if len(fields) >= 7 {
+			oltRx, _ = parseFloat(fields[6])
+		}
+		out = append(out, OntPower{OntIdx: ontIdx, OltRx: oltRx, OntRx: ontRx})
 	}
 	return out
 }

@@ -85,10 +85,10 @@ func (s *Scheduler) Start() {
 	log.Println("scheduler started")
 
 	// Run ll jobs immediately in background without blocking
-	//go func() {
-	//	log.Println("[startup] running all jobs immediately")
-		// s.runPowerScan()
-		// s.runInventoryScan()
+	go func() {
+		log.Println("[startup] running all jobs immediately")
+	s.runInventoryScan()
+	s.runPowerScan()
 		// 	s.runHealthScan()
 		// 	s.runHealthScan()
 		// s.runDescScan()
@@ -97,8 +97,8 @@ func (s *Scheduler) Start() {
 		// 	s.runHealthScan()
 		// 	s.runBackup()
 		// 	s.runHealthScan()
-	//	log.Println("[startup] initial scan complete")
-	//}()
+		log.Println("[startup] initial scan complete")
+	}()
 }
 
 func mustAdd(sched gocron.Scheduler, interval time.Duration, fn func(), name string) {
@@ -151,6 +151,7 @@ func (s *Scheduler) runPowerScan() {
 			records[i] = models.PowerReading{
 				OntIdx: p.OntIdx,
 				OltRx:  p.OltRx,
+				OntRx:  p.OntRx,
 			}
 		}
 

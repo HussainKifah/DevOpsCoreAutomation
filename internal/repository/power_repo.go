@@ -28,6 +28,7 @@ type PowerReadingWithDesc struct {
 	Host       string    `json:"host"`
 	OntIdx     string    `json:"ont_idx"`
 	OltRx      float64   `json:"olt_rx"`
+	OntRx      float64   `json:"ont_rx"`
 	MeasuredAt time.Time `json:"measured_at"`
 	Desc1      string    `json:"desc1"`
 	Desc2      string    `json:"desc2"`
@@ -150,7 +151,7 @@ func (r *powerRepository) GetPaginated(page, perPage int, device, search, sortBy
 
 	// Data query — separate fresh query to avoid shared state with Count
 	dataQ := r.DB.Model(&models.PowerReading{}).
-		Select("power_readings.id, power_readings.device, power_readings.site, power_readings.host, power_readings.ont_idx, power_readings.olt_rx, power_readings.measured_at, COALESCE(ont_descriptions.desc1, '') as desc1, COALESCE(ont_descriptions.desc2, '') as desc2, COALESCE(ont_inventory_items.equip_id, '') as equip_id, COALESCE(ont_inventory_items.serial_no, '') as serial_no").
+		Select("power_readings.id, power_readings.device, power_readings.site, power_readings.host, power_readings.ont_idx, power_readings.olt_rx, power_readings.ont_rx, power_readings.measured_at, COALESCE(ont_descriptions.desc1, '') as desc1, COALESCE(ont_descriptions.desc2, '') as desc2, COALESCE(ont_inventory_items.equip_id, '') as equip_id, COALESCE(ont_inventory_items.serial_no, '') as serial_no").
 		Joins(descJoin).Joins(invJoin)
 	if device != "" {
 		dataQ = dataQ.Where("power_readings.device = ?", device)
@@ -165,13 +166,15 @@ func (r *powerRepository) GetPaginated(page, perPage int, device, search, sortBy
 	}
 
 	// Whitelist sort columns for SQL safety
-	orderCol := "power_readings.olt_rx"
+	orderCol := "power_readings.ont_rx"
 	if sortBy != "" {
 		switch sortBy {
 		case "ont_idx":
 			orderCol = "power_readings.ont_idx"
 		case "olt_rx":
 			orderCol = "power_readings.olt_rx"
+		case "ont_rx":
+			orderCol = "power_readings.ont_rx"
 		case "device":
 			orderCol = "power_readings.device"
 		case "site":
@@ -219,7 +222,7 @@ func (r *powerRepository) GetByHost(host string) ([]models.PowerReading, error) 
 
 func (r *powerRepository) GetWeak(threshold float64) ([]models.PowerReading, error) {
 	var out []models.PowerReading
-	err := r.DB.Where("olt_rx < ?", threshold).Order("olt_rx").Find(&out).Error
+	err := r.DB.Where("ont_rx < ?", threshold).Order("ont_rx").Find(&out).Error
 	return out, err
 }
 
@@ -235,7 +238,7 @@ func (r *powerRepository) GetDevices() ([]DeviceInfo, error) {
 func (r *powerRepository) GetSummary(threshold float64) ([]DevicePowerSummary, error) {
 	var out []DevicePowerSummary
 	err := r.DB.Model(&models.PowerReading{}).
-		Select("device, site, host, COUNT(*) as total, SUM(CASE WHEN olt_rx < ? THEN 1 ELSE 0 END) as weak_count", threshold).
+		Select("device, site, host, COUNT(*) as total, SUM(CASE WHEN ont_rx < ? THEN 1 ELSE 0 END) as weak_count", threshold).
 		Group("device, site, host").
 		Order("site, device").
 		Find(&out).Error
