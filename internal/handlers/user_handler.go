@@ -24,7 +24,7 @@ func (h *UserhHandler) Create(c *gin.Context) {
 		FullName string `json:"full_name" binding:"required,min=2,max=100"`
 		Email    string `json:"email" binding:"required,email"`
 		Password string `json:"password" binding:"required,min=8"`
-		Role     string `json:"role" binding:"required,oneof=user admin excess noc ip"`
+		Role     string `json:"role" binding:"required,oneof=viewer admin excess noc ip"`
 	}
 
 	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
@@ -127,7 +127,7 @@ func (h *UserhHandler) UpdateUser(c *gin.Context) {
 	var req struct {
 		FullName string `json:"full_name" binding:"omitempty,min=2,max=100"`
 		Email    string `json:"email" binding:"omitempty,email"`
-		Role     string `json:"role" binding:"omitempty,oneof=user admin excess noc ip"`
+		Role     string `json:"role" binding:"omitempty,oneof=viewer admin excess noc ip"`
 		Active   *bool  `json:"active"`
 	}
 

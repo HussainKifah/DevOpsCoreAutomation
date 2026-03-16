@@ -35,15 +35,21 @@ func Setup(
 	// Auth API (public)
 	r.POST("/api/auth/login", authH.Login)
 
-	// Protected page routes (excess + admin only)
+	// Page routes viewable by excess, admin, and viewer
 	pages := r.Group("/")
-	pages.Use(middleware.PageAuthMiddleware(jwtManager), middleware.PageRoleGuard("excess", "admin"))
+	pages.Use(middleware.PageAuthMiddleware(jwtManager), middleware.PageRoleGuard("excess", "admin", "viewer"))
 	{
 		pages.GET("/", func(c *gin.Context) { c.Redirect(302, "/dashboard") })
 		pages.GET("/dashboard", pageH.Dashboard)
 		pages.GET("/devices", pageH.Devices)
 		pages.GET("/alerts", pageH.Alerts)
-		pages.GET("/backups", pageH.Backups)
+	}
+
+	// Backups page (excess + admin only)
+	backupPages := r.Group("/")
+	backupPages.Use(middleware.PageAuthMiddleware(jwtManager), middleware.PageRoleGuard("excess", "admin"))
+	{
+		backupPages.GET("/backups", pageH.Backups)
 	}
 
 	// Admin-only page routes
@@ -62,9 +68,9 @@ func Setup(
 		authAPI.POST("/refresh", authH.Refresh)
 	}
 
-	// Protected API routes (excess + admin only)
+	// Read-only API routes (excess, admin, viewer)
 	api := r.Group("/api")
-	api.Use(middleware.AuthMiddleware(jwtManager), middleware.RoleGuard("excess", "admin"))
+	api.Use(middleware.AuthMiddleware(jwtManager), middleware.RoleGuard("excess", "admin", "viewer"))
 	{
 		api.GET("/devices", powerH.GetDevices)
 
@@ -102,20 +108,25 @@ func Setup(
 			history.GET("/day", calendarH.GetDayDetail)
 		}
 
-		backups := api.Group("/backups")
-		{
-			backups.GET("", backupH.GetAll)
-			backups.GET("/:id/download", backupH.Download)
-		}
-
 		inventory := api.Group("/inventory")
 		{
 			inventory.GET("/summary", inventoryH.GetLatestSummary)
 			inventory.GET("/olts", inventoryH.GetLatestOltInventories)
 			inventory.GET("/olts/:host", inventoryH.GetOltInventoryHistory)
 		}
+	}
 
-		scan := api.Group("/scan")
+	// Write API routes (excess + admin only: backups, scans, admin)
+	writeAPI := r.Group("/api")
+	writeAPI.Use(middleware.AuthMiddleware(jwtManager), middleware.RoleGuard("excess", "admin"))
+	{
+		backups := writeAPI.Group("/backups")
+		{
+			backups.GET("", backupH.GetAll)
+			backups.GET("/:id/download", backupH.Download)
+		}
+
+		scan := writeAPI.Group("/scan")
 		{
 			scan.POST("/health", scanH.RunHealth)
 			scan.POST("/power", scanH.RunPower)
@@ -124,7 +135,7 @@ func Setup(
 		}
 
 		// Admin-only API routes
-		users := api.Group("/admin/users")
+		users := writeAPI.Group("/admin/users")
 		users.Use(middleware.RoleGuard("admin"))
 		{
 			users.GET("", userH.ListUsers)

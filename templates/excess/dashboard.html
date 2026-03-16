@@ -535,6 +535,7 @@
       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
       Export Excel
     </button>
+    {{if or (eq .UserRole "excess") (eq .UserRole "admin")}}
     <button
       @click="runScanNow()"
       :disabled="scanRunning"
@@ -544,6 +545,7 @@
       <svg x-show="scanRunning" class="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 019.95 9" stroke-linecap="round"/></svg>
       <span x-text="scanRunning ? 'Scanning...' : 'Run Scan Now'"></span>
     </button>
+    {{end}}
   </div>
 
   <!-- Loading: pulsing skeleton -->

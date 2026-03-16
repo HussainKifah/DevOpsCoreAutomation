@@ -92,10 +92,12 @@
         <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/></svg>
         <span class="hidden lg:inline">Alerts</span>
       </a>
+      {{if or (eq .UserRole "excess") (eq .UserRole "admin")}}
       <a href="/backups" class="sidebar-link flex items-center justify-center lg:justify-start gap-2 lg:gap-3 px-2 lg:px-3 py-2.5 rounded-r-lg text-sm font-medium text-[#94a3b8] lg:pl-4 {{if eq .Page "backups"}}active{{end}}" title="Backups">
         <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
         <span class="hidden lg:inline">Backups</span>
       </a>
+      {{end}}
 
       {{if eq .UserRole "admin"}}
       <div class="pt-4 mt-4 border-t border-[rgba(255,255,255,0.08)]">
@@ -129,7 +131,8 @@
           {{if eq .UserRole "excess"}}bg-gradient-to-br from-blue-600 to-blue-800{{end}}
           {{if eq .UserRole "noc"}}bg-gradient-to-br from-orange-500 to-orange-700{{end}}
           {{if eq .UserRole "ip"}}bg-gradient-to-br from-teal-500 to-teal-700{{end}}
-          {{if and (ne .UserRole "admin") (ne .UserRole "excess") (ne .UserRole "noc") (ne .UserRole "ip")}}bg-gradient-to-br from-blue-600 to-blue-800{{end}}">
+          {{if eq .UserRole "viewer"}}bg-gradient-to-br from-green-500 to-green-700{{end}}
+          {{if and (ne .UserRole "admin") (ne .UserRole "excess") (ne .UserRole "noc") (ne .UserRole "ip") (ne .UserRole "viewer")}}bg-gradient-to-br from-blue-600 to-blue-800{{end}}">
           {{$display := or .UserName .UserEmail}}{{if $display}}{{slice $display 0 1}}{{end}}
         </div>
         <div class="flex-1 min-w-0">
@@ -158,10 +161,12 @@
       <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/></svg>
       <span class="text-[10px]">Alerts</span>
     </a>
+    {{if or (eq .UserRole "excess") (eq .UserRole "admin")}}
     <a href="/backups" class="flex flex-col items-center gap-1 py-2 px-4 {{if eq .Page "backups"}}text-[#3b82f6]{{else}}text-[#94a3b8]{{end}}">
       <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
       <span class="text-[10px]">Backups</span>
     </a>
+    {{end}}
   </nav>
 
   <!-- Main content -->
