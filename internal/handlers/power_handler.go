@@ -22,7 +22,7 @@ func (h *PowerHandler) GetAll(c *gin.Context) {
 	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "50"))
 	device := c.Query("device")
 	search := c.Query("search")
-	sortBy := c.DefaultQuery("sort_by", "olt_rx")
+	sortBy := c.DefaultQuery("sort_by", "ont_rx")
 	sortOrder := c.DefaultQuery("sort_order", "asc")
 	if sortOrder != "desc" {
 		sortOrder = "asc"
@@ -37,7 +37,7 @@ func (h *PowerHandler) GetAll(c *gin.Context) {
 		perPage = 50
 	}
 
-	data, err := h.PowerRepo.GetPaginated(page, perPage, device, search, sortBy, sortOrder, vendor)
+	data, err := h.PowerRepo.GetPaginated(page, perPage, device, search, sortBy, sortOrder)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

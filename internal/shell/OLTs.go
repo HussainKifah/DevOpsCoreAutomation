@@ -17,6 +17,10 @@ type OLT struct {
 }
 type OLTs []OLT
 
+var excludedOLTs = map[string]bool{
+	// "192.168.200.14": true, // overheating
+}
+
 func OLTsData() (nokia OLTs, huawei OLTs, err error) {
 	apiURL := os.Getenv("OLTS_API_ENV")
 	if apiURL == "" {
@@ -39,7 +43,7 @@ func OLTsData() (nokia OLTs, huawei OLTs, err error) {
 	}
 
 	for _, olt := range data {
-		if olt.Ip == "" {
+		if olt.Ip == "" || excludedOLTs[olt.Ip] {
 			continue
 		}
 

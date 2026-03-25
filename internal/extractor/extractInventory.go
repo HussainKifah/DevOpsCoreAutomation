@@ -11,14 +11,15 @@ type VendorCount struct {
 }
 
 var (
-	reEquipID   = regexp.MustCompile(`(?i)equip-id\s*:\s*(.*?)(?:\s{2,}|$)`)
-	reSwVerAct  = regexp.MustCompile(`(?i)sw-ver-act\s*:\s*(.+?)(?:\s{2,}|$)`)
-	reVendorID  = regexp.MustCompile(`(?i)vendor-id\s*:\s*(\S+)`)
-	reYpSerial  = regexp.MustCompile(`(?i)yp-serial-no\s*:\s*(.+)`)
-	reOntID     = regexp.MustCompile(`(?i)ont-id\s*:\s*(\d+(?:/\d+)+)`)
-	reOntIDAlt  = regexp.MustCompile(`(?i)equipment\s+ont\s+(?:ont-id\s+)?(\d+(?:/\d+)+)`)
-	reOntIDLoose = regexp.MustCompile(`(?i)ont-id\s*:?\s*(\d+(?:/\d+)+)`)
-	blockSplit  = regexp.MustCompile(`(?m)^-{20,}\s*$`)
+	reEquipID     = regexp.MustCompile(`(?i)equip-id\s*:\s*(.*?)(?:\s{2,}|$)`)
+	reSwVerAct    = regexp.MustCompile(`(?i)sw-ver-act\s*:\s*(.+?)(?:\s{2,}|$)`)
+	reVendorID    = regexp.MustCompile(`(?i)vendor-id\s*:\s*(\S+)`)
+	reYpSerial    = regexp.MustCompile(`(?i)yp-serial-no\s*:\s*(.+)`)
+	reOntID       = regexp.MustCompile(`(?i)ont-id\s*:\s*(\d+(?:/\d+)+)`)
+	reOntIDAlt    = regexp.MustCompile(`(?i)equipment\s+ont\s+(?:ont-id\s+)?(\d+(?:/\d+)+)`)
+	reOntIDLoose  = regexp.MustCompile(`(?i)ont-id\s*:?\s*(\d+(?:/\d+)+)`)
+	reOntIDHyphen = regexp.MustCompile(`(?i)ont-id\s*:\s*(\d+(?:-\d+)+)`)
+	blockSplit    = regexp.MustCompile(`(?m)^-{20,}\s*$`)
 )
 
 type EquipID struct {
@@ -71,6 +72,15 @@ func extractField(re *regexp.Regexp, block string) string {
 	return ""
 }
 
+// normalizeOntIdx converts ont_idx to slash format to match power_readings (optics table).
+// Power readings use "1/2/3" format; Nokia inventory may use "1-2-3".
+func normalizeOntIdx(ontIdx string) string {
+	if ontIdx == "" {
+		return ""
+	}
+	return strings.ReplaceAll(ontIdx, "-", "/")
+}
+
 func ExtractAllEquipID(output string) []EquipID {
 	output = strings.ReplaceAll(output, "\r\n", "\n")
 	output = strings.ReplaceAll(output, "\r", "\n")
@@ -103,6 +113,10 @@ func ExtractAllEquipID(output string) []EquipID {
 		if ontIdx == "" {
 			ontIdx = extractField(reOntIDLoose, block)
 		}
+		if ontIdx == "" {
+			ontIdx = extractField(reOntIDHyphen, block)
+		}
+		ontIdx = normalizeOntIdx(ontIdx)
 		results = append(results, EquipID{
 			ID:       id,
 			OntIdx:   ontIdx,

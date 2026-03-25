@@ -236,7 +236,7 @@
           var key = a.host;
           if (!map[key]) map[key] = { device: a.device, site: a.site, host: a.host, count: 0, worstRx: 0 };
           map[key].count++;
-          if ((a.olt_rx || 0) < (map[key].worstRx || 0)) map[key].worstRx = a.olt_rx;
+          if ((a.ont_rx || 0) < (map[key].worstRx || 0)) map[key].worstRx = a.ont_rx;
         });
         return Object.values(map).sort(function(a, b) { return b.count - a.count; });
       },

@@ -50,14 +50,16 @@
                       'bg-blue-500/20 text-blue-400': u.role === 'excess',
                       'bg-orange-500/20 text-orange-400': u.role === 'noc',
                       'bg-teal-500/20 text-teal-400': u.role === 'ip',
-                      'bg-[#475569]/30 text-[#94a3b8]': !['admin','excess','noc','ip'].includes(u.role)
+                      'bg-green-500/20 text-green-400': u.role === 'viewer',
+                      'bg-[#475569]/30 text-[#94a3b8]': !['admin','excess','noc','ip','viewer'].includes(u.role)
                     }">
                     <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="{
                       'bg-purple-400': u.role === 'admin',
                       'bg-blue-400': u.role === 'excess',
                       'bg-orange-400': u.role === 'noc',
                       'bg-teal-400': u.role === 'ip',
-                      'bg-[#94a3b8]': !['admin','excess','noc','ip'].includes(u.role)
+                      'bg-green-400': u.role === 'viewer',
+                      'bg-[#94a3b8]': !['admin','excess','noc','ip','viewer'].includes(u.role)
                     }"></span>
                     <span x-text="u.role"></span>
                   </span>
@@ -114,7 +116,7 @@
         <div>
           <label class="block text-sm font-medium text-[#94a3b8] mb-1">Role</label>
           <select x-model="form.role" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] px-3 py-2 text-sm">
-            <option value="user">User</option>
+            <option value="viewer">Viewer</option>
             <option value="admin">Admin</option>
             <option value="excess">Excess</option>
             <option value="noc">NOC</option>

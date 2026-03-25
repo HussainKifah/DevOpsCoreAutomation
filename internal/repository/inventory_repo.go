@@ -8,9 +8,9 @@ import (
 type InventoryRepository interface {
 	SaveSummary(summary *models.InventorySummary) error
 	SaveOltInventory(inventories []models.OltInventory) error
-	ReplaceOntInventoryByHost(host, vendor string, items []models.OntInventoryItem) error
-	GetLatestSummary(vendor string) (*models.InventorySummary, error)
-	GetLatestOltInventories(vendor string) ([]models.OltInventory, error)
+	ReplaceOntInventoryByHost(host string, items []models.OntInventoryItem) error
+	GetLatestSummary() (*models.InventorySummary, error)
+	GetLatestOltInventories() ([]models.OltInventory, error)
 	GetOltInventoryHistory(host string, limit int) ([]models.OltInventory, error)
 }
 
@@ -33,15 +33,15 @@ func (r *InventoryRepo) SaveOltInventory(inventories []models.OltInventory) erro
 	return r.db.Create(&inventories).Error
 }
 
-func (r *InventoryRepo) ReplaceOntInventoryByHost(host, vendor string, items []models.OntInventoryItem) error {
+func (r *InventoryRepo) ReplaceOntInventoryByHost(host string, items []models.OntInventoryItem) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("host = ? AND vendor = ?", host, vendor).Delete(&models.OntInventoryItem{}).Error; err != nil {
+		if err := tx.Unscoped().Where("host = ?", host).Delete(&models.OntInventoryItem{}).Error; err != nil {
 			return err
 		}
 		var valid []models.OntInventoryItem
 		for _, it := range items {
 			if it.OntIdx != "" {
-				valid = append(valid, models.OntInventoryItem{Host: host, OntIdx: it.OntIdx, Vendor: vendor, EquipID: it.EquipID, SerialNo: it.SerialNo})
+				valid = append(valid, models.OntInventoryItem{Host: host, OntIdx: it.OntIdx, EquipID: it.EquipID, SerialNo: it.SerialNo})
 			}
 		}
 		if len(valid) == 0 {
@@ -51,7 +51,7 @@ func (r *InventoryRepo) ReplaceOntInventoryByHost(host, vendor string, items []m
 	})
 }
 
-func (r *InventoryRepo) GetLatestSummary(vendor string) (*models.InventorySummary, error) {
+func (r *InventoryRepo) GetLatestSummary() (*models.InventorySummary, error) {
 	var summary models.InventorySummary
 	err := r.db.Where("vendor = ?", vendor).Order("measured_at desc").First(&summary).Error
 	if err != nil {

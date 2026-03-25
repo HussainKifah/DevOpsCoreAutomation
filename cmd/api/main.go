@@ -50,7 +50,7 @@ func main() {
 
 	sshPool := shell.NewConnectionPool(cfg.OLTUser, cfg.OLTPass)
 
-	sched := scheduler.New(cfg, hub, sshPool, powerRepo, descRepo, healthRepo, historyRepo, portRepo, portHistRepo, backupRepo, inventoryRepo)
+	sched := scheduler.New(cfg, hub, sshPool, powerRepo, descRepo, healthRepo, historyRepo, portRepo, portHistRepo, backupRepo, inventoryRepo, database)
 	sched.Start()
 
 	cryptoKey := []byte(cfg.JWTSecret)
@@ -105,10 +105,14 @@ func main() {
 				log.Fatalf("server failed: %v", err)
 			}
 		} else {
+
 			log.Printf("server starting HTTP on %s", addr)
 			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Fatalf("server failed: %v", err)
+
 			}
+
+
 		}
 	}()
 	quit := make(chan os.Signal, 1)

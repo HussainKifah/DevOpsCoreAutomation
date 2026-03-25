@@ -18,9 +18,10 @@ type PortProtectionRepository interface {
 	BulkInsert(device, site, host string, records []models.PortProtectionRecord) error
 	ReplaceAll(batches []PortBatch) error
 	DeleteByHost(host string) error
-	GetAll(vendor string) ([]models.PortProtectionRecord, error)
-	GetByHost(host, vendor string) ([]models.PortProtectionRecord, error)
-	GetDown(vendor string) ([]models.PortProtectionRecord, error)
+	DeleteExceptHosts(hosts []string) error
+	GetAll() ([]models.PortProtectionRecord, error)
+	GetByHost(host string) ([]models.PortProtectionRecord, error)
+	GetDown() ([]models.PortProtectionRecord, error)
 }
 
 type portProtectionRepository struct {
@@ -49,11 +50,7 @@ func (r *portProtectionRepository) ReplaceAll(batches []PortBatch) error {
 	return r.DB.Transaction(func(tx *gorm.DB) error {
 		now := time.Now()
 		for _, b := range batches {
-			vendor := "nokia"
-			if len(b.Records) > 0 && b.Records[0].Vendor != "" {
-				vendor = b.Records[0].Vendor
-			}
-			if err := tx.Where("host = ? AND vendor = ?", b.Host, vendor).Delete(&models.PortProtectionRecord{}).Error; err != nil {
+			if err := tx.Unscoped().Where("host = ?", b.Host).Delete(&models.PortProtectionRecord{}).Error; err != nil {
 				return err
 			}
 			if len(b.Records) == 0 {
@@ -77,7 +74,14 @@ func (r *portProtectionRepository) DeleteByHost(host string) error {
 	return r.DB.Where("host = ?", host).Delete(&models.PortProtectionRecord{}).Error
 }
 
-func (r *portProtectionRepository) GetAll(vendor string) ([]models.PortProtectionRecord, error) {
+func (r *portProtectionRepository) DeleteExceptHosts(hosts []string) error {
+	if len(hosts) == 0 {
+		return nil
+	}
+	return r.DB.Unscoped().Where("host NOT IN ?", hosts).Delete(&models.PortProtectionRecord{}).Error
+}
+
+func (r *portProtectionRepository) GetAll() ([]models.PortProtectionRecord, error) {
 	var out []models.PortProtectionRecord
 	err := r.DB.Where("vendor = ?", vendor).Order("host, port").Find(&out).Error
 	return out, err

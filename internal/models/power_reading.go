@@ -14,5 +14,6 @@ type PowerReading struct {
 	Vendor     string    `gorm:"index;not null;default:'nokia'" json:"vendor"`
 	OntIdx     string    `gorm:"not null" json:"ont_idx"`
 	OltRx      float64   `json:"olt_rx"`
+	OntRx      float64   `json:"ont_rx"`
 	MeasuredAt time.Time `gorm:"autoCreateTime" json:"measured_at"`
 }

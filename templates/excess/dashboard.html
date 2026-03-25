@@ -535,6 +535,7 @@
       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
       Export Excel
     </button>
+    {{if or (eq .UserRole "excess") (eq .UserRole "admin")}}
     <button
       @click="runScanNow()"
       :disabled="scanRunning"
@@ -544,6 +545,7 @@
       <svg x-show="scanRunning" class="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 019.95 9" stroke-linecap="round"/></svg>
       <span x-text="scanRunning ? 'Scanning...' : 'Run Scan Now'"></span>
     </button>
+    {{end}}
   </div>
 
   <!-- Loading: pulsing skeleton -->
@@ -843,7 +845,7 @@
       </div>
       <div class="mission-card bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] p-4">
         <p class="text-xs font-medium text-[#94a3b8] uppercase tracking-wide">Weakest Signal</p>
-        <p class="text-2xl font-bold font-mono mt-1" :class="(tableRows.length && Math.min(...tableRows.map(r=>r.olt_rx||0)) < -24) ? 'text-[#ef4444]' : 'text-[#f1f5f9]'" x-text="tableRows.length ? Math.min(...tableRows.map(r=>r.olt_rx||0)).toFixed(1) + ' dBm' : '—'"></p>
+        <p class="text-2xl font-bold font-mono mt-1" :class="(tableRows.length && Math.min(...tableRows.map(r=>r.ont_rx||0)) < -24) ? 'text-[#ef4444]' : 'text-[#f1f5f9]'" x-text="tableRows.length ? Math.min(...tableRows.map(r=>r.ont_rx||0)).toFixed(1) + ' dBm' : '—'"></p>
       </div>
       <div class="mission-card bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] p-4">
         <p class="text-xs font-medium text-[#94a3b8] uppercase tracking-wide">Devices Monitored</p>
@@ -925,7 +927,7 @@
                   <th
                     class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400"
                   >
-                    OLT Rx (dBm)
+                    ONT Rx (dBm)
                   </th>
                   <th
                     class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400"
@@ -957,23 +959,23 @@
               <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                 <template x-for="r in tableRows" :key="r.ID">
                   <tr class="transition-colors"
-                    :class="r.olt_rx < -25 ? 'bg-red-950/30 hover:bg-red-950/40' : 'hover:bg-[#1a2236]/50'">
+                    :class="r.ont_rx < -25 ? 'bg-red-950/30 hover:bg-red-950/40' : 'hover:bg-[#1a2236]/50'">
                     <td
                       class="px-4 py-2.5 font-mono text-xs text-[#f1f5f9]"
                       x-text="r.ont_idx"
                     ></td>
                     <td class="px-4 py-2.5">
                       <div class="flex items-center gap-1 w-8" title="Signal strength">
-                        <span class="w-1 h-2 rounded-sm" :class="r.olt_rx >= -20 ? 'bg-[#10b981]' : 'bg-[#475569]'"></span>
-                        <span class="w-1 h-3 rounded-sm" :class="r.olt_rx >= -22 ? 'bg-[#10b981]' : r.olt_rx >= -24 ? 'bg-[#f59e0b]' : 'bg-[#475569]'"></span>
-                        <span class="w-1 h-4 rounded-sm" :class="r.olt_rx >= -24 ? (r.olt_rx >= -20 ? 'bg-[#10b981]' : 'bg-[#f59e0b]') : 'bg-[#ef4444]'"></span>
+                        <span class="w-1 h-2 rounded-sm" :class="r.ont_rx >= -20 ? 'bg-[#10b981]' : 'bg-[#475569]'"></span>
+                        <span class="w-1 h-3 rounded-sm" :class="r.ont_rx >= -22 ? 'bg-[#10b981]' : r.ont_rx >= -24 ? 'bg-[#f59e0b]' : 'bg-[#475569]'"></span>
+                        <span class="w-1 h-4 rounded-sm" :class="r.ont_rx >= -24 ? (r.ont_rx >= -20 ? 'bg-[#10b981]' : 'bg-[#f59e0b]') : 'bg-[#ef4444]'"></span>
                       </div>
                     </td>
                     <td class="px-4 py-2.5">
                       <span
                         class="font-mono text-xs px-2 py-0.5 rounded-full"
-                        :class="r.olt_rx < -24 ? 'bg-red-500/20 text-[#ef4444]' : r.olt_rx < -22 ? 'bg-[#f59e0b]/20 text-[#f59e0b]' : 'bg-[#10b981]/20 text-[#10b981]'"
-                        x-text="r.olt_rx.toFixed(1)"
+                        :class="r.ont_rx < -24 ? 'bg-red-500/20 text-[#ef4444]' : r.ont_rx < -22 ? 'bg-[#f59e0b]/20 text-[#f59e0b]' : 'bg-[#10b981]/20 text-[#10b981]'"
+                        x-text="r.ont_rx.toFixed(1)"
                       ></span>
                     </td>
                     <td
@@ -1087,6 +1089,7 @@
         <div
           class="mission-card bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] overflow-hidden"
         >
+          <!-- Mini severity bar -->
           <div class="h-1"
             :class="group.ports.some(p => p.port_state === 'act-down' || p.paired_state === 'act-down') ? 'bg-[#ef4444]' : 'bg-[#f59e0b]'"></div>
           <div class="p-5">
@@ -1114,7 +1117,20 @@
                 class="flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors"
                 :class="portCardClass(p)"
               >
+                <!-- Port badge: larger, clickable, tooltip -->
                 <div class="relative group/port min-w-[90px]">
+                  <span
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono text-xs font-semibold cursor-default border transition-colors"
+                    :class="p.port_state === 'act-down' || p.paired_state === 'act-down' ? 'bg-[#ef4444]/20 border-[#ef4444]/50 text-[#ef4444]' : 'bg-[#1a2236] border-[rgba(255,255,255,0.08)] text-[#f1f5f9]'"
+                    :title="(p.swo_reason ? p.swo_reason + ' \u2022 ' : '') + 'num_swo: ' + (p.num_swo || 0)"
+                    x-text="p.port"
+                  ></span>
+                  <div class="absolute bottom-full left-0 mb-1 px-2 py-1.5 rounded-lg bg-[#111827] border border-[rgba(255,255,255,0.08)] text-xs text-[#f1f5f9] whitespace-nowrap opacity-0 pointer-events-none group-hover/port:opacity-100 transition-opacity z-10 shadow-xl"
+                    x-text="(p.swo_reason ? 'SWO: ' + p.swo_reason + ' (\u2022 ' + (p.num_swo || 0) + ')' : 'No SWO data')"
+                  ></div>
+                </div>
+                <!-- Port state dot -->
+                <div class="flex flex-col items-center gap-0.5">
                   <span
                     class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono text-xs font-semibold cursor-default border transition-colors"
                     :class="p.port_state === 'act-down' || p.paired_state === 'act-down' ? 'bg-[#ef4444]/20 border-[#ef4444]/50 text-[#ef4444]' : 'bg-[#1a2236] border-[rgba(255,255,255,0.08)] text-[#f1f5f9]'"
@@ -1128,10 +1144,6 @@
                 <div class="flex flex-col items-center gap-0.5">
                   <span class="w-3.5 h-3.5 rounded-full transition-colors" :class="stateColor(p.port_state)"></span>
                   <span class="text-[9px] text-gray-400" x-text="p.port_state"></span>
-                </div>
-                <div class="flex flex-col items-center gap-0.5">
-                  <span class="w-3.5 h-3.5 rounded-full border-[2.5px] transition-colors" :class="stateBorderColor(p.paired_state)"></span>
-                  <span class="text-[9px] text-gray-400" x-text="p.paired_state"></span>
                 </div>
                 <div class="ml-auto"></div>
               </div>
@@ -1732,11 +1744,17 @@
         if (!ep) return
         this.scanRunning = true
         try {
-          await fetch(ep, { method: 'POST' })
+          const res = await fetch(ep, { method: 'POST' })
+          if (res.status === 409) {
+            this.scanRunning = false
+            alert('Another scan is already running. Please wait for it to finish.')
+            return
+          }
         } catch (e) {
           console.error('[scan]', e)
+          this.scanRunning = false
+          return
         }
-        setTimeout(() => { this.scanRunning = false }, 3000)
       },
 
       async exportExcel() {
@@ -1762,7 +1780,7 @@
             const json = await res.json()
             const allRows = json.data || []
             const rows = allRows.map(r => ({
-              ONT_Index: r.ont_idx, OLT_Rx_dBm: r.olt_rx, Desc1: r.desc1, Desc2: r.desc2,
+              ONT_Index: r.ont_idx, ONT_Rx_dBm: r.ont_rx, Desc1: r.desc1, Desc2: r.desc2,
               Device: r.device, Site: r.site, Host: r.host
             }))
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length ? rows : [{}]), 'Powers')
@@ -1944,10 +1962,10 @@
 
         window.addEventListener("ws-update", (e) => {
           var type = e.detail.type
-          if (type === "health_update") this.refreshHealth()
-          if (type === "power_update") this.refreshPower()
-          if (type === "port_update") this.refreshPorts()
-          if (type === "inventory_update") this.refreshInventory()
+          if (type === "health_update") { this.refreshHealth(); this.scanRunning = false }
+          if (type === "power_update") { this.refreshPower(); this.scanRunning = false }
+          if (type === "port_update") { this.refreshPorts(); this.scanRunning = false }
+          if (type === "inventory_update") { this.refreshInventory(); this.scanRunning = false }
         })
 
         window.addEventListener("vendor-changed", () => {
