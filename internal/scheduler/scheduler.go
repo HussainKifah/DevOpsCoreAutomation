@@ -79,30 +79,37 @@ func (s *Scheduler) Start() {
 		log.Fatalf("scheduler: %v", err)
 	}
 
+	 // Nokia jobs
 	 mustAdd(sched, s.cfg.PowerScanInterval, s.runPowerScan, "power-scan")
 	 mustAdd(sched, s.cfg.DescScanInterval, s.runDescScan, "desc-scan")
 	 mustAdd(sched, s.cfg.HealthScanInterval, s.runHealthScan, "health-scan")
 	 mustAdd(sched, s.cfg.PortScanInterval, s.runPortScan, "port-scan")
+
+	 // Huawei jobs (same intervals as Nokia)
+	 mustAdd(sched, s.cfg.HealthScanInterval, s.runHuaweiHealthScan, "huawei-health-scan")
+	 mustAdd(sched, s.cfg.PowerScanInterval, s.runHuaweiPowerScan, "huawei-power-scan")
+	 mustAdd(sched, s.cfg.PortScanInterval, s.runHuaweiPortScan, "huawei-port-scan")
+
 	 //mustAddCron(sched, "0 21 * * *", s.runBackup, "backup") // 9:00 PM daily (3 hours before midnight)
 	 mustAddCron(sched, "0 1 * * *", s.runHistoryCleanup, "history-cleanup")
 	 mustAddCron(sched, "0 2 1 * *", s.runInventoryScan, "inventory-scan") // Runs at 02:00 on the 1st of every month
+	 mustAddCron(sched, "0 2 1 * *", s.runHuaweiInventoryScan, "huawei-inventory-scan")
 
 	sched.Start()
 	log.Println("scheduler started")
 
-	// Run ll jobs immediately in background without blocking
+	// Run all jobs immediately in background without blocking
 	go func() {
 		log.Println("[startup] running all jobs immediately")
-		// s.runInventoryScan()
-		// s.runPowerScan()
-		// s.runHealthScan()
-		// 	s.runHealthScan()
+		// Nokia
+		s.runPowerScan()
 		s.runDescScan()
-		// 	s.runHealthScan()
+		s.runHealthScan()
 		s.runPortScan()
-		// 	s.runHealthScan()
-		// 	s.runBackup()
-		// 	s.runHealthScan()
+		// Huawei
+		s.runHuaweiHealthScan()
+		s.runHuaweiPowerScan()
+		s.runHuaweiPortScan()
 		log.Println("[startup] initial scan complete")
 	}()
 }
