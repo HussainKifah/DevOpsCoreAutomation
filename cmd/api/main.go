@@ -49,7 +49,7 @@ func main() {
 
 	sshPool := shell.NewConnectionPool(cfg.OLTUser, cfg.OLTPass)
 
-	sched := scheduler.New(cfg, hub, sshPool, powerRepo, descRepo, healthRepo, historyRepo, portRepo, portHistRepo, backupRepo, inventoryRepo)
+	sched := scheduler.New(cfg, hub, sshPool, powerRepo, descRepo, healthRepo, historyRepo, portRepo, portHistRepo, backupRepo, inventoryRepo, database)
 	sched.Start()
 
 	server := gin.Default()

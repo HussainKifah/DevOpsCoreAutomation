@@ -1667,11 +1667,17 @@
         if (!ep) return
         this.scanRunning = true
         try {
-          await fetch(ep, { method: 'POST' })
+          const res = await fetch(ep, { method: 'POST' })
+          if (res.status === 409) {
+            this.scanRunning = false
+            alert('Another scan is already running. Please wait for it to finish.')
+            return
+          }
         } catch (e) {
           console.error('[scan]', e)
+          this.scanRunning = false
+          return
         }
-        setTimeout(() => { this.scanRunning = false }, 3000)
       },
 
       async exportExcel() {
@@ -1861,10 +1867,10 @@
 
         window.addEventListener("ws-update", (e) => {
           var type = e.detail.type
-          if (type === "health_update") this.refreshHealth()
-          if (type === "power_update") this.refreshPower()
-          if (type === "port_update") this.refreshPorts()
-          if (type === "inventory_update") this.refreshInventory()
+          if (type === "health_update") { this.refreshHealth(); this.scanRunning = false }
+          if (type === "power_update") { this.refreshPower(); this.scanRunning = false }
+          if (type === "port_update") { this.refreshPorts(); this.scanRunning = false }
+          if (type === "inventory_update") { this.refreshInventory(); this.scanRunning = false }
         })
       },
 

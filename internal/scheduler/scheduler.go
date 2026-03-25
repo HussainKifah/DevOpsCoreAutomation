@@ -17,6 +17,8 @@ import (
 	"github.com/Flafl/DevOpsCore/internal/shell"
 	websocket "github.com/Flafl/DevOpsCore/internal/webSocket"
 	"github.com/go-co-op/gocron/v2"
+	"github.com/robfig/cron/v3"
+	"gorm.io/gorm"
 )
 
 type Scheduler struct {
@@ -31,6 +33,7 @@ type Scheduler struct {
 	portHistRepo   repository.PortHistoryRepository
 	backupRepo     repository.BackupRepository
 	inventoryRepo  repository.InventoryRepository
+	db             *gorm.DB // purge soft-deleted volatile tombstones after each power/desc/port job
 
 	healthBuf   map[string]*models.HealthSnapshot
 	healthBufMu sync.Mutex
@@ -49,6 +52,7 @@ func New(
 	phr repository.PortHistoryRepository,
 	br repository.BackupRepository,
 	ir repository.InventoryRepository,
+	database *gorm.DB,
 ) *Scheduler {
 	return &Scheduler{
 		cfg:            cfg,
@@ -62,6 +66,7 @@ func New(
 		portHistRepo:   phr,
 		backupRepo:     br,
 		inventoryRepo:  ir,
+		db:             database,
 		healthBuf:      make(map[string]*models.HealthSnapshot),
 		scanSem:        make(chan struct{}, 1),
 	}
@@ -77,7 +82,7 @@ func (s *Scheduler) Start() {
 	 mustAdd(sched, s.cfg.DescScanInterval, s.runDescScan, "desc-scan")
 	 mustAdd(sched, s.cfg.HealthScanInterval, s.runHealthScan, "health-scan")
 	 mustAdd(sched, s.cfg.PortScanInterval, s.runPortScan, "port-scan")
-	 mustAddCron(sched, "0 21 * * *", s.runBackup, "backup") // 9:00 PM daily (3 hours before midnight)
+	 //mustAddCron(sched, "0 21 * * *", s.runBackup, "backup") // 9:00 PM daily (3 hours before midnight)
 	 mustAddCron(sched, "0 1 * * *", s.runHistoryCleanup, "history-cleanup")
 	 mustAddCron(sched, "0 2 1 * *", s.runInventoryScan, "inventory-scan") // Runs at 02:00 on the 1st of every month
 
@@ -87,13 +92,13 @@ func (s *Scheduler) Start() {
 	// Run ll jobs immediately in background without blocking
 	go func() {
 		log.Println("[startup] running all jobs immediately")
-	s.runInventoryScan()
-	s.runPowerScan()
+		// s.runInventoryScan()
+		// s.runPowerScan()
+		// s.runHealthScan()
 		// 	s.runHealthScan()
+		s.runDescScan()
 		// 	s.runHealthScan()
-		// s.runDescScan()
-		// 	s.runHealthScan()
-		// 	s.runPortScan()
+		s.runPortScan()
 		// 	s.runHealthScan()
 		// 	s.runBackup()
 		// 	s.runHealthScan()
@@ -113,17 +118,45 @@ func mustAdd(sched gocron.Scheduler, interval time.Duration, fn func(), name str
 	}
 }
 
-func mustAddCron(sched gocron.Scheduler, cron string, fn func(), name string) {
+func mustAddCron(sched gocron.Scheduler, cronExpr string, fn func(), name string) {
+	nextRun := nextCronTime(cronExpr)
 	_, err := sched.NewJob(
-		gocron.CronJob(cron, false),
+		gocron.CronJob(cronExpr, false),
 		gocron.NewTask(fn),
 		gocron.WithName(name),
 		gocron.WithSingletonMode(gocron.LimitModeReschedule),
+		gocron.WithStartAt(gocron.WithStartDateTime(nextRun)),
 	)
 	if err != nil {
 		log.Fatalf("scheduler: add cron job %s: %v", name, err)
 	}
-	log.Printf("scheduled cron job %q: %s", name, cron)
+	log.Printf("scheduled cron job %q: %s (first run at %s)", name, cronExpr, nextRun.Format(time.RFC3339))
+}
+
+func nextCronTime(cronExpr string) time.Time {
+	parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	sched, err := parser.Parse(cronExpr)
+	if err != nil {
+		log.Fatalf("parse cron %q: %v", cronExpr, err)
+	}
+	return sched.Next(time.Now())
+}
+
+// purgeVolatileSoftDeleted removes soft-deleted rows from live OLT tables (power, descriptions,
+// port protection, current health). Runs after each matching job; health uses upsert so bloat is
+// rare, but any soft-deleted olt_health rows are stripped here too.
+func (s *Scheduler) purgeVolatileSoftDeleted(jobName string) {
+	if s.db == nil {
+		return
+	}
+	pw, pd, pp, ph, err := repository.PurgeSoftDeletedVolatileRows(s.db)
+	if err != nil {
+		log.Printf("[job] %s: purge soft-deleted volatile rows: %v", jobName, err)
+		return
+	}
+	if pw+pd+pp+ph > 0 {
+		log.Printf("[job] %s: purged soft-deleted tombstones: power=%d descriptions=%d port_protection=%d olt_health=%d", jobName, pw, pd, pp, ph)
+	}
 }
 
 // --- Power scan job ---
@@ -131,6 +164,11 @@ func mustAddCron(sched gocron.Scheduler, cron string, fn func(), name string) {
 func (s *Scheduler) runPowerScan() {
 	s.scanSem <- struct{}{}
 	defer func() { <-s.scanSem }()
+	s.runPowerScanWork()
+}
+
+func (s *Scheduler) runPowerScanWork() {
+	defer s.purgeVolatileSoftDeleted("power-scan")
 	log.Println("[job] power-scan: starting")
 	cmd := "show equipment ont optics"
 
@@ -171,6 +209,14 @@ func (s *Scheduler) runPowerScan() {
 	log.Printf("[job] power-scan: collected %d OLTs, writing to DB", len(batches))
 	if err := s.powerRepo.ReplaceAll(batches); err != nil {
 		log.Printf("[job] power-scan: replace all failed: %v", err)
+	} else {
+		hosts := make([]string, len(batches))
+		for i, b := range batches {
+			hosts[i] = b.Host
+		}
+		if err := s.powerRepo.DeleteExceptHosts(hosts); err != nil {
+			log.Printf("[job] power-scan: prune stale hosts failed: %v", err)
+		}
 	}
 
 	s.notify("power_update")
@@ -182,6 +228,11 @@ func (s *Scheduler) runPowerScan() {
 func (s *Scheduler) runDescScan() {
 	s.scanSem <- struct{}{}
 	defer func() { <-s.scanSem }()
+	s.runDescScanWork()
+}
+
+func (s *Scheduler) runDescScanWork() {
+	defer s.purgeVolatileSoftDeleted("desc-scan")
 	log.Println("[job] desc-scan: starting")
 	cmd := "show equipment ont status pon"
 
@@ -222,6 +273,14 @@ func (s *Scheduler) runDescScan() {
 	log.Printf("[job] desc-scan: collected %d OLTs, writing to DB", len(batches))
 	if err := s.descRepo.ReplaceAll(batches); err != nil {
 		log.Printf("[job] desc-scan: replace all failed: %v", err)
+	} else {
+		hosts := make([]string, len(batches))
+		for i, b := range batches {
+			hosts[i] = b.Host
+		}
+		if err := s.descRepo.DeleteExceptHosts(hosts); err != nil {
+			log.Printf("[job] desc-scan: prune stale hosts failed: %v", err)
+		}
 	}
 
 	s.notify("desc_update")
@@ -233,6 +292,11 @@ func (s *Scheduler) runDescScan() {
 func (s *Scheduler) runHealthScan() {
 	s.scanSem <- struct{}{}
 	defer func() { <-s.scanSem }()
+	s.runHealthScanWork()
+}
+
+func (s *Scheduler) runHealthScanWork() {
+	defer s.purgeVolatileSoftDeleted("health-scan")
 	log.Println("[job] health-scan: starting")
 	cmds := []string{
 		"show system cpu-load detail",
@@ -329,11 +393,25 @@ func (s *Scheduler) runHealthScan() {
 	log.Println("[job] health-scan: done")
 }
 
-// FlushHealthBuffer saves any buffered snapshots as-is (used on shutdown).
-func (s *Scheduler) RunHealthScan()    { go s.runHealthScan() }
-func (s *Scheduler) RunPowerScan()     { go s.runPowerScan() }
-func (s *Scheduler) RunPortScan()      { go s.runPortScan() }
-func (s *Scheduler) RunInventoryScan() { go s.runInventoryScan() }
+// TryRun* acquires the semaphore synchronously; if busy returns false.
+// On success the actual work runs in a background goroutine.
+func (s *Scheduler) RunHealthScan() bool    { return s.tryRun(s.runHealthScanWork) }
+func (s *Scheduler) RunPowerScan() bool     { return s.tryRun(s.runPowerScanWork) }
+func (s *Scheduler) RunPortScan() bool      { return s.tryRun(s.runPortScanWork) }
+func (s *Scheduler) RunInventoryScan() bool { return s.tryRun(s.runInventoryScanWork) }
+
+func (s *Scheduler) tryRun(work func()) bool {
+	select {
+	case s.scanSem <- struct{}{}:
+		go func() {
+			defer func() { <-s.scanSem }()
+			work()
+		}()
+		return true
+	default:
+		return false
+	}
+}
 
 func (s *Scheduler) FlushHealthBuffer() {
 	s.healthBufMu.Lock()
@@ -426,6 +504,11 @@ func (s *Scheduler) runHistoryCleanup() {
 func (s *Scheduler) runPortScan() {
 	s.scanSem <- struct{}{}
 	defer func() { <-s.scanSem }()
+	s.runPortScanWork()
+}
+
+func (s *Scheduler) runPortScanWork() {
+	defer s.purgeVolatileSoftDeleted("port-scan")
 	log.Println("[job] port-scan: starting")
 	cmd := "show port-protection"
 	now := time.Now()
@@ -498,6 +581,14 @@ func (s *Scheduler) runPortScan() {
 	log.Printf("[job] port-scan: collected %d/%d OLTs, writing to DB", successCount, expectedOLTs)
 	if err := s.portRepo.ReplaceAll(portBatches); err != nil {
 		log.Printf("[job] port-scan: replace all failed: %v", err)
+	} else {
+		hosts := make([]string, len(portBatches))
+		for i, b := range portBatches {
+			hosts[i] = b.Host
+		}
+		if err := s.portRepo.DeleteExceptHosts(hosts); err != nil {
+			log.Printf("[job] port-scan: prune stale hosts failed: %v", err)
+		}
 	}
 
 	if len(allHistorySnaps) > 0 {
@@ -565,6 +656,10 @@ func (s *Scheduler) runBackup() {
 func (s *Scheduler) runInventoryScan() {
 	s.scanSem <- struct{}{}
 	defer func() { <-s.scanSem }()
+	s.runInventoryScanWork()
+}
+
+func (s *Scheduler) runInventoryScanWork() {
 	log.Println("[job] inventory-scan: starting")
 
 	cmd := "show equipment ont interface detail"
@@ -636,10 +731,17 @@ func (s *Scheduler) runInventoryScan() {
 				}
 			}
 		}
-		// Store only items with valid ont_idx
+		// Store only items with valid ont_idx, deduplicated by ont_idx
+		seen := make(map[string]int)
 		var toStore []models.OntInventoryItem
 		for _, it := range ontItems {
-			if it.OntIdx != "" {
+			if it.OntIdx == "" {
+				continue
+			}
+			if idx, exists := seen[it.OntIdx]; exists {
+				toStore[idx] = it
+			} else {
+				seen[it.OntIdx] = len(toStore)
 				toStore = append(toStore, it)
 			}
 		}

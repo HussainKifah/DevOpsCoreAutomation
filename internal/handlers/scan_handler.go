@@ -7,10 +7,10 @@ import (
 )
 
 type Scanner interface {
-	RunHealthScan()
-	RunPowerScan()
-	RunPortScan()
-	RunInventoryScan()
+	RunHealthScan() bool
+	RunPowerScan() bool
+	RunPortScan() bool
+	RunInventoryScan() bool
 }
 
 type ScanHandler struct {
@@ -22,21 +22,33 @@ func NewScanHandler(s Scanner) *ScanHandler {
 }
 
 func (h *ScanHandler) RunHealth(c *gin.Context) {
-	h.scanner.RunHealthScan()
+	if !h.scanner.RunHealthScan() {
+		c.JSON(http.StatusConflict, gin.H{"error": "another scan is already running"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"status": "health scan started"})
 }
 
 func (h *ScanHandler) RunPower(c *gin.Context) {
-	h.scanner.RunPowerScan()
+	if !h.scanner.RunPowerScan() {
+		c.JSON(http.StatusConflict, gin.H{"error": "another scan is already running"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"status": "power scan started"})
 }
 
 func (h *ScanHandler) RunPorts(c *gin.Context) {
-	h.scanner.RunPortScan()
+	if !h.scanner.RunPortScan() {
+		c.JSON(http.StatusConflict, gin.H{"error": "another scan is already running"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"status": "port scan started"})
 }
 
 func (h *ScanHandler) RunInventory(c *gin.Context) {
-	h.scanner.RunInventoryScan()
+	if !h.scanner.RunInventoryScan() {
+		c.JSON(http.StatusConflict, gin.H{"error": "another scan is already running"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"status": "inventory scan started"})
 }

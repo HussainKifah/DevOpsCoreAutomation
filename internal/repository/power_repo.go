@@ -55,6 +55,8 @@ type PowerRepository interface {
 	BulkInsert(device, site, host string, readings []models.PowerReading) error
 	ReplaceAll(batches []PowerBatch) error
 	DeleteByHost(host string) error
+	// DeleteExceptHosts removes readings for hosts not in the list (hard delete). Use after a full scan to drop removed OLTs.
+	DeleteExceptHosts(hosts []string) error
 	GetAll() ([]models.PowerReading, error)
 	GetPaginated(page, perPage int, device, search, sortBy, sortOrder string) (*PaginatedReadings, error)
 	GetByHost(host string) ([]models.PowerReading, error)
@@ -89,7 +91,7 @@ func (r *powerRepository) ReplaceAll(batches []PowerBatch) error {
 	return r.DB.Transaction(func(tx *gorm.DB) error {
 		now := time.Now()
 		for _, b := range batches {
-			if err := tx.Where("host = ?", b.Host).Delete(&models.PowerReading{}).Error; err != nil {
+			if err := tx.Unscoped().Where("host = ?", b.Host).Delete(&models.PowerReading{}).Error; err != nil {
 				return err
 			}
 			if len(b.Records) == 0 {
@@ -111,6 +113,13 @@ func (r *powerRepository) ReplaceAll(batches []PowerBatch) error {
 
 func (r *powerRepository) DeleteByHost(host string) error {
 	return r.DB.Where("host = ?", host).Delete(&models.PowerReading{}).Error
+}
+
+func (r *powerRepository) DeleteExceptHosts(hosts []string) error {
+	if len(hosts) == 0 {
+		return nil
+	}
+	return r.DB.Unscoped().Where("host NOT IN ?", hosts).Delete(&models.PowerReading{}).Error
 }
 
 func (r *powerRepository) GetAll() ([]models.PowerReading, error) {

@@ -35,7 +35,7 @@ func (r *InventoryRepo) SaveOltInventory(inventories []models.OltInventory) erro
 
 func (r *InventoryRepo) ReplaceOntInventoryByHost(host string, items []models.OntInventoryItem) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("host = ?", host).Delete(&models.OntInventoryItem{}).Error; err != nil {
+		if err := tx.Unscoped().Where("host = ?", host).Delete(&models.OntInventoryItem{}).Error; err != nil {
 			return err
 		}
 		var valid []models.OntInventoryItem
