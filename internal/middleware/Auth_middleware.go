@@ -136,12 +136,15 @@ func PageRoleGuard(allowedRoles ...string) gin.HandlerFunc {
 			return
 		}
 		if !allowed[claims.Role] {
-			if allowed["excess"] {
-				ctx.SetCookie("access_token", "", -1, "/", "", false, true)
-				ctx.SetCookie("refresh_token", "", -1, "/", "", false, true)
-				ctx.Redirect(http.StatusFound, "/login")
-			} else {
+			switch claims.Role {
+			case "ip":
+				ctx.Redirect(http.StatusFound, "/workflows")
+			case "excess":
 				ctx.Redirect(http.StatusFound, "/dashboard")
+			case "admin":
+				ctx.Redirect(http.StatusFound, "/dashboard")
+			default:
+				ctx.Redirect(http.StatusFound, "/login")
 			}
 			ctx.Abort()
 			return

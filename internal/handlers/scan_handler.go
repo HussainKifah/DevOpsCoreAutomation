@@ -11,6 +11,11 @@ type Scanner interface {
 	RunPowerScan()
 	RunPortScan()
 	RunInventoryScan()
+	RunHuaweiHealthScan()
+	RunHuaweiPowerScan()
+	RunHuaweiPortScan()
+	RunHuaweiBackup()
+	RunHuaweiInventoryScan()
 }
 
 type ScanHandler struct {
@@ -23,20 +28,29 @@ func NewScanHandler(s Scanner) *ScanHandler {
 
 func (h *ScanHandler) RunHealth(c *gin.Context) {
 	h.scanner.RunHealthScan()
-	c.JSON(http.StatusOK, gin.H{"status": "health scan started"})
+	h.scanner.RunHuaweiHealthScan()
+	c.JSON(http.StatusOK, gin.H{"status": "health scan started (nokia + huawei)"})
 }
 
 func (h *ScanHandler) RunPower(c *gin.Context) {
 	h.scanner.RunPowerScan()
-	c.JSON(http.StatusOK, gin.H{"status": "power scan started"})
+	h.scanner.RunHuaweiPowerScan()
+	c.JSON(http.StatusOK, gin.H{"status": "power scan started (nokia + huawei)"})
 }
 
 func (h *ScanHandler) RunPorts(c *gin.Context) {
 	h.scanner.RunPortScan()
-	c.JSON(http.StatusOK, gin.H{"status": "port scan started"})
+	h.scanner.RunHuaweiPortScan()
+	c.JSON(http.StatusOK, gin.H{"status": "port scan started (nokia + huawei)"})
 }
 
 func (h *ScanHandler) RunInventory(c *gin.Context) {
 	h.scanner.RunInventoryScan()
-	c.JSON(http.StatusOK, gin.H{"status": "inventory scan started"})
+	h.scanner.RunHuaweiInventoryScan()
+	c.JSON(http.StatusOK, gin.H{"status": "inventory scan started (nokia + huawei)"})
+}
+
+func (h *ScanHandler) RunBackup(c *gin.Context) {
+	h.scanner.RunHuaweiBackup()
+	c.JSON(http.StatusOK, gin.H{"status": "huawei backup started"})
 }

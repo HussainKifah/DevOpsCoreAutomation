@@ -7,22 +7,28 @@ import (
 	"path/filepath"
 
 	auth "github.com/Flafl/DevOpsCore/internal/Auth"
+	"github.com/Flafl/DevOpsCore/internal/repository"
 	"github.com/gin-gonic/gin"
 )
 
 type PageHandler struct {
 	templates    map[string]*template.Template
 	loginTmpl    *template.Template
+	userRepo     repository.UserRepository
 }
 
-func NewPageHandler(templateDir string) *PageHandler {
+func NewPageHandler(templateDir string, userRepo repository.UserRepository) *PageHandler {
 	base := filepath.Join(templateDir, "layout", "base.html")
 	pages := map[string]string{
 		"dashboard":   filepath.Join(templateDir, "excess", "dashboard.html"),
 		"devices":     filepath.Join(templateDir, "excess", "devices.html"),
 		"alerts":      filepath.Join(templateDir, "excess", "alerts.html"),
 		"backups":     filepath.Join(templateDir, "excess", "backups.html"),
-		"admin-users": filepath.Join(templateDir, "admin", "users.html"),
+		"admin-users":     filepath.Join(templateDir, "admin", "users.html"),
+		"workflows":       filepath.Join(templateDir, "ip", "workflows.html"),
+		"ip-backups":      filepath.Join(templateDir, "ip", "backups.html"),
+		"ip-cmd-output":   filepath.Join(templateDir, "ip", "cmd_output.html"),
+		"ip-activity-log": filepath.Join(templateDir, "ip", "activity_log.html"),
 	}
 
 	tmpl := make(map[string]*template.Template, len(pages))
@@ -39,7 +45,7 @@ func NewPageHandler(templateDir string) *PageHandler {
 		log.Fatalf("failed to parse login template: %v", err)
 	}
 
-	return &PageHandler{templates: tmpl, loginTmpl: loginTmpl}
+	return &PageHandler{templates: tmpl, loginTmpl: loginTmpl, userRepo: userRepo}
 }
 
 func (h *PageHandler) render(c *gin.Context, name string, data gin.H) {
@@ -58,6 +64,12 @@ func (h *PageHandler) render(c *gin.Context, name string, data gin.H) {
 			data["UserEmail"] = uc.Email
 			data["UserRole"] = uc.Role
 			data["UserID"] = uc.UserID
+			// Prefer full name for display; fallback to email if full name is empty
+			if user, err := h.userRepo.GetByID(uc.UserID); err == nil && user.Fullname != "" {
+				data["UserName"] = user.Fullname
+			} else {
+				data["UserName"] = uc.Email
+			}
 		}
 	}
 
@@ -82,4 +94,8 @@ func (h *PageHandler) Dashboard(c *gin.Context) { h.render(c, "dashboard", nil) 
 func (h *PageHandler) Devices(c *gin.Context)   { h.render(c, "devices", nil) }
 func (h *PageHandler) Alerts(c *gin.Context)     { h.render(c, "alerts", nil) }
 func (h *PageHandler) Backups(c *gin.Context)    { h.render(c, "backups", nil) }
-func (h *PageHandler) AdminUsers(c *gin.Context) { h.render(c, "admin-users", nil) }
+func (h *PageHandler) AdminUsers(c *gin.Context)  { h.render(c, "admin-users", nil) }
+func (h *PageHandler) Workflows(c *gin.Context)   { h.render(c, "workflows", nil) }
+func (h *PageHandler) IPBackups(c *gin.Context)    { h.render(c, "ip-backups", nil) }
+func (h *PageHandler) IPCmdOutput(c *gin.Context)  { h.render(c, "ip-cmd-output", nil) }
+func (h *PageHandler) IPActivityLog(c *gin.Context) { h.render(c, "ip-activity-log", nil) }

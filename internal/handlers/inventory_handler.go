@@ -17,7 +17,8 @@ func NewInventoryHandler(repo repository.InventoryRepository) *InventoryHandler 
 }
 
 func (h *InventoryHandler) GetLatestSummary(c *gin.Context) {
-	summary, err := h.repo.GetLatestSummary()
+	vendor := c.DefaultQuery("vendor", "nokia")
+	summary, err := h.repo.GetLatestSummary(vendor)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch latest inventory summary"})
 		return
@@ -26,7 +27,8 @@ func (h *InventoryHandler) GetLatestSummary(c *gin.Context) {
 }
 
 func (h *InventoryHandler) GetLatestOltInventories(c *gin.Context) {
-	inventories, err := h.repo.GetLatestOltInventories()
+	vendor := c.DefaultQuery("vendor", "nokia")
+	inventories, err := h.repo.GetLatestOltInventories(vendor)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch olt inventories"})
 		return
@@ -42,7 +44,7 @@ func (h *InventoryHandler) GetOltInventoryHistory(c *gin.Context) {
 	}
 
 	limitStr := c.Query("limit")
-	limit := 10 // Default limit
+	limit := 10
 	if limitStr != "" {
 		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
 			limit = l

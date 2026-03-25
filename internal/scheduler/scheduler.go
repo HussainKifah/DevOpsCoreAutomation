@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Flafl/DevOpsCore/config"
+	huawei "github.com/Flafl/DevOpsCore/internal/excessCommands/Huawei"
 	"github.com/Flafl/DevOpsCore/internal/extractor"
 	"github.com/Flafl/DevOpsCore/internal/models"
 	"github.com/Flafl/DevOpsCore/internal/repository"
@@ -73,32 +74,39 @@ func (s *Scheduler) Start() {
 		log.Fatalf("scheduler: %v", err)
 	}
 
-	mustAdd(sched, s.cfg.PowerScanInterval, s.runPowerScan, "power-scan")
-	mustAdd(sched, s.cfg.DescScanInterval, s.runDescScan, "desc-scan")
-	mustAdd(sched, s.cfg.HealthScanInterval, s.runHealthScan, "health-scan")
-	mustAdd(sched, s.cfg.PortScanInterval, s.runPortScan, "port-scan")
-	mustAddCron(sched, "0 21 * * *", s.runBackup, "backup") // 9:00 PM daily (3 hours before midnight)
-	mustAddCron(sched, "0 1 * * *", s.runHistoryCleanup, "history-cleanup")
-	mustAddCron(sched, "0 2 1 * *", s.runInventoryScan, "inventory-scan") // Runs at 02:00 on the 1st of every month
+	// mustAdd(sched, s.cfg.PowerScanInterval, s.runPowerScan, "power-scan")
+	// mustAdd(sched, s.cfg.DescScanInterval, s.runDescScan, "desc-scan")
+	// mustAdd(sched, s.cfg.HealthScanInterval, s.runHealthScan, "health-scan")
+	// mustAdd(sched, s.cfg.PortScanInterval, s.runPortScan, "port-scan")
+	// mustAddCron(sched, "0 21 * * *", s.runBackup, "backup") // 9:00 PM daily (3 hours before midnight)
+	// mustAddCron(sched, "0 1 * * *", s.runHistoryCleanup, "history-cleanup")
+	// mustAddCron(sched, "0 2 1 * *", s.runInventoryScan, "inventory-scan") // Runs at 02:00 on the 1st of every month
+
+	// Huawei jobs (same intervals as Nokia)
+	// mustAdd(sched, s.cfg.HealthScanInterval, s.runHuaweiHealthScan, "huawei-health-scan")
+	// mustAdd(sched, s.cfg.PowerScanInterval, s.runHuaweiPowerScan, "huawei-power-scan")
+	// mustAdd(sched, s.cfg.PortScanInterval, s.runHuaweiPortScan, "huawei-port-scan")
+	// mustAddCron(sched, "0 22 * * *", s.runHuaweiBackup, "huawei-backup")
+	// mustAddCron(sched, "0 3 1 * *", s.runHuaweiInventoryScan, "huawei-inventory-scan")
 
 	sched.Start()
 	log.Println("scheduler started")
 
-	// Run ll jobs immediately in background without blocking
-	// go func() {
-	// 	log.Println("[startup] running all jobs immediately")
-	// 	s.runInventoryScan()
-	// 	s.runHealthScan()
-	// 	s.runPowerScan()
-	// 	s.runHealthScan()
-	// 	s.runDescScan()
-	// 	s.runHealthScan()
-	// 	s.runPortScan()
-	// 	s.runHealthScan()
-	// 	s.runBackup()
-	// 	s.runHealthScan()
-	// 	log.Println("[startup] initial scan complete")
-	// }()
+	go func() {
+		log.Println("[startup] running all jobs immediately")
+		// s.runPowerScan()
+		// s.runInventoryScan()
+		// s.runHealthScan()
+		// s.runDescScan()
+		// s.runPortScan()
+		// s.runBackup()
+		// s.runHuaweiHealthScan()
+		// s.runHuaweiInventoryScan()
+		// s.runHuaweiPortScan()
+		// s.runHuaweiBackup()
+		s.runHuaweiPowerScan()
+		log.Println("[startup] initial scan complete")
+	}()
 }
 
 func mustAdd(sched gocron.Scheduler, interval time.Duration, fn func(), name string) {
@@ -126,7 +134,9 @@ func mustAddCron(sched gocron.Scheduler, cron string, fn func(), name string) {
 	log.Printf("scheduled cron job %q: %s", name, cron)
 }
 
-// --- Power scan job ---
+// ═══════════════════════════════════════════════════════════════════════
+//  Nokia jobs (existing)
+// ═══════════════════════════════════════════════════════════════════════
 
 func (s *Scheduler) runPowerScan() {
 	s.scanSem <- struct{}{}
@@ -151,6 +161,7 @@ func (s *Scheduler) runPowerScan() {
 			records[i] = models.PowerReading{
 				OntIdx: p.OntIdx,
 				OltRx:  p.OltRx,
+				Vendor: "nokia",
 			}
 		}
 
@@ -176,8 +187,6 @@ func (s *Scheduler) runPowerScan() {
 	log.Println("[job] power-scan: done")
 }
 
-// --- Description scan job ---
-
 func (s *Scheduler) runDescScan() {
 	s.scanSem <- struct{}{}
 	defer func() { <-s.scanSem }()
@@ -202,6 +211,7 @@ func (s *Scheduler) runDescScan() {
 				OntIdx: d.OntIdx,
 				Desc1:  d.Desc1,
 				Desc2:  d.Desc2,
+				Vendor: "nokia",
 			}
 		}
 
@@ -226,8 +236,6 @@ func (s *Scheduler) runDescScan() {
 	s.notify("desc_update")
 	log.Println("[job] desc-scan: done")
 }
-
-// --- Health scan job ---
 
 func (s *Scheduler) runHealthScan() {
 	s.scanSem <- struct{}{}
@@ -262,7 +270,7 @@ func (s *Scheduler) runHealthScan() {
 
 		uptime := h.Uptime
 		if uptime == "" {
-			if existing, err := s.healthRepo.GetByHost(r.Host); err == nil && existing != nil {
+			if existing, err := s.healthRepo.GetByHost(r.Host, "nokia"); err == nil && existing != nil {
 				uptime = existing.Uptime
 			}
 		}
@@ -273,6 +281,7 @@ func (s *Scheduler) runHealthScan() {
 				Device:       r.Device,
 				Site:         r.Site,
 				Host:         r.Host,
+				Vendor:       "nokia",
 				Uptime:       uptime,
 				CpuLoads:     cpuSlice,
 				Temperatures: tempSlice,
@@ -282,6 +291,7 @@ func (s *Scheduler) runHealthScan() {
 				Device:       r.Device,
 				Site:         r.Site,
 				Host:         r.Host,
+				Vendor:       "nokia",
 				Uptime:       uptime,
 				CpuLoads:     cpuSlice,
 				Temperatures: tempSlice,
@@ -328,7 +338,6 @@ func (s *Scheduler) runHealthScan() {
 	log.Println("[job] health-scan: done")
 }
 
-// FlushHealthBuffer saves any buffered snapshots as-is (used on shutdown).
 func (s *Scheduler) RunHealthScan()    { go s.runHealthScan() }
 func (s *Scheduler) RunPowerScan()     { go s.runPowerScan() }
 func (s *Scheduler) RunPortScan()      { go s.runPortScan() }
@@ -351,6 +360,7 @@ func averageSnapshots(a, b *models.HealthSnapshot) *models.HealthSnapshot {
 		Device:       a.Device,
 		Site:         a.Site,
 		Host:         a.Host,
+		Vendor:       a.Vendor,
 		Uptime:       b.Uptime,
 		CpuLoads:     averageJSONSlice(a.CpuLoads, b.CpuLoads, "average_pct"),
 		Temperatures: averageJSONSlice(a.Temperatures, b.Temperatures, "act_temp"),
@@ -400,8 +410,6 @@ func toFloat(v any) float64 {
 	}
 }
 
-// --- History cleanup job ---
-
 func (s *Scheduler) runHistoryCleanup() {
 	cutoff := time.Now().AddDate(0, -1, 0)
 
@@ -419,8 +427,6 @@ func (s *Scheduler) runHistoryCleanup() {
 		log.Printf("[job] history-cleanup: deleted %d old port snapshots", portDel)
 	}
 }
-
-// --- Port protection scan job ---
 
 func (s *Scheduler) runPortScan() {
 	s.scanSem <- struct{}{}
@@ -455,11 +461,13 @@ func (s *Scheduler) runPortScan() {
 					PairedState: p.PairedState,
 					SwoReason:   p.SwoReason,
 					NumSwo:      p.NumSwo,
+					Vendor:      "nokia",
 				})
 				allHistorySnaps = append(allHistorySnaps, models.PortSnapshot{
 					Device:      r.Device,
 					Site:        r.Site,
 					Host:        r.Host,
+					Vendor:      "nokia",
 					Port:        p.Port,
 					PortState:   p.PortState,
 					PairedState: p.PairedState,
@@ -509,8 +517,6 @@ func (s *Scheduler) runPortScan() {
 	log.Println("[job] port-scan: done")
 }
 
-// --- Backup job ---
-
 func (s *Scheduler) runBackup() {
 	s.scanSem <- struct{}{}
 	defer func() { <-s.scanSem }()
@@ -550,6 +556,7 @@ func (s *Scheduler) runBackup() {
 			Device:   r.Device,
 			Site:     site,
 			Host:     r.Host,
+			Vendor:   "nokia",
 			FilePath: path,
 		}); err != nil {
 			log.Printf("[job] backup: db %s: %v", r.Host, err)
@@ -559,16 +566,15 @@ func (s *Scheduler) runBackup() {
 	log.Println("[job] backup: done")
 }
 
-// --- Inventory scan job ---
-
 func (s *Scheduler) runInventoryScan() {
 	s.scanSem <- struct{}{}
 	defer func() { <-s.scanSem }()
 	log.Println("[job] inventory-scan: starting")
 
-	cmd := "show equipment ont interface detail | match exact:equip-id | count"
+	cmd := "show equipment ont interface detail"
 
 	totals := make(map[string]int)
+	firstVendor := make(map[string]string)
 	var order []string
 	var oltInventories []models.OltInventory
 	now := time.Now()
@@ -587,14 +593,15 @@ func (s *Scheduler) runInventoryScan() {
 		for _, c := range counts {
 			oltTotal += c.Count
 
-			// For global totals
 			if totals[c.ID] == 0 {
 				order = append(order, c.ID)
 			}
+			if firstVendor[c.ID] == "" {
+				firstVendor[c.ID] = c.VendorDisplay()
+			}
 			totals[c.ID] += c.Count
 
-			// For this specific OLT
-			vendor := extractor.GetVender(c.ID)
+			vendor := c.VendorDisplay()
 			if vendorTotals[vendor] == 0 {
 				vendorOrder = append(vendorOrder, vendor)
 			}
@@ -606,23 +613,58 @@ func (s *Scheduler) runInventoryScan() {
 			oltVendorCounts = append(oltVendorCounts, extractor.VendorCount{Vendor: v, Count: vendorTotals[v]})
 		}
 
+		swVerCounts := extractor.CountBySwVerAct(r.Data)
+
+		perOnt := extractor.ExtractPerOntInventory(r.Data)
+		var ontItems []models.OntInventoryItem
+		needFallback := false
+		for _, p := range perOnt {
+			if p.OntIdx != "" {
+				ontItems = append(ontItems, models.OntInventoryItem{OntIdx: p.OntIdx, EquipID: p.EquipID, SerialNo: p.SerialNo, Vendor: "nokia"})
+			} else {
+				needFallback = true
+				ontItems = append(ontItems, models.OntInventoryItem{OntIdx: "", EquipID: p.EquipID, SerialNo: p.SerialNo, Vendor: "nokia"})
+			}
+		}
+		if needFallback && len(ontItems) > 0 {
+			ontIdxList, err := s.powerRepo.GetOntIndicesByHost(r.Host)
+			if err == nil && len(ontIdxList) > 0 {
+				for i := range ontItems {
+					if ontItems[i].OntIdx == "" && i < len(ontIdxList) {
+						ontItems[i].OntIdx = ontIdxList[i]
+					}
+				}
+			}
+		}
+		var toStore []models.OntInventoryItem
+		for _, it := range ontItems {
+			if it.OntIdx != "" {
+				toStore = append(toStore, it)
+			}
+		}
+		if len(toStore) > 0 {
+			if err := s.inventoryRepo.ReplaceOntInventoryByHost(r.Host, "nokia", toStore); err != nil {
+				log.Printf("[job] inventory-scan: per-ONT inventory for %s: %v", r.Host, err)
+			}
+		}
+
 		oltInventories = append(oltInventories, models.OltInventory{
 			Host:         r.Host,
 			Device:       r.Device,
 			Site:         r.Site,
+			Vendor:       "nokia",
 			Counts:       counts,
 			VendorCounts: oltVendorCounts,
+			SwVerCounts:  swVerCounts,
 			Total:        oltTotal,
 			MeasuredAt:   now,
 		})
 	}
 
-	// Save individual OLT inventories
 	if err := s.inventoryRepo.SaveOltInventory(oltInventories); err != nil {
 		log.Printf("[job] inventory-scan: failed to save OLT inventories: %v", err)
 	}
 
-	// Calculate and save global summary
 	globalCounts := make([]extractor.EquipIDCount, 0, len(order))
 	globalTotal := 0
 	globalVendorTotals := make(map[string]int)
@@ -630,10 +672,13 @@ func (s *Scheduler) runInventoryScan() {
 
 	for _, id := range order {
 		c := totals[id]
-		globalCounts = append(globalCounts, extractor.EquipIDCount{ID: id, Count: c})
+		vendor := firstVendor[id]
+		if vendor == "" {
+			vendor = "Unknown"
+		}
+		globalCounts = append(globalCounts, extractor.EquipIDCount{ID: id, Count: c, Vendor: vendor})
 		globalTotal += c
 
-		vendor := extractor.GetVender(id)
 		if globalVendorTotals[vendor] == 0 {
 			globalVendorOrder = append(globalVendorOrder, vendor)
 		}
@@ -645,9 +690,34 @@ func (s *Scheduler) runInventoryScan() {
 		globalVendorCounts = append(globalVendorCounts, extractor.VendorCount{Vendor: v, Count: globalVendorTotals[v]})
 	}
 
+	swVerTotals := make(map[string]int)
+	swVerFirst := make(map[string]*extractor.SwVerCount)
+	var swVerOrder []string
+	for _, olt := range oltInventories {
+		for _, sv := range olt.SwVerCounts {
+			if swVerTotals[sv.SwVerAct] == 0 {
+				swVerOrder = append(swVerOrder, sv.SwVerAct)
+				svCopy := sv
+				swVerFirst[sv.SwVerAct] = &svCopy
+			}
+			swVerTotals[sv.SwVerAct] += sv.Count
+		}
+	}
+	globalSwVerCounts := make([]extractor.SwVerCount, 0, len(swVerOrder))
+	for _, ver := range swVerOrder {
+		c := swVerTotals[ver]
+		r := extractor.SwVerCount{SwVerAct: ver, Count: c}
+		if f := swVerFirst[ver]; f != nil && f.Vendor != "" {
+			r.Vendor = f.Vendor
+		}
+		globalSwVerCounts = append(globalSwVerCounts, r)
+	}
+
 	summary := &models.InventorySummary{
+		Vendor:       "nokia",
 		Count:        globalCounts,
 		VendorCounts: globalVendorCounts,
+		SwVerCounts:  globalSwVerCounts,
 		Total:        globalTotal,
 		MeasuredAt:   now,
 	}
@@ -658,6 +728,430 @@ func (s *Scheduler) runInventoryScan() {
 
 	s.notify("inventory_update")
 	log.Println("[job] inventory-scan: done")
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Huawei jobs
+// ═══════════════════════════════════════════════════════════════════════
+
+func (s *Scheduler) RunHuaweiHealthScan()    { go s.runHuaweiHealthScan() }
+func (s *Scheduler) RunHuaweiPowerScan()     { go s.runHuaweiPowerScan() }
+func (s *Scheduler) RunHuaweiPortScan()      { go s.runHuaweiPortScan() }
+func (s *Scheduler) RunHuaweiBackup()        { go s.runHuaweiBackup() }
+func (s *Scheduler) RunHuaweiInventoryScan() { go s.runHuaweiInventoryScan() }
+
+func (s *Scheduler) runHuaweiHealthScan() {
+	log.Println("[job] huawei-health-scan: starting")
+	results := huawei.CollectHealth(s.cfg.HuaweiOLTUser, s.cfg.HuaweiOLTPass)
+	if len(results) == 0 {
+		log.Println("[job] huawei-health-scan: no results")
+		return
+	}
+
+	now := time.Now()
+	var records []*models.OltHealth
+	var snapshots []*models.HealthSnapshot
+
+	for _, r := range results {
+		if r.Err != "" && len(r.Health.CpuLoads) == 0 && len(r.Health.Temperatures) == 0 {
+			log.Printf("[job] huawei-health-scan: skip %s: %s", r.Host, r.Err)
+			continue
+		}
+
+		cpuSlice := make(models.JSONSlice, len(r.Health.CpuLoads))
+		for i, c := range r.Health.CpuLoads {
+			cpuSlice[i] = map[string]any{"slot": c.Slot, "average_pct": float64(c.CpuUsage)}
+		}
+		tempSlice := make(models.JSONSlice, len(r.Health.Temperatures))
+		for i, t := range r.Health.Temperatures {
+			tempSlice[i] = map[string]any{"slot": t.Slot, "act_temp": float64(t.TempC)}
+		}
+
+		uptime := r.Health.Uptime
+		if uptime == "" {
+			if existing, err := s.healthRepo.GetByHost(r.Host, "huawei"); err == nil && existing != nil {
+				uptime = existing.Uptime
+			}
+		}
+
+		rec := &models.OltHealth{
+			Device:       r.Device,
+			Site:         r.Site,
+			Host:         r.Host,
+			Vendor:       "huawei",
+			Uptime:       uptime,
+			CpuLoads:     cpuSlice,
+			Temperatures: tempSlice,
+			MeasuredAt:   now,
+		}
+		records = append(records, rec)
+
+		snapshots = append(snapshots, &models.HealthSnapshot{
+			Device:       r.Device,
+			Site:         r.Site,
+			Host:         r.Host,
+			Vendor:       "huawei",
+			Uptime:       uptime,
+			CpuLoads:     cpuSlice,
+			Temperatures: tempSlice,
+			MeasuredAt:   now,
+		})
+	}
+
+	if len(records) == 0 {
+		log.Println("[job] huawei-health-scan: no valid results")
+		return
+	}
+
+	log.Printf("[job] huawei-health-scan: collected %d OLTs, writing to DB", len(records))
+	if err := s.healthRepo.BulkUpsert(records); err != nil {
+		log.Printf("[job] huawei-health-scan: bulk upsert failed: %v", err)
+	}
+
+	if len(snapshots) > 0 {
+		if err := s.healthHistRepo.BulkInsert(snapshots); err != nil {
+			log.Printf("[job] huawei-health-scan: history insert failed: %v", err)
+		}
+	}
+
+	s.notify("health_update")
+	log.Println("[job] huawei-health-scan: done")
+}
+
+func (s *Scheduler) runHuaweiPowerScan() {
+	log.Println("[job] huawei-power-scan: starting")
+	olts := shell.GetHuaweiOLTs()
+	if len(olts) == 0 {
+		log.Println("[job] huawei-power-scan: no Huawei OLTs")
+		return
+	}
+	log.Printf("[job] huawei-power-scan: %d Huawei OLT(s) — ONT power journal: %s", len(olts), huawei.HuaweiPowerOntJournalFile())
+	log.Printf("[job] huawei-power-scan: per-OLT raw/tsv under logs/huawei/huawei_<ip>_<timestamp>_*.log")
+
+	var batches []repository.PowerBatch
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for _, olt := range olts {
+		olt := olt
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			res, err := huawei.CollectOpticalPowers(olt.Ip, s.cfg.HuaweiOLTUser, s.cfg.HuaweiOLTPass, olt.Name, olt.Site)
+			if err != nil {
+				log.Printf("[job] huawei-power-scan: %s (%s): %v", olt.Name, olt.Ip, err)
+			}
+			if res != nil {
+				log.Printf("[job] huawei-power-scan: %s (%s) — readings=%d cmds=%d chunks ok=%d fail=%d | raw=%s | tsv=%s",
+					olt.Name, olt.Ip, len(res.Powers), res.CommandsRun, res.ChunksOK, res.ChunksFailed,
+					res.RawLogPath, res.PowersLogPath)
+			}
+			if res == nil || len(res.Powers) == 0 {
+				return
+			}
+
+			records := make([]models.PowerReading, len(res.Powers))
+			for i, p := range res.Powers {
+				records[i] = models.PowerReading{
+					OntIdx: fmt.Sprintf("0/%d/%d/%d", p.Slot, p.Pon, p.Ont),
+					OltRx:  p.OltRxOntPower,
+					Vendor: "huawei",
+				}
+			}
+
+			mu.Lock()
+			batches = append(batches, repository.PowerBatch{
+				Device:  res.Device,
+				Site:    res.Site,
+				Host:    res.Host,
+				Records: records,
+			})
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+
+	if len(batches) == 0 {
+		log.Println("[job] huawei-power-scan: no results")
+		return
+	}
+
+	log.Printf("[job] huawei-power-scan: collected %d OLTs, writing to DB", len(batches))
+	if err := s.powerRepo.ReplaceAll(batches); err != nil {
+		log.Printf("[job] huawei-power-scan: replace all failed: %v", err)
+	}
+
+	s.notify("power_update")
+	log.Println("[job] huawei-power-scan: done")
+}
+
+func (s *Scheduler) runHuaweiPortScan() {
+	log.Println("[job] huawei-port-scan: starting")
+	results := huawei.CollectProtectGroups(s.cfg.HuaweiOLTUser, s.cfg.HuaweiOLTPass)
+	if len(results) == 0 {
+		log.Println("[job] huawei-port-scan: no results")
+		return
+	}
+
+	now := time.Now()
+	var portBatches []repository.PortBatch
+	var allHistorySnaps []models.PortSnapshot
+
+	for _, r := range results {
+		if r.Err != "" && len(r.Groups) == 0 {
+			log.Printf("[job] huawei-port-scan: skip %s: %s", r.Host, r.Err)
+			continue
+		}
+
+		var records []models.PortProtectionRecord
+		for _, g := range r.Groups {
+			switched := false
+			if len(g.Members) == 2 {
+				switched = g.Members[0].Role != "work" || g.Members[1].Role != "protect"
+			}
+			for _, m := range g.Members {
+				rec := models.PortProtectionRecord{
+					Port:        fmt.Sprintf("group%d/%s", g.GroupID, m.Member),
+					PortState:   m.Role,
+					PairedState: m.State,
+					SwoReason:   m.Operation,
+					NumSwo:      g.GroupID,
+					Vendor:      "huawei",
+				}
+				if switched {
+					rec.SwoReason = "switchover|" + m.Operation
+				}
+				records = append(records, rec)
+
+				allHistorySnaps = append(allHistorySnaps, models.PortSnapshot{
+					Device:      r.Device,
+					Site:        r.Site,
+					Host:        r.Host,
+					Vendor:      "huawei",
+					Port:        rec.Port,
+					PortState:   m.Role,
+					PairedState: m.State,
+					SwoReason:   rec.SwoReason,
+					MeasuredAt:  now,
+				})
+			}
+		}
+
+		portBatches = append(portBatches, repository.PortBatch{
+			Device:  r.Device,
+			Site:    r.Site,
+			Host:    r.Host,
+			Records: records,
+		})
+	}
+
+	if len(portBatches) == 0 {
+		log.Println("[job] huawei-port-scan: no valid batches")
+		return
+	}
+
+	log.Printf("[job] huawei-port-scan: collected %d OLTs, writing to DB", len(portBatches))
+	if err := s.portRepo.ReplaceAll(portBatches); err != nil {
+		log.Printf("[job] huawei-port-scan: replace all failed: %v", err)
+	}
+
+	if len(allHistorySnaps) > 0 {
+		if err := s.portHistRepo.BulkInsert(allHistorySnaps); err != nil {
+			log.Printf("[job] huawei-port-scan: history bulk insert failed: %v", err)
+		}
+	}
+
+	s.notify("port_update")
+	log.Println("[job] huawei-port-scan: done")
+}
+
+func (s *Scheduler) runHuaweiBackup() {
+	log.Println("[job] huawei-backup: starting")
+	results := huawei.Backups(s.cfg.HuaweiOLTUser, s.cfg.HuaweiOLTPass)
+
+	for _, r := range results {
+		if r.FilePath == "" {
+			if r.Err != "" {
+				log.Printf("[job] huawei-backup: %s: %s", r.Host, r.Err)
+			}
+			continue
+		}
+		if err := s.backupRepo.Create(&models.OltBackups{
+			Device:   r.Device,
+			Site:     r.Site,
+			Host:     r.Host,
+			Vendor:   "huawei",
+			FilePath: r.FilePath,
+		}); err != nil {
+			log.Printf("[job] huawei-backup: db %s: %v", r.Host, err)
+		}
+	}
+
+	s.notify("backup_update")
+	log.Println("[job] huawei-backup: done")
+}
+
+func (s *Scheduler) runHuaweiInventoryScan() {
+	log.Println("[job] huawei-inventory-scan: starting")
+	results := huawei.CollectInventory(s.cfg.HuaweiOLTUser, s.cfg.HuaweiOLTPass)
+	if len(results) == 0 {
+		log.Println("[job] huawei-inventory-scan: no results")
+		return
+	}
+
+	now := time.Now()
+	modelTotals := make(map[string]int)
+	var modelOrder []string
+	var oltInventories []models.OltInventory
+
+	for _, r := range results {
+		if r.Err != "" && len(r.ONTs) == 0 {
+			log.Printf("[job] huawei-inventory-scan: skip %s: %s", r.Host, r.Err)
+			continue
+		}
+
+		oltModelCounts := make(map[string]int)
+		var oltModelOrder []string
+		oltVendorCounts := make(map[string]int)
+		var oltVendorOrder []string
+		for _, ont := range r.ONTs {
+			model := ont.OntModel
+			if model == "" {
+				model = "Unknown"
+			}
+			if oltModelCounts[model] == 0 {
+				oltModelOrder = append(oltModelOrder, model)
+			}
+			oltModelCounts[model]++
+
+			if modelTotals[model] == 0 {
+				modelOrder = append(modelOrder, model)
+			}
+			modelTotals[model]++
+
+			vid := ont.VendorID
+			if vid == "" {
+				vid = "Unknown"
+			}
+			if oltVendorCounts[vid] == 0 {
+				oltVendorOrder = append(oltVendorOrder, vid)
+			}
+			oltVendorCounts[vid]++
+		}
+
+		counts := make([]extractor.EquipIDCount, 0, len(oltModelOrder))
+		for _, m := range oltModelOrder {
+			counts = append(counts, extractor.EquipIDCount{ID: m, Count: oltModelCounts[m], Vendor: "huawei"})
+		}
+
+		vendorCounts := make([]extractor.VendorCount, 0, len(oltVendorOrder))
+		for _, v := range oltVendorOrder {
+			vendorCounts = append(vendorCounts, extractor.VendorCount{Vendor: v, Count: oltVendorCounts[v]})
+		}
+
+		swVerCounts := make(map[string]int)
+		var swVerOrder []string
+		for _, ont := range r.ONTs {
+			sw := ont.SwVersion
+			if sw == "" {
+				sw = "Unknown"
+			}
+			if swVerCounts[sw] == 0 {
+				swVerOrder = append(swVerOrder, sw)
+			}
+			swVerCounts[sw]++
+		}
+		swVers := make([]extractor.SwVerCount, 0, len(swVerOrder))
+		for _, sw := range swVerOrder {
+			swVers = append(swVers, extractor.SwVerCount{SwVerAct: sw, Count: swVerCounts[sw], Vendor: "Huawei"})
+		}
+
+		oltInventories = append(oltInventories, models.OltInventory{
+			Host:         r.Host,
+			Device:       r.Device,
+			Site:         r.Site,
+			Vendor:       "huawei",
+			Counts:       counts,
+			VendorCounts: vendorCounts,
+			SwVerCounts:  swVers,
+			Total:        r.Total,
+			MeasuredAt:   now,
+		})
+
+		var ontItems []models.OntInventoryItem
+		for _, ont := range r.ONTs {
+			if ont.Index != "" {
+				ontItems = append(ontItems, models.OntInventoryItem{
+					OntIdx:  ont.Index,
+					EquipID: ont.OntModel,
+					Vendor:  "huawei",
+				})
+			}
+		}
+		if len(ontItems) > 0 {
+			if err := s.inventoryRepo.ReplaceOntInventoryByHost(r.Host, "huawei", ontItems); err != nil {
+				log.Printf("[job] huawei-inventory-scan: per-ONT inventory %s: %v", r.Host, err)
+			}
+		}
+	}
+
+	if err := s.inventoryRepo.SaveOltInventory(oltInventories); err != nil {
+		log.Printf("[job] huawei-inventory-scan: save OLT inventories: %v", err)
+	}
+
+	globalCounts := make([]extractor.EquipIDCount, 0, len(modelOrder))
+	globalTotal := 0
+	for _, m := range modelOrder {
+		c := modelTotals[m]
+		globalCounts = append(globalCounts, extractor.EquipIDCount{ID: m, Count: c, Vendor: "Huawei"})
+		globalTotal += c
+	}
+
+	swVerTotals := make(map[string]int)
+	var swVerOrder []string
+	for _, olt := range oltInventories {
+		for _, sv := range olt.SwVerCounts {
+			if swVerTotals[sv.SwVerAct] == 0 {
+				swVerOrder = append(swVerOrder, sv.SwVerAct)
+			}
+			swVerTotals[sv.SwVerAct] += sv.Count
+		}
+	}
+	globalSwVerCounts := make([]extractor.SwVerCount, 0, len(swVerOrder))
+	for _, ver := range swVerOrder {
+		globalSwVerCounts = append(globalSwVerCounts, extractor.SwVerCount{SwVerAct: ver, Count: swVerTotals[ver], Vendor: "Huawei"})
+	}
+
+	globalVendorTotals := make(map[string]int)
+	var globalVendorOrder []string
+	for _, olt := range oltInventories {
+		for _, vc := range olt.VendorCounts {
+			if globalVendorTotals[vc.Vendor] == 0 {
+				globalVendorOrder = append(globalVendorOrder, vc.Vendor)
+			}
+			globalVendorTotals[vc.Vendor] += vc.Count
+		}
+	}
+	globalVendorCounts := make([]extractor.VendorCount, 0, len(globalVendorOrder))
+	for _, v := range globalVendorOrder {
+		globalVendorCounts = append(globalVendorCounts, extractor.VendorCount{Vendor: v, Count: globalVendorTotals[v]})
+	}
+
+	summary := &models.InventorySummary{
+		Vendor:       "huawei",
+		Count:        globalCounts,
+		VendorCounts: globalVendorCounts,
+		SwVerCounts:  globalSwVerCounts,
+		Total:        globalTotal,
+		MeasuredAt:   now,
+	}
+
+	if err := s.inventoryRepo.SaveSummary(summary); err != nil {
+		log.Printf("[job] huawei-inventory-scan: save summary: %v", err)
+	}
+
+	s.notify("inventory_update")
+	log.Println("[job] huawei-inventory-scan: done")
 }
 
 // --- notify ---

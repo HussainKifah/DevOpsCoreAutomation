@@ -25,6 +25,7 @@ func Setup(
 	pageH *handlers.PageHandler,
 	inventoryH *handlers.InventoryHandler,
 	scanH *handlers.ScanHandler,
+	workflowH *handlers.WorkflowHandler,
 ) {
 	// WebSocket endpoint (auth inside handler)
 	r.GET("/ws", websocket.ServerWs(hub, jwtManager))
@@ -35,11 +36,21 @@ func Setup(
 	// Auth API (public)
 	r.POST("/api/auth/login", authH.Login)
 
+	// Root redirect — send each role to their home page
+	r.GET("/", middleware.PageAuthMiddleware(jwtManager), func(c *gin.Context) {
+		if claims, ok := c.Get("user"); ok {
+			if uc, ok := claims.(*auth.Claims); ok && uc.Role == "ip" {
+				c.Redirect(302, "/workflows")
+				return
+			}
+		}
+		c.Redirect(302, "/dashboard")
+	})
+
 	// Protected page routes (excess + admin only)
 	pages := r.Group("/")
 	pages.Use(middleware.PageAuthMiddleware(jwtManager), middleware.PageRoleGuard("excess", "admin"))
 	{
-		pages.GET("/", func(c *gin.Context) { c.Redirect(302, "/dashboard") })
 		pages.GET("/dashboard", pageH.Dashboard)
 		pages.GET("/devices", pageH.Devices)
 		pages.GET("/alerts", pageH.Alerts)
@@ -132,5 +143,37 @@ func Setup(
 			users.PUT("/:id", userH.UpdateUser)
 			users.DELETE("/:id", userH.DeleteUser)
 		}
+	}
+
+	// ──────────── IP Team pages (role: ip, admin) ────────────
+	ipPages := r.Group("/")
+	ipPages.Use(middleware.PageAuthMiddleware(jwtManager), middleware.PageRoleGuard("ip", "admin"))
+	{
+		ipPages.GET("/workflows", pageH.Workflows)
+		ipPages.GET("/ip-backups", pageH.IPBackups)
+		ipPages.GET("/ip-cmd-output", pageH.IPCmdOutput)
+		ipPages.GET("/ip-activity-log", pageH.IPActivityLog)
+	}
+
+	// IP Team API routes (role: ip, admin)
+	wfAPI := r.Group("/api/workflows")
+	wfAPI.Use(middleware.AuthMiddleware(jwtManager), middleware.RoleGuard("ip", "admin"))
+	{
+		wfAPI.GET("/devices", workflowH.ListDevices)
+		wfAPI.POST("/devices", workflowH.CreateDevice)
+		wfAPI.PUT("/devices/:id", workflowH.UpdateDevice)
+		wfAPI.DELETE("/devices/:id", workflowH.DeleteDevice)
+
+		wfAPI.GET("/jobs", workflowH.ListJobs)
+		wfAPI.POST("/jobs", workflowH.CreateJob)
+		wfAPI.PUT("/jobs/:id", workflowH.UpdateJob)
+		wfAPI.DELETE("/jobs/:id", workflowH.DeleteJob)
+		wfAPI.POST("/jobs/:id/run", workflowH.RunJobNow)
+		wfAPI.GET("/jobs/:id/runs", workflowH.GetRuns)
+
+		wfAPI.GET("/runs", workflowH.GetRunsByType)
+		wfAPI.GET("/runs/:id/output", workflowH.GetRunOutput)
+
+		wfAPI.GET("/logs", workflowH.GetLogs)
 	}
 }

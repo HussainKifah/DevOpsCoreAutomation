@@ -1,0 +1,361 @@
+{{define "content"}}
+<div x-data="activityLogPage()" x-init="init()">
+
+  <!-- ── Header ── -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-[#f1f5f9]">Activity Log</h1>
+      <p class="text-sm text-[#94a3b8] mt-0.5">Every job execution — successes, failures, warnings, and system events</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <!-- Live indicator -->
+      <div class="flex items-center gap-1.5 text-xs" :class="liveMode ? 'text-[#10b981]' : 'text-[#475569]'">
+        <span class="w-2 h-2 rounded-full" :class="liveMode ? 'bg-[#10b981] animate-pulse' : 'bg-[#475569]'"></span>
+        <span x-text="liveMode ? 'Live' : 'Paused'"></span>
+      </div>
+      <button @click="liveMode = !liveMode" class="px-3 py-1.5 text-xs rounded-lg border border-[rgba(255,255,255,0.08)] text-[#94a3b8] hover:text-[#f1f5f9] hover:bg-white/5 transition-colors">
+        <span x-text="liveMode ? 'Pause' : 'Resume live'"></span>
+      </button>
+      <button @click="fetchLogs(true)" :disabled="refreshing" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-[rgba(255,255,255,0.08)] text-[#94a3b8] hover:text-[#f1f5f9] hover:bg-white/5 transition-colors disabled:opacity-40">
+        <svg :class="refreshing ? 'animate-spin' : ''" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"/></svg>
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Stats bar ── -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+    <div class="bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] px-4 py-3">
+      <p class="text-[10px] font-semibold uppercase tracking-wider text-[#475569] mb-1">Total Events</p>
+      <p class="text-xl font-bold font-mono text-[#f1f5f9]" x-text="stats.total"></p>
+    </div>
+    <div class="bg-[#1a2236] rounded-xl border border-[#10b981]/20 px-4 py-3">
+      <p class="text-[10px] font-semibold uppercase tracking-wider text-[#475569] mb-1">Successes</p>
+      <p class="text-xl font-bold font-mono text-[#10b981]" x-text="stats.success"></p>
+    </div>
+    <div class="bg-[#1a2236] rounded-xl border border-[#f59e0b]/20 px-4 py-3">
+      <p class="text-[10px] font-semibold uppercase tracking-wider text-[#475569] mb-1">Warnings</p>
+      <p class="text-xl font-bold font-mono text-[#f59e0b]" x-text="stats.warning"></p>
+    </div>
+    <div class="bg-[#1a2236] rounded-xl border border-[#ef4444]/20 px-4 py-3">
+      <p class="text-[10px] font-semibold uppercase tracking-wider text-[#475569] mb-1">Errors</p>
+      <p class="text-xl font-bold font-mono text-[#ef4444]" x-text="stats.error"></p>
+    </div>
+  </div>
+
+  <!-- ── Filters ── -->
+  <div class="flex flex-wrap gap-3 mb-5 p-4 bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)]">
+    <!-- Search -->
+    <div class="relative flex-1 min-w-52">
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#475569]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
+      <input type="text" x-model.debounce.300ms="filters.search" @input="page = 1; fetchLogs()"
+        placeholder="Search device, host, message, command..."
+        class="w-full pl-9 pr-3 py-2 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] placeholder-[#475569] text-sm focus:ring-2 focus:ring-[#3b82f6]">
+    </div>
+    <!-- Level filter -->
+    <select x-model="filters.level" @change="page = 1; fetchLogs()"
+      class="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] px-3 py-2 text-sm focus:ring-2 focus:ring-[#3b82f6]">
+      <option value="">All Levels</option>
+      <option value="info">Info</option>
+      <option value="success">Success</option>
+      <option value="warning">Warning</option>
+      <option value="error">Error</option>
+    </select>
+    <!-- Job type filter -->
+    <select x-model="filters.job_type" @change="page = 1; fetchLogs()"
+      class="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] px-3 py-2 text-sm focus:ring-2 focus:ring-[#3b82f6]">
+      <option value="">All Types</option>
+      <option value="backup">Backup</option>
+      <option value="command">Command</option>
+      <option value="system">System</option>
+    </select>
+    <!-- Event filter -->
+    <select x-model="filters.event" @change="page = 1; fetchLogs()"
+      class="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] px-3 py-2 text-sm focus:ring-2 focus:ring-[#3b82f6]">
+      <option value="">All Events</option>
+      <option value="job_started">Job Started</option>
+      <option value="job_success">Job Success</option>
+      <option value="job_failed">Job Failed</option>
+      <option value="job_skipped">Job Skipped</option>
+      <option value="scheduler_reload">Scheduler Reload</option>
+      <option value="scheduler_started">Scheduler Started</option>
+      <option value="scheduler_stopped">Scheduler Stopped</option>
+      <option value="system">System</option>
+    </select>
+    <!-- Clear filters -->
+    <button @click="clearFilters()"
+      x-show="filters.search || filters.level || filters.job_type || filters.event"
+      class="px-3 py-2 text-xs rounded-lg border border-[rgba(255,255,255,0.08)] text-[#94a3b8] hover:text-[#ef4444] hover:border-[#ef4444]/40 transition-colors">
+      Clear
+    </button>
+    <!-- Total count -->
+    <span class="ml-auto text-sm text-[#475569] self-center font-mono" x-text="total + ' entries'"></span>
+  </div>
+
+  <!-- ── Loading skeleton ── -->
+  <template x-if="loading">
+    <div class="space-y-2">
+      <template x-for="i in [1,2,3,4,5,6,7,8]" :key="i">
+        <div class="h-14 rounded-xl bg-[#1a2236] animate-pulse"></div>
+      </template>
+    </div>
+  </template>
+
+  <!-- ── Log table ── -->
+  <template x-if="!loading">
+    <div>
+      <template x-if="logs.length === 0">
+        <div class="flex flex-col items-center justify-center py-20 rounded-xl bg-[#1a2236] border border-[rgba(255,255,255,0.08)] text-[#94a3b8]">
+          <svg class="w-12 h-12 mb-3 opacity-30" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+          </svg>
+          <p class="text-sm font-medium">No log entries match your filters</p>
+          <p class="text-xs text-[#475569] mt-1">Try clearing filters or run a job to generate logs</p>
+        </div>
+      </template>
+
+      <template x-if="logs.length > 0">
+        <div class="mission-card bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="bg-[#111827] border-b border-[rgba(255,255,255,0.08)]">
+                  <th class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-[#475569] w-36">Time</th>
+                  <th class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-[#475569] w-24">Level</th>
+                  <th class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-[#475569] w-28">Event</th>
+                  <th class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-[#475569] w-20">Type</th>
+                  <th class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-[#475569]">Device / Message</th>
+                  <th class="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-wider text-[#475569] w-24">Duration</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-[rgba(255,255,255,0.05)]">
+                <template x-for="entry in logs" :key="entry.id">
+                  <tr class="transition-colors hover:bg-white/[0.03] cursor-pointer group"
+                    :class="{
+                      'bg-[#ef4444]/5': entry.level === 'error',
+                      'bg-[#f59e0b]/5': entry.level === 'warning',
+                    }"
+                    @click="toggleDetail(entry.id)">
+
+                    <!-- Time -->
+                    <td class="px-4 py-3 font-mono text-xs text-[#475569] whitespace-nowrap">
+                      <div x-text="fmtDate(entry.created_at)"></div>
+                      <div class="text-[#2d3a52] text-[10px]" x-text="fmtTime(entry.created_at)"></div>
+                    </td>
+
+                    <!-- Level badge -->
+                    <td class="px-4 py-3">
+                      <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide"
+                        :class="{
+                          'bg-[#10b981]/20 text-[#10b981]': entry.level === 'success',
+                          'bg-[#3b82f6]/20 text-[#60a5fa]': entry.level === 'info',
+                          'bg-[#f59e0b]/20 text-[#f59e0b]': entry.level === 'warning',
+                          'bg-[#ef4444]/20 text-[#ef4444]': entry.level === 'error',
+                        }">
+                        <!-- icon -->
+                        <svg x-show="entry.level === 'success'" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                        <svg x-show="entry.level === 'info'" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
+                        <svg x-show="entry.level === 'warning'" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"/></svg>
+                        <svg x-show="entry.level === 'error'" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
+                        <span x-text="entry.level"></span>
+                      </span>
+                    </td>
+
+                    <!-- Event -->
+                    <td class="px-4 py-3">
+                      <span class="text-xs font-mono text-[#94a3b8]" x-text="entry.event.replace(/_/g, ' ')"></span>
+                    </td>
+
+                    <!-- Job type -->
+                    <td class="px-4 py-3">
+                      <span x-show="entry.job_type && entry.job_type !== 'system'"
+                        class="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded uppercase"
+                        :class="{
+                          'bg-[#10b981]/15 text-[#10b981]': entry.job_type === 'backup',
+                          'bg-[#8b5cf6]/15 text-[#8b5cf6]': entry.job_type === 'command',
+                        }"
+                        x-text="entry.job_type"></span>
+                      <span x-show="entry.job_type === 'system'"
+                        class="inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded bg-[#475569]/30 text-[#94a3b8] uppercase">
+                        sys
+                      </span>
+                    </td>
+
+                    <!-- Device / Message -->
+                    <td class="px-4 py-3 min-w-0">
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <template x-if="entry.device_name">
+                          <span class="text-xs font-semibold text-[#f1f5f9]" x-text="entry.device_name"></span>
+                        </template>
+                        <template x-if="entry.host">
+                          <span class="text-[10px] font-mono text-[#475569]" x-text="entry.host"></span>
+                        </template>
+                        <template x-if="entry.command && entry.job_type === 'command'">
+                          <code class="text-[10px] font-mono text-[#60a5fa] bg-[#3b82f6]/10 px-1.5 py-0.5 rounded truncate max-w-48" x-text="'$ ' + entry.command"></code>
+                        </template>
+                      </div>
+                      <p class="text-xs mt-0.5 leading-relaxed"
+                        :class="{
+                          'text-[#94a3b8]': entry.level === 'info' || entry.level === 'success',
+                          'text-[#f59e0b]': entry.level === 'warning',
+                          'text-[#ef4444]': entry.level === 'error',
+                        }"
+                        x-text="entry.message"></p>
+                      <!-- Expanded detail: job_id / run_id links -->
+                      <div x-show="expandedId === entry.id" x-transition class="mt-2 flex flex-wrap gap-3">
+                        <template x-if="entry.job_id">
+                          <span class="text-[10px] text-[#475569]">Job ID: <span class="font-mono text-[#94a3b8]" x-text="entry.job_id"></span></span>
+                        </template>
+                        <template x-if="entry.run_id">
+                          <span class="text-[10px] text-[#475569]">Run ID: <span class="font-mono text-[#94a3b8]" x-text="entry.run_id"></span></span>
+                        </template>
+                        <template x-if="entry.vendor">
+                          <span class="text-[10px] px-2 py-0.5 rounded uppercase font-semibold"
+                            :class="{
+                              'bg-[#3b82f6]/15 text-[#3b82f6]': entry.vendor === 'nokia',
+                              'bg-[#10b981]/15 text-[#10b981]': entry.vendor === 'cisco',
+                              'bg-[#f59e0b]/15 text-[#f59e0b]': entry.vendor === 'mikrotik',
+                            }"
+                            x-text="entry.vendor"></span>
+                        </template>
+                      </div>
+                    </td>
+
+                    <!-- Duration -->
+                    <td class="px-4 py-3 text-right">
+                      <span x-show="entry.duration_ms > 0" class="text-xs font-mono text-[#475569]"
+                        x-text="fmtDuration(entry.duration_ms)"></span>
+                      <span x-show="!entry.duration_ms || entry.duration_ms === 0" class="text-[#2d3a52]">—</span>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div class="flex items-center justify-between px-5 py-3 border-t border-[rgba(255,255,255,0.08)]">
+            <span class="text-xs text-[#475569]" x-text="'Showing ' + ((page-1)*perPage+1) + '–' + Math.min(page*perPage, total) + ' of ' + total"></span>
+            <div class="flex items-center gap-2">
+              <button @click="page = Math.max(1, page - 1); fetchLogs()" :disabled="page <= 1"
+                class="px-3 py-1.5 text-xs rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] disabled:opacity-30 hover:bg-white/5 transition-colors">Prev</button>
+              <span class="text-xs text-[#475569] font-mono" x-text="page + ' / ' + totalPages"></span>
+              <button @click="page = Math.min(totalPages, page + 1); fetchLogs()" :disabled="page >= totalPages"
+                class="px-3 py-1.5 text-xs rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] disabled:opacity-30 hover:bg-white/5 transition-colors">Next</button>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </template>
+
+</div>
+
+<script>
+function activityLogPage() {
+  return {
+    loading: true,
+    refreshing: false,
+    liveMode: true,
+    logs: [],
+    total: 0,
+    totalPages: 1,
+    page: 1,
+    perPage: 50,
+    expandedId: null,
+    filters: { search: '', level: '', job_type: '', event: '' },
+    stats: { total: 0, success: 0, warning: 0, error: 0 },
+    _liveInterval: null,
+
+    async init() {
+      await this.fetchLogs(true);
+      this.loading = false;
+      // Auto-refresh every 15 seconds if live mode is on
+      this._liveInterval = setInterval(() => {
+        if (this.liveMode && this.page === 1) this.fetchLogs(false);
+      }, 15000);
+      // Also refresh on WebSocket workflow events
+      window.addEventListener('ws-update', (e) => {
+        const t = e.detail?.type || '';
+        if (t.startsWith('workflow') && this.liveMode && this.page === 1) {
+          this.fetchLogs(false);
+        }
+      });
+    },
+
+    async fetchLogs(showLoading) {
+      if (showLoading) this.loading = true;
+      this.refreshing = true;
+      try {
+        const params = new URLSearchParams({
+          page: this.page,
+          per_page: this.perPage,
+        });
+        if (this.filters.search)   params.set('search', this.filters.search);
+        if (this.filters.level)    params.set('level', this.filters.level);
+        if (this.filters.job_type) params.set('job_type', this.filters.job_type);
+        if (this.filters.event)    params.set('event', this.filters.event);
+
+        const res = await fetch('/api/workflows/logs?' + params);
+        const data = await res.json();
+        this.logs = data.logs || [];
+        this.total = data.total || 0;
+        this.totalPages = data.total_pages || 1;
+
+        // Compute stats from this page + accumulate for display
+        // For accurate stats we do a second summary call
+        await this.fetchStats();
+      } catch (e) {
+        console.error('[activity-log] fetch error:', e);
+      }
+      this.loading = false;
+      this.refreshing = false;
+    },
+
+    async fetchStats() {
+      // Fetch counts for each level (no pagination)
+      const levels = ['success', 'warning', 'error'];
+      const totals = await Promise.all(levels.map(async (lvl) => {
+        const r = await fetch('/api/workflows/logs?level=' + lvl + '&per_page=1&page=1');
+        const d = await r.json();
+        return d.total || 0;
+      }));
+      this.stats.success = totals[0];
+      this.stats.warning = totals[1];
+      this.stats.error   = totals[2];
+      // Total (no filter)
+      const r = await fetch('/api/workflows/logs?per_page=1&page=1');
+      const d = await r.json();
+      this.stats.total = d.total || 0;
+    },
+
+    clearFilters() {
+      this.filters = { search: '', level: '', job_type: '', event: '' };
+      this.page = 1;
+      this.fetchLogs(true);
+    },
+
+    toggleDetail(id) {
+      this.expandedId = this.expandedId === id ? null : id;
+    },
+
+    fmtDate(ts) {
+      if (!ts) return '—';
+      return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    },
+
+    fmtTime(ts) {
+      if (!ts) return '';
+      return new Date(ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    },
+
+    fmtDuration(ms) {
+      if (!ms || ms === 0) return '—';
+      if (ms < 1000) return ms + 'ms';
+      if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+      return Math.floor(ms / 60000) + 'm ' + Math.floor((ms % 60000) / 1000) + 's';
+    },
+  };
+}
+</script>
+{{end}}

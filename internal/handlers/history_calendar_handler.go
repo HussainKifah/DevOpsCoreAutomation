@@ -20,6 +20,7 @@ func NewHistoryCalendarHandler(hr repository.HealthHistoryRepository, pr reposit
 }
 
 func (h *HistoryCalendarHandler) GetCalendar(c *gin.Context) {
+	vendor := c.DefaultQuery("vendor", "nokia")
 	monthStr := c.DefaultQuery("month", time.Now().Format("2006-01"))
 	t, err := time.Parse("2006-01", monthStr)
 	if err != nil {
@@ -39,11 +40,11 @@ func (h *HistoryCalendarHandler) GetCalendar(c *gin.Context) {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		healthDays, hErr = h.HealthRepo.GetCalendarDays(from, to)
+		healthDays, hErr = h.HealthRepo.GetCalendarDays(from, to, vendor)
 	}()
 	go func() {
 		defer wg.Done()
-		portDays, pErr = h.PortRepo.GetCalendarDays(from, to)
+		portDays, pErr = h.PortRepo.GetCalendarDays(from, to, vendor)
 	}()
 	wg.Wait()
 
@@ -64,6 +65,7 @@ func (h *HistoryCalendarHandler) GetCalendar(c *gin.Context) {
 }
 
 func (h *HistoryCalendarHandler) GetDayDetail(c *gin.Context) {
+	vendor := c.DefaultQuery("vendor", "nokia")
 	dateStr := c.Query("date")
 	if dateStr == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "date parameter required (YYYY-MM-DD)"})
@@ -85,11 +87,11 @@ func (h *HistoryCalendarHandler) GetDayDetail(c *gin.Context) {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		healthEntries, hErr = h.HealthRepo.GetSnapshotsForDate(date)
+		healthEntries, hErr = h.HealthRepo.GetSnapshotsForDate(date, vendor)
 	}()
 	go func() {
 		defer wg.Done()
-		portEntries, pErr = h.PortRepo.GetSnapshotsForDate(date)
+		portEntries, pErr = h.PortRepo.GetSnapshotsForDate(date, vendor)
 	}()
 	wg.Wait()
 

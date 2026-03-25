@@ -16,11 +16,16 @@ type Config struct {
 	DBName     string
 	DBSSLMode  string
 
-	ServerPort string
-	JWTSecret  string
+	ServerPort  string
+	JWTSecret   string
+	TLSCertFile string // HTTPS: path to cert.pem (set with TLS_KEY to enable)
+	TLSKeyFile  string // HTTPS: path to key.pem
 
-	OLTUser string
+	OLTUser string // Nokia SSH credentials
 	OLTPass string
+
+	HuaweiOLTUser string // Huawei SSH credentials (falls back to OLTUser if empty)
+	HuaweiOLTPass string
 
 	PowerScanInterval  time.Duration
 	HealthScanInterval time.Duration
@@ -42,11 +47,16 @@ func Load() *Config {
 		DBName:     getEnv("DB_NAME", "devopscore"),
 		DBSSLMode:  getEnv("DB_SSLMODE", "disable"),
 
-		ServerPort: getEnv("PORT", "8080"),
-		JWTSecret:  getEnv("JWT_SECRET", ""),
+		ServerPort:  getEnv("PORT", "8080"),
+		JWTSecret:   getEnv("JWT_SECRET", ""),
+		TLSCertFile: getEnv("TLS_CERT", ""),
+		TLSKeyFile:  getEnv("TLS_KEY", ""),
 
 		OLTUser: getEnv("OLT_SSH_USER", ""),
 		OLTPass: getEnv("OLT_SSH_PASS", ""),
+
+		HuaweiOLTUser: getEnv("HW_SSH_USER", getEnv("OLT_SSH_USER", "")),
+		HuaweiOLTPass: getEnv("HW_SSH_PASS", getEnv("OLT_SSH_PASS", "")),
 
 		PowerScanInterval:  parseDuration(getEnv("POWER_SCAN_INTERVAL", "6h")),
 		HealthScanInterval: parseDuration(getEnv("HEALTH_SCAN_INTERVAL", "0.5h")),

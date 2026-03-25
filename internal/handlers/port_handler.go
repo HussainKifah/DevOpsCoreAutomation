@@ -16,7 +16,8 @@ func NewPortHandler(r repository.PortProtectionRepository) *PortHandler {
 }
 
 func (h *PortHandler) GetDown(c *gin.Context) {
-	data, err := h.Repo.GetDown()
+	vendor := c.DefaultQuery("vendor", "nokia")
+	data, err := h.Repo.GetDown(vendor)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -26,7 +27,8 @@ func (h *PortHandler) GetDown(c *gin.Context) {
 
 func (h *PortHandler) GetByHost(c *gin.Context) {
 	host := c.Param("host")
-	data, err := h.Repo.GetByHost(host)
+	vendor := c.DefaultQuery("vendor", "nokia")
+	data, err := h.Repo.GetByHost(host, vendor)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

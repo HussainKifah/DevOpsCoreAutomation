@@ -13,7 +13,8 @@ type OltHealth struct {
 	gorm.Model
 	Device       string    `gorm:"index;not null" json:"device"`
 	Site         string    `gorm:"index;not null" json:"site"`
-	Host         string    `gorm:"uniqueIndex;not null" json:"host"`
+	Host         string    `gorm:"uniqueIndex:idx_health_host_vendor;not null" json:"host"`
+	Vendor       string    `gorm:"uniqueIndex:idx_health_host_vendor;index;not null;default:'nokia'" json:"vendor"`
 	Uptime       string    `json:"uptime"`
 	CpuLoads     JSONSlice `gorm:"type:jsonb" json:"cpu_loads"`
 	Temperatures JSONSlice `gorm:"type:jsonb" json:"temperatures"`

@@ -1,7 +1,7 @@
 {{define "content"}}
 <div x-data="dashboardPage()" x-init="init()">
   <div class="flex items-center justify-between mb-6">
-    <h1 class="text-2xl font-bold">Dashboard</h1>
+    <h1 class="text-2xl font-bold text-[#f1f5f9]">Dashboard</h1>
     <button
       @click="calOpen = !calOpen; if(calOpen) loadCalendar()"
       class="relative p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-sm"
@@ -488,36 +488,42 @@
     </div>
   </div>
 
-  <!-- Tab headers -->
-  <div class="flex border-b border-gray-200 dark:border-gray-700 mb-6">
-    <button
-      @click="tab = 'health'"
-      :class="tab === 'health' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
-      class="px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors"
-    >
-      Health
-    </button>
-    <button
-      @click="tab = 'powers'; $nextTick(() => renderPowerChart())"
-      :class="tab === 'powers' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
-      class="px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors"
-    >
-      Powers
-    </button>
-    <button
-      @click="tab = 'ports'"
-      :class="tab === 'ports' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
-      class="px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors"
-    >
-      Port Protection
-    </button>
-    <button
-      @click="tab = 'inventory'; $nextTick(() => renderInventoryCharts())"
-      :class="tab === 'inventory' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
-      class="px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors"
-    >
-      Inventory
-    </button>
+  <!-- Tab headers: sticky horizontal scrollable with device count badges -->
+  <div class="sticky top-12 z-10 -mx-6 px-6 overflow-x-auto bg-[#0a0e1a] border-b border-[rgba(255,255,255,0.08)] mb-6 scrollbar-thin">
+    <div class="flex gap-1 min-w-max pb-px">
+      <button
+        @click="tab = 'health'"
+        :class="tab === 'health' ? 'border-[#3b82f6] text-[#3b82f6]' : 'border-transparent text-[#94a3b8] hover:text-[#f1f5f9]'"
+        class="px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 shrink-0"
+      >
+        Health
+        <span class="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-mono rounded-full bg-[#1a2236] text-[#94a3b8]" x-text="healthData.length"></span>
+      </button>
+      <button
+        @click="tab = 'powers'; $nextTick(() => renderPowerChart())"
+        :class="tab === 'powers' ? 'border-[#3b82f6] text-[#3b82f6]' : 'border-transparent text-[#94a3b8] hover:text-[#f1f5f9]'"
+        class="px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 shrink-0"
+      >
+        Powers
+        <span class="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-mono rounded-full bg-[#1a2236] text-[#94a3b8]" x-text="powerSummary.length"></span>
+      </button>
+      <button
+        @click="tab = 'ports'"
+        :class="tab === 'ports' ? 'border-[#3b82f6] text-[#3b82f6]' : 'border-transparent text-[#94a3b8] hover:text-[#f1f5f9]'"
+        class="px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 shrink-0"
+      >
+        Port Protection
+        <span class="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-mono rounded-full bg-[#1a2236] text-[#94a3b8]" x-text="portGroups.length"></span>
+      </button>
+      <button
+        @click="tab = 'inventory'; inventorySubTab = 'hardware'; $nextTick(() => renderInventoryCharts())"
+        :class="tab === 'inventory' ? 'border-[#3b82f6] text-[#3b82f6]' : 'border-transparent text-[#94a3b8] hover:text-[#f1f5f9]'"
+        class="px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 shrink-0"
+      >
+        Inventory
+        <span class="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-mono rounded-full bg-[#1a2236] text-[#94a3b8]" x-text="inventoryOLTs.length"></span>
+      </button>
+    </div>
   </div>
 
   <!-- Action buttons for current tab -->
@@ -540,18 +546,27 @@
     </button>
   </div>
 
-  <!-- Loading -->
+  <!-- Loading: pulsing skeleton -->
   <template x-if="loading">
-    <div class="flex items-center justify-center py-20">
-      <div
-        class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"
-      ></div>
-      <span class="ml-3 text-gray-500">Loading data...</span>
+    <div class="space-y-4 py-6">
+      <div class="h-8 w-48 rounded-lg bg-[#1a2236] animate-pulse"></div>
+      <div class="h-12 w-full max-w-xl rounded-lg bg-[#1a2236] animate-pulse"></div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="h-32 rounded-xl bg-[#1a2236] animate-pulse"></div>
+        <div class="h-32 rounded-xl bg-[#1a2236] animate-pulse"></div>
+        <div class="h-32 rounded-xl bg-[#1a2236] animate-pulse"></div>
+      </div>
+      <div class="h-64 rounded-xl bg-[#1a2236] animate-pulse"></div>
     </div>
   </template>
 
   <!-- ==================== HEALTH TAB ==================== -->
-  <div x-show="tab === 'health' && !loading" x-cloak>
+  <div
+    x-show="tab === 'health' && !loading"
+    x-cloak
+    @keydown.arrow-left.window="tab === 'health' && healthData.length > 0 && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName || '') && (healthIdx = Math.max(0, healthIdx - 1))"
+    @keydown.arrow-right.window="tab === 'health' && healthData.length > 0 && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName || '') && (healthIdx = Math.min(healthData.length - 1, healthIdx + 1))"
+  >
     <template x-if="healthData.length === 0 && !loading">
       <p class="text-gray-500 text-center py-10">
         No health data available yet.
@@ -560,90 +575,144 @@
 
     <template x-if="healthData.length > 0">
       <div>
-        <!-- OLT navigation -->
-        <div class="flex items-center justify-between mb-6">
-          <button
-            @click="healthIdx = (healthIdx - 1 + healthData.length) % healthData.length"
-            class="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm"
-          >
-            <svg
-              class="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              viewBox="0 0 24 24"
+        <!-- OLT navigation bar -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-6 p-4 rounded-xl bg-[#1a2236] border border-[rgba(255,255,255,0.08)]">
+          <div class="flex items-center justify-between sm:justify-start gap-2">
+            <button
+              @click="healthIdx = 0"
+              :disabled="healthIdx === 0"
+              class="p-2 rounded-lg border transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+              :class="healthIdx === 0 ? 'border-gray-600 text-gray-500' : 'border-gray-500 text-gray-300 hover:bg-[#252d42] hover:border-blue-500'"
+              title="First OLT"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M15.75 19.5L8.25 12l7.5-7.5"
-              />
-            </svg>
-            Previous
-          </button>
-          <div class="text-center">
-            <p class="text-sm font-semibold" x-text="currentHealth.device"></p>
-            <p
-              class="text-xs text-gray-500"
-              x-text="currentHealth.host + ' \u00B7 ' + currentHealth.site"
-            ></p>
-            <p
-              class="text-xs text-gray-400 mt-0.5"
-              x-text="(healthIdx + 1) + ' of ' + healthData.length + ' OLTs'"
-            ></p>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 19.5L4.5 12.75l6.75-6.75m6 6L4.5 12.75l6.75 6.75"/></svg>
+            </button>
+            <button
+              @click="healthIdx = (healthIdx - 1 + healthData.length) % healthData.length"
+              class="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-500 hover:bg-[#252d42] hover:border-blue-500 transition-colors text-sm text-gray-200 shrink-0"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
+              Prev
+            </button>
           </div>
-          <button
-            @click="healthIdx = (healthIdx + 1) % healthData.length"
-            class="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm"
-          >
-            Next
-            <svg
-              class="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              viewBox="0 0 24 24"
+          <div class="flex-1 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 min-w-0 px-2">
+            <div class="flex flex-col items-center text-center min-w-0">
+              <p class="text-sm font-semibold text-[#f1f5f9] truncate max-w-full" x-text="currentHealth.device"></p>
+              <p class="text-xs text-[#94a3b8] truncate max-w-full" x-text="currentHealth.host + ' · ' + currentHealth.site"></p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <div class="flex items-center gap-1.5 bg-[#0f1629] rounded-lg px-2 py-1.5 border border-[rgba(255,255,255,0.06)]">
+                <input
+                  type="number"
+                  min="1"
+                  :max="healthData.length"
+                  :value="healthIdx + 1"
+                  @input="var v = parseInt($event.target.value); if (!isNaN(v) && v >= 1 && v <= healthData.length) healthIdx = v - 1"
+                  @keydown.enter="$event.target.blur()"
+                  class="w-10 text-center text-xs font-mono bg-transparent text-[#f1f5f9] border-none focus:ring-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <span class="text-[#64748b] text-xs">/</span>
+                <span class="text-xs text-[#94a3b8] font-mono" x-text="healthData.length"></span>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center justify-end sm:justify-start gap-2">
+            <button
+              @click="healthIdx = (healthIdx + 1) % healthData.length"
+              class="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-500 hover:bg-[#252d42] hover:border-blue-500 transition-colors text-sm text-gray-200 shrink-0"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M8.25 4.5l7.5 7.5-7.5 7.5"
-              />
-            </svg>
-          </button>
+              Next
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+            </button>
+            <button
+              @click="healthIdx = healthData.length - 1"
+              :disabled="healthIdx === healthData.length - 1"
+              class="p-2 rounded-lg border transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+              :class="healthIdx === healthData.length - 1 ? 'border-gray-600 text-gray-500' : 'border-gray-500 text-gray-300 hover:bg-[#252d42] hover:border-blue-500'"
+              title="Last OLT"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12.75 19.5l6.75-6.75-6.75-6.75m-6 6l6.75 6.75 6.75-6.75"/></svg>
+            </button>
+          </div>
         </div>
 
-        <!-- OLT selector pills -->
-        <div class="flex flex-wrap gap-2 mb-6">
-          <template x-for="(h, i) in healthData" :key="h.host">
+        <!-- OLT selector pills: centered group, full names, pills fill row space evenly -->
+        <div class="w-full flex flex-wrap justify-center gap-2 mb-6">
+          <template x-for="(h, i) in displayedHealthData" :key="h.host">
             <button
               @click="healthIdx = i"
-              :class="healthIdx === i ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:border-blue-400'"
-              class="px-3 py-1.5 text-xs font-medium rounded-full border transition-colors"
-              x-text="h.device"
-            ></button>
+              :class="[
+                healthIdx === i
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/30'
+                  : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:border-blue-400',
+                healthIdx !== i && healthStatus(h) === 'CRITICAL' && 'border-l-4 border-l-red-500',
+                healthIdx !== i && healthStatus(h) === 'WARNING' && 'border-l-4 border-l-amber-500',
+                healthIdx === i && healthStatus(h) === 'CRITICAL' && 'ring-2 ring-red-500/50',
+                healthIdx === i && healthStatus(h) === 'WARNING' && 'ring-2 ring-amber-500/50'
+              ]"
+              class="flex-initial min-h-[2.25rem] px-3 py-2 text-xs font-medium rounded-lg border transition-all flex items-center justify-center gap-1.5 whitespace-nowrap"
+              :title="healthStatus(h) !== 'NORMAL' ? (h.device + ': ' + healthStatus(h)) : h.device"
+            >
+              <span x-show="healthStatus(h) !== 'NORMAL'" class="w-1.5 h-1.5 rounded-full shrink-0"
+                :class="healthStatus(h) === 'CRITICAL' ? 'bg-red-400' : 'bg-amber-400'"
+              ></span>
+              <span class="whitespace-nowrap" x-text="h.device"></span>
+            </button>
           </template>
+        </div>
+
+        <!-- Filter: Show problematic first -->
+        <div x-show="healthData.length > 2" class="flex items-center gap-2 mb-4">
+          <button
+            @click="healthSortByIssues = !healthSortByIssues; if (healthSortByIssues) { healthDataSorted = healthData.slice().sort((a,b) => { var sa = healthStatus(a), sb = healthStatus(b); var o = { CRITICAL: 0, WARNING: 1, NORMAL: 2 }; return (o[sa]||2) - (o[sb]||2); }); healthIdx = 0; } else { healthDataSorted = []; }"
+            :class="healthSortByIssues ? 'bg-amber-500/20 text-amber-400 border-amber-500/50' : 'bg-[#1a2236] text-[#94a3b8] border-[rgba(255,255,255,0.08)]'"
+            class="px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors flex items-center gap-2"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5h18M3 9h18m-7.5 4.5h7.5"/></svg>
+            <span x-text="healthSortByIssues ? 'Problems first' : 'Sort: Problems first'"></span>
+          </button>
         </div>
 
         <!-- Health card for current OLT -->
         <div
-          class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6"
+          class="mission-card rounded-xl border p-6 transition-all duration-300"
+          :class="[
+            'bg-[#1a2236] border-[rgba(255,255,255,0.08)]',
+            healthStatus(currentHealth) === 'CRITICAL' && 'border-l-4 border-l-red-500 shadow-lg shadow-red-500/10',
+            healthStatus(currentHealth) === 'WARNING' && 'border-l-4 border-l-amber-500 shadow-lg shadow-amber-500/10',
+            healthStatus(currentHealth) === 'NORMAL' && ''
+          ]"
         >
           <div class="flex items-center justify-between mb-6">
             <div>
               <h3
-                class="text-lg font-semibold"
+                class="text-lg font-semibold text-[#f1f5f9]"
                 x-text="currentHealth.device"
               ></h3>
               <p
-                class="text-sm text-gray-500"
-                x-text="currentHealth.host + ' \u00B7 ' + currentHealth.site"
+                class="text-sm text-[#94a3b8]"
+                x-text="currentHealth.host + ' · ' + currentHealth.site"
               ></p>
+              <p class="text-xs text-[#475569] mt-1" x-text="'Last Updated: ' + (currentHealth.measured_at ? new Date(currentHealth.measured_at).toLocaleString() : 'N/A')"></p>
             </div>
             <span
-              class="text-xs px-3 py-1.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 font-medium"
-              >Online</span
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+              :class="{
+                'bg-red-500/20 text-red-400': healthStatus(currentHealth) === 'CRITICAL',
+                'bg-amber-500/20 text-amber-400': healthStatus(currentHealth) === 'WARNING',
+                'bg-[#10b981]/20 text-[#10b981]': healthStatus(currentHealth) === 'NORMAL'
+              }"
             >
+              <span
+                class="w-2 h-2 rounded-full"
+                :class="{
+                  'bg-red-400': healthStatus(currentHealth) === 'CRITICAL',
+                  'bg-amber-400': healthStatus(currentHealth) === 'WARNING',
+                  'bg-[#10b981]': healthStatus(currentHealth) === 'NORMAL'
+                }"
+              ></span>
+              <span x-text="healthStatus(currentHealth)"></span>
+            </span>
           </div>
 
           <!-- Uptime -->
@@ -664,14 +733,14 @@
             <div class="flex flex-wrap gap-5">
               <template x-for="(cpu, i) in (currentHealth.cpu_loads || [])" :key="i">
                 <div class="flex flex-col items-center">
-                  <div class="relative w-16 h-16">
+                  <div class="relative w-16 h-16" :style="'filter: drop-shadow(0 0 6px ' + (cpu.average_pct > 80 ? 'rgba(239,68,68,0.6)' : cpu.average_pct > 60 ? 'rgba(245,158,11,0.6)' : 'rgba(16,185,129,0.6)') + ')'">
                     <svg class="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
                       <circle cx="32" cy="32" r="27" fill="none" stroke-width="5"
-                        class="stroke-gray-200 dark:stroke-gray-700"
+                        class="stroke-[#1a2236]"
                       />
                       <circle cx="32" cy="32" r="27" fill="none" stroke-width="5"
                         stroke-linecap="round"
-                        :stroke="cpu.average_pct > 80 ? '#ef4444' : cpu.average_pct > 60 ? '#eab308' : '#22c55e'"
+                        :stroke="cpu.average_pct > 80 ? '#ef4444' : cpu.average_pct > 60 ? '#f59e0b' : '#10b981'"
                         :stroke-dasharray="(Math.min(100, cpu.average_pct) / 100 * 169.6) + ' 169.6'"
                         class="transition-all duration-700"
                       />
@@ -712,8 +781,8 @@
                     ></span>
                     <!-- Thermometer body -->
                     <div
-                      class="relative w-5 h-28 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden border-2"
-                      :class="t.act_temp > 65 ? 'border-red-400' : t.act_temp > 50 ? 'border-orange-400' : 'border-green-400'"
+                      class="relative w-5 h-28 rounded-full bg-[#1a2236] overflow-hidden border-2"
+                      :class="[t.act_temp > 65 ? 'border-red-400 pulse-critical' : t.act_temp > 50 ? 'border-orange-400' : 'border-green-400']"
                     >
                       <!-- Scale marks -->
                       <div
@@ -762,6 +831,25 @@
 
   <!-- ==================== POWERS TAB ==================== -->
   <div x-show="tab === 'powers' && !loading" x-cloak>
+    <!-- KPI stat bar -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div class="mission-card bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] p-4">
+        <p class="text-xs font-medium text-[#94a3b8] uppercase tracking-wide">Total ONTs</p>
+        <p class="text-2xl font-bold font-mono text-[#f1f5f9] mt-1" x-text="powerSummary.reduce((a,s)=>a+(s.total||0),0)"></p>
+      </div>
+      <div class="mission-card bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] p-4">
+        <p class="text-xs font-medium text-[#94a3b8] uppercase tracking-wide">Weak ONTs</p>
+        <p class="text-2xl font-bold font-mono text-[#f59e0b] mt-1" x-text="powerSummary.reduce((a,s)=>a+(s.weak_count||0),0)"></p>
+      </div>
+      <div class="mission-card bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] p-4">
+        <p class="text-xs font-medium text-[#94a3b8] uppercase tracking-wide">Weakest Signal</p>
+        <p class="text-2xl font-bold font-mono mt-1" :class="(tableRows.length && Math.min(...tableRows.map(r=>r.olt_rx||0)) < -24) ? 'text-[#ef4444]' : 'text-[#f1f5f9]'" x-text="tableRows.length ? Math.min(...tableRows.map(r=>r.olt_rx||0)).toFixed(1) + ' dBm' : '—'"></p>
+      </div>
+      <div class="mission-card bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] p-4">
+        <p class="text-xs font-medium text-[#94a3b8] uppercase tracking-wide">Devices Monitored</p>
+        <p class="text-2xl font-bold font-mono text-[#f1f5f9] mt-1" x-text="powerSummary.length"></p>
+      </div>
+    </div>
     <!-- Device filter + search -->
     <div class="flex flex-wrap gap-4 mb-4">
       <select
@@ -833,6 +921,7 @@
                   >
                     ONT Index
                   </th>
+                  <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] w-12">Signal</th>
                   <th
                     class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400"
                   >
@@ -867,15 +956,23 @@
               </thead>
               <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                 <template x-for="r in tableRows" :key="r.ID">
-                  <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                  <tr class="transition-colors"
+                    :class="r.olt_rx < -25 ? 'bg-red-950/30 hover:bg-red-950/40' : 'hover:bg-[#1a2236]/50'">
                     <td
-                      class="px-4 py-2.5 font-mono text-xs"
+                      class="px-4 py-2.5 font-mono text-xs text-[#f1f5f9]"
                       x-text="r.ont_idx"
                     ></td>
                     <td class="px-4 py-2.5">
+                      <div class="flex items-center gap-1 w-8" title="Signal strength">
+                        <span class="w-1 h-2 rounded-sm" :class="r.olt_rx >= -20 ? 'bg-[#10b981]' : 'bg-[#475569]'"></span>
+                        <span class="w-1 h-3 rounded-sm" :class="r.olt_rx >= -22 ? 'bg-[#10b981]' : r.olt_rx >= -24 ? 'bg-[#f59e0b]' : 'bg-[#475569]'"></span>
+                        <span class="w-1 h-4 rounded-sm" :class="r.olt_rx >= -24 ? (r.olt_rx >= -20 ? 'bg-[#10b981]' : 'bg-[#f59e0b]') : 'bg-[#ef4444]'"></span>
+                      </div>
+                    </td>
+                    <td class="px-4 py-2.5">
                       <span
                         class="font-mono text-xs px-2 py-0.5 rounded-full"
-                        :class="r.olt_rx < -24 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : r.olt_rx < -22 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'"
+                        :class="r.olt_rx < -24 ? 'bg-red-500/20 text-[#ef4444]' : r.olt_rx < -22 ? 'bg-[#f59e0b]/20 text-[#f59e0b]' : 'bg-[#10b981]/20 text-[#10b981]'"
                         x-text="r.olt_rx.toFixed(1)"
                       ></span>
                     </td>
@@ -944,10 +1041,11 @@
     </div>
 
     <template x-if="filteredPorts.length === 0 && !loading">
-      <p class="text-gray-500 text-center py-10">No down ports detected.</p>
+      <p class="text-gray-500 text-center py-10" x-text="isHuawei ? 'No protect groups found.' : 'No down ports detected.'"></p>
     </template>
 
-    <!-- Legend -->
+    <!-- Nokia Legend -->
+    <template x-if="!isHuawei">
     <div class="flex flex-wrap gap-4 mb-4 text-xs text-gray-500">
       <div class="flex items-center gap-1.5">
         <span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span>
@@ -966,20 +1064,36 @@
         inact-up
       </div>
     </div>
+    </template>
 
-    <!-- Device groups -->
+    <!-- Huawei Legend -->
+    <template x-if="isHuawei">
+    <div class="flex flex-wrap gap-4 mb-4 text-xs text-gray-500">
+      <div class="flex items-center gap-1.5">
+        <span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span>
+        Normal (work=active, protect=standby)
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span>
+        Switchover (roles swapped)
+      </div>
+    </div>
+    </template>
+
+    <!-- ===== NOKIA PORT VIEW ===== -->
+    <template x-if="!isHuawei">
     <div class="space-y-4">
       <template x-for="group in portGroups" :key="group.device">
         <div
-          class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5"
+          class="mission-card bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] overflow-hidden"
         >
+          <div class="h-1"
+            :class="group.ports.some(p => p.port_state === 'act-down' || p.paired_state === 'act-down') ? 'bg-[#ef4444]' : 'bg-[#f59e0b]'"></div>
+          <div class="p-5">
           <div class="flex items-center justify-between mb-4">
             <div>
               <h3 class="font-semibold text-sm" x-text="group.device"></h3>
-              <p
-                class="text-xs text-gray-500"
-                x-text="group.host + ' \u00B7 ' + group.site"
-              ></p>
+              <p class="text-xs text-gray-500" x-text="group.host + ' \u00B7 ' + group.site"></p>
             </div>
             <div class="flex gap-2">
               <span
@@ -1000,55 +1114,121 @@
                 class="flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors"
                 :class="portCardClass(p)"
               >
-                <!-- Port name -->
-                <span
-                  class="font-mono text-xs font-semibold min-w-[80px]"
-                  x-text="p.port"
-                ></span>
-                <!-- Port state dot -->
-                <div class="flex flex-col items-center gap-0.5">
+                <div class="relative group/port min-w-[90px]">
                   <span
-                    class="w-3.5 h-3.5 rounded-full transition-colors"
-                    :class="stateColor(p.port_state)"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono text-xs font-semibold cursor-default border transition-colors"
+                    :class="p.port_state === 'act-down' || p.paired_state === 'act-down' ? 'bg-[#ef4444]/20 border-[#ef4444]/50 text-[#ef4444]' : 'bg-[#1a2236] border-[rgba(255,255,255,0.08)] text-[#f1f5f9]'"
+                    :title="(p.swo_reason ? p.swo_reason + ' \u2022 ' : '') + 'num_swo: ' + (p.num_swo || 0)"
+                    x-text="p.port"
                   ></span>
-                  <span
-                    class="text-[9px] text-gray-400"
-                    x-text="p.port_state"
-                  ></span>
+                  <div class="absolute bottom-full left-0 mb-1 px-2 py-1.5 rounded-lg bg-[#111827] border border-[rgba(255,255,255,0.08)] text-xs text-[#f1f5f9] whitespace-nowrap opacity-0 pointer-events-none group-hover/port:opacity-100 transition-opacity z-10 shadow-xl"
+                    x-text="(p.swo_reason ? 'SWO: ' + p.swo_reason + ' (\u2022 ' + (p.num_swo || 0) + ')' : 'No SWO data')"
+                  ></div>
                 </div>
-                <!-- Paired state dot (ring style) -->
                 <div class="flex flex-col items-center gap-0.5">
-                  <span
-                    class="w-3.5 h-3.5 rounded-full border-[2.5px] transition-colors"
-                    :class="stateBorderColor(p.paired_state)"
-                  ></span>
-                  <span
-                    class="text-[9px] text-gray-400"
-                    x-text="p.paired_state"
-                  ></span>
+                  <span class="w-3.5 h-3.5 rounded-full transition-colors" :class="stateColor(p.port_state)"></span>
+                  <span class="text-[9px] text-gray-400" x-text="p.port_state"></span>
                 </div>
-                <!-- SWO info -->
-                <template x-if="p.swo_reason">
-                  <span
-                    class="ml-auto text-[10px] text-gray-400 font-mono"
-                    x-text="p.swo_reason + ' (' + p.num_swo + ')'"
-                  ></span>
-                </template>
+                <div class="flex flex-col items-center gap-0.5">
+                  <span class="w-3.5 h-3.5 rounded-full border-[2.5px] transition-colors" :class="stateBorderColor(p.paired_state)"></span>
+                  <span class="text-[9px] text-gray-400" x-text="p.paired_state"></span>
+                </div>
+                <div class="ml-auto"></div>
               </div>
             </template>
+          </div>
+          </div>
           </div>
         </div>
       </template>
     </div>
+    </template>
+
+    <!-- ===== HUAWEI PROTECT GROUP VIEW ===== -->
+    <template x-if="isHuawei">
+    <div class="space-y-4">
+      <template x-for="group in portGroups" :key="group.device + '|' + group.host">
+        <div class="mission-card bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] overflow-hidden">
+          <div class="h-1"
+            :class="group.protectPairs.some(pair => pair.switched) ? 'bg-[#ef4444]' : 'bg-[#10b981]'"></div>
+          <div class="p-5">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="font-semibold text-sm" x-text="group.device"></h3>
+                <p class="text-xs text-gray-500" x-text="group.host + ' \u00B7 ' + group.site"></p>
+              </div>
+              <div class="flex gap-2">
+                <span class="text-xs px-2 py-1 rounded-full"
+                  :class="group.protectPairs.filter(p => !p.switched).length === group.protectPairs.length ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-green-100/50 text-green-600 dark:bg-green-900/20 dark:text-green-500'"
+                  x-text="group.protectPairs.filter(p => !p.switched).length + ' Normal'"></span>
+                <span class="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                  x-text="group.protectPairs.filter(p => p.switched).length + ' Switchover'"
+                  x-show="group.protectPairs.some(p => p.switched)"></span>
+              </div>
+            </div>
+
+            <!-- Protect group pairs -->
+            <div class="space-y-2">
+              <template x-for="pair in group.protectPairs" :key="pair.groupId">
+                <div class="rounded-lg border overflow-hidden transition-colors"
+                  :class="pair.switched ? 'border-[#ef4444]/50 bg-[#ef4444]/5' : 'border-[rgba(255,255,255,0.08)] bg-[#111827]/50'">
+                  <!-- Pair header -->
+                  <div class="flex items-center justify-between px-4 py-2 border-b"
+                    :class="pair.switched ? 'border-[#ef4444]/30 bg-[#ef4444]/10' : 'border-[rgba(255,255,255,0.06)]'">
+                    <span class="font-mono text-xs font-bold" :class="pair.switched ? 'text-red-400' : 'text-[#94a3b8]'"
+                      x-text="'Group #' + pair.groupId"></span>
+                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                      :class="pair.switched ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-green-500/20 text-green-400'"
+                      x-text="pair.switched ? 'CRITICAL' : 'NORMAL'"></span>
+                  </div>
+                  <!-- Members -->
+                  <template x-for="(m, mi) in pair.members" :key="m.member">
+                    <div class="flex items-center gap-3 px-4 py-2 text-xs"
+                      :class="mi === 0 ? 'border-b border-[rgba(255,255,255,0.04)]' : ''">
+                      <!-- Member slot -->
+                      <span class="font-mono font-semibold text-[#f1f5f9] min-w-[60px]" x-text="m.member"></span>
+                      <!-- Role badge -->
+                      <span class="px-2 py-0.5 rounded font-semibold min-w-[60px] text-center"
+                        :class="m.role === 'work' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'"
+                        x-text="m.role"></span>
+                      <!-- State badge -->
+                      <span class="px-2 py-0.5 rounded font-medium min-w-[60px] text-center"
+                        :class="m.state === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'"
+                        x-text="m.state"></span>
+                      <!-- Operation -->
+                      <span class="text-gray-400 min-w-[120px]" x-text="m.operation || 'none'"></span>
+                      <!-- Peer -->
+                      <span class="font-mono text-gray-500 text-[10px]">
+                        <span class="text-gray-600">peer:</span> <span x-text="m.peer || 'none'"></span>
+                      </span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+    </template>
   </div>
 
   <!-- ==================== INVENTORY TAB ==================== -->
   <div x-show="tab === 'inventory' && !loading" x-cloak>
-    <!-- Device filter -->
-    <div class="mb-6">
+    <!-- Summary banner -->
+    <div class="mb-6 px-4 py-3 rounded-xl bg-[#1a2236] border border-[rgba(255,255,255,0.08)]">
+      <span class="text-sm font-medium text-[#94a3b8]">
+        <span class="font-mono font-semibold text-[#f1f5f9]" x-text="(inventorySummary?.total || 0) + ' Total ONTs'"></span>
+        <span class="mx-2">across</span>
+        <span class="font-mono font-semibold text-[#f1f5f9]" x-text="(inventoryOLTs?.length || 0) + ' OLTs'"></span>
+        <span class="mx-2 text-[#475569]">— Last scanned: <span class="text-[#94a3b8]" x-text="inventorySummary?.last_scanned || 'N/A'"></span></span>
+      </span>
+    </div>
+    <!-- Device filter and sub-tabs -->
+    <div class="flex flex-wrap items-center gap-4 mb-6">
       <select
         x-model="inventoryDevice"
-        @change="$nextTick(() => renderInventoryCharts())"
+        @change="inventorySoftwarePage = 1; $nextTick(() => { renderInventoryCharts(); renderInventorySoftwareCharts(); })"
         class="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
       >
         <option value="">All Devices</option>
@@ -1056,8 +1236,26 @@
           <option :value="d" x-text="d"></option>
         </template>
       </select>
+      <div class="flex border-b border-gray-200 dark:border-gray-700">
+        <button
+          @click="inventorySubTab = 'hardware'; $nextTick(() => renderInventoryCharts())"
+          :class="inventorySubTab === 'hardware' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+          class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+        >
+          Hardware
+        </button>
+        <button
+          @click="inventorySubTab = 'software'; $nextTick(() => renderInventorySoftwareCharts())"
+          :class="inventorySubTab === 'software' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+          class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+        >
+          Software
+        </button>
+      </div>
     </div>
 
+    <!-- ========== HARDWARE SUB-TAB ========== -->
+    <div x-show="inventorySubTab === 'hardware'" x-cloak>
     <!-- Charts -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
       <div
@@ -1179,6 +1377,95 @@
       </div>
     </div>
   </div>
+
+    <!-- ========== SOFTWARE SUB-TAB ========== -->
+    <div x-show="inventorySubTab === 'software'" x-cloak>
+    <!-- Software Versions Chart -->
+    <div class="mb-6">
+      <div
+        class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5"
+      >
+        <h3
+          class="text-sm font-semibold mb-4 text-gray-600 dark:text-gray-400"
+        >
+          Software Versions
+        </h3>
+        <div class="w-full" style="height: 320px">
+          <canvas id="inventorySoftwareVersionChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Software Versions Details Table (full width) with pagination -->
+    <div class="mb-6">
+      <div
+        class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col"
+      >
+        <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            Software Versions Details
+          </h3>
+          <div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+            <span x-text="'Page ' + inventorySoftwarePage + ' of ' + Math.max(1, Math.ceil((getInventorySoftwareTableData().details.length || 0) / inventorySoftwarePerPage))"></span>
+            <button
+              @click="inventorySoftwarePage = Math.max(1, inventorySoftwarePage - 1)"
+              :disabled="inventorySoftwarePage <= 1"
+              class="px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Previous
+            </button>
+            <button
+              @click="inventorySoftwarePage = Math.min(Math.max(1, Math.ceil((getInventorySoftwareTableData().details.length || 0) / inventorySoftwarePerPage)), inventorySoftwarePage + 1)"
+              :disabled="inventorySoftwarePage >= Math.max(1, Math.ceil((getInventorySoftwareTableData().details.length || 0) / inventorySoftwarePerPage))"
+              class="px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+        <div class="overflow-y-auto flex-1">
+          <table class="w-full text-sm text-left relative">
+            <thead
+              class="bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 sticky top-0 shadow-sm z-10"
+            >
+              <tr>
+                <th class="px-5 py-3 font-semibold">Version</th>
+                <th class="px-5 py-3 font-semibold">Vendor</th>
+                <th class="px-5 py-3 font-semibold text-right">Count</th>
+                <th class="px-5 py-3 font-semibold text-right">Percentage</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+              <template
+                x-for="s in getInventorySoftwareTableData().details.slice((inventorySoftwarePage - 1) * inventorySoftwarePerPage, inventorySoftwarePage * inventorySoftwarePerPage)"
+                :key="s.sw_ver_act + '-' + (s.vendor || '')"
+              >
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                  <td
+                    class="px-5 py-2.5 font-mono text-gray-800 dark:text-gray-200"
+                    x-text="s.sw_ver_act"
+                  ></td>
+                  <td
+                    class="px-5 py-2.5 text-gray-600 dark:text-gray-400"
+                    x-text="s.vendor || 'Unknown'"
+                  ></td>
+                  <td
+                    class="px-5 py-2.5 text-right font-mono text-gray-600 dark:text-gray-400"
+                    x-text="s.count"
+                  ></td>
+                  <td
+                    class="px-5 py-2.5 text-right font-mono text-gray-500"
+                    x-text="((s.count / getInventorySoftwareTableData().total) * 100).toFixed(1) + '%'"
+                  ></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
 </div>
 
 <script>
@@ -1188,6 +1475,21 @@
       loading: true,
       healthData: [],
       healthIdx: 0,
+      healthSortByIssues: false,
+      healthDataSorted: [],
+
+      healthStatus(h) {
+        if (!h) return "NORMAL"
+        var cpuMax = (h.cpu_loads || []).reduce(function (m, c) {
+          return Math.max(m, c.average_pct || 0)
+        }, 0)
+        var tempMax = (h.temperatures || []).reduce(function (m, t) {
+          return Math.max(m, t.act_temp || 0)
+        }, 0)
+        if (cpuMax > 80 || tempMax > 65) return "CRITICAL"
+        if (cpuMax > 60 || tempMax > 50) return "WARNING"
+        return "NORMAL"
+      },
       powerSummary: [],
       downPorts: [],
       powerDevice: "",
@@ -1206,8 +1508,12 @@
       inventorySummary: null,
       inventoryOLTs: [],
       inventoryDevice: "",
+      inventorySubTab: "hardware",
+      inventorySoftwarePage: 1,
+      inventorySoftwarePerPage: 15,
       inventoryVendorChartInst: null,
       inventoryModelChartInst: null,
+      inventorySoftwareVersionChartInst: null,
 
       calOpen: false,
       calYear: new Date().getFullYear(),
@@ -1355,7 +1661,7 @@
         this.calLoading = true
         var ms = this.calYear + "-" + String(this.calMonth + 1).padStart(2, "0")
         try {
-          var res = await fetch("/api/history/calendar?month=" + ms)
+          var res = await fetch("/api/history/calendar?month=" + ms + "&" + vendorParam())
           var data = await res.json()
           this.calHealthDays = {}
           this.calPortDays = {}
@@ -1401,7 +1707,7 @@
         this.calExpandedHost = null
         this.calDayLoading = true
         try {
-          var res = await fetch("/api/history/day?date=" + dateStr)
+          var res = await fetch("/api/history/day?date=" + dateStr + "&" + vendorParam())
           this.calDayDetail = await res.json()
         } catch (e) {
           this.calDayDetail = { health: [], ports: [] }
@@ -1448,7 +1754,7 @@
         }
 
         if (this.tab === 'powers') {
-          const params = new URLSearchParams({ export: 'true' })
+          const params = new URLSearchParams({ export: 'true', vendor: Alpine.store('vendor').current })
           if (this.powerDevice) params.set('device', this.powerDevice)
           if (this.powerSearch) params.set('search', this.powerSearch)
           try {
@@ -1464,7 +1770,7 @@
             console.error('[export powers]', e)
           }
           try {
-            const sumRes = await fetch('/api/power/summary')
+            const sumRes = await fetch('/api/power/summary?' + vendorParam())
             const summaryData = await sumRes.json()
             const summaryRows = (summaryData || []).map(s => ({
               Device: s.device, Host: s.host, Site: s.site, Total: s.total, Weak: s.weak_count
@@ -1478,12 +1784,30 @@
         }
 
         if (this.tab === 'ports') {
-          const rows = this.filteredPorts.map(p => ({
-            Device: p.device, Host: p.host, Site: p.site, Port: p.port,
-            Port_State: p.port_state, Paired_State: p.paired_state,
-            SWO_Reason: p.swo_reason, Num_SWO: p.num_swo
-          }))
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Port Protection')
+          if (this.isHuawei) {
+            const rows = []
+            this.portGroups.forEach(g => {
+              (g.protectPairs || []).forEach(pair => {
+                pair.members.forEach(m => {
+                  rows.push({
+                    Device: g.device, Host: g.host, Site: g.site,
+                    Group: pair.groupId,
+                    Member: m.member, Role: m.role, State: m.state,
+                    Operation: m.operation, Peer: m.peer,
+                    Status: pair.switched ? 'CRITICAL' : 'NORMAL'
+                  })
+                })
+              })
+            })
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Protect Groups')
+          } else {
+            const rows = this.filteredPorts.map(p => ({
+              Device: p.device, Host: p.host, Site: p.site, Port: p.port,
+              Port_State: p.port_state, Paired_State: p.paired_state,
+              SWO_Reason: p.swo_reason, Num_SWO: p.num_swo
+            }))
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Port Protection')
+          }
           XLSX.writeFile(wb, 'Port_Protection_' + today + '.xlsx')
         }
 
@@ -1509,8 +1833,8 @@
 
           try {
             const [sumRes, oltsRes] = await Promise.all([
-              fetch('/api/inventory/summary'),
-              fetch('/api/inventory/olts')
+              fetch('/api/inventory/summary?' + vendorParam()),
+              fetch('/api/inventory/olts?' + vendorParam())
             ])
             const summary = await sumRes.json()
             const allOlts = (await oltsRes.json()) || []
@@ -1611,8 +1935,12 @@
         }
 
         if (this.tab === "powers") this.$nextTick(() => this.renderPowerChart())
-        if (this.tab === "inventory")
-          this.$nextTick(() => this.renderInventoryCharts())
+        if (this.tab === "inventory") {
+          this.$nextTick(() => {
+            if (this.inventorySubTab === "hardware") this.renderInventoryCharts()
+            else this.renderInventorySoftwareCharts()
+          })
+        }
 
         window.addEventListener("ws-update", (e) => {
           var type = e.detail.type
@@ -1621,17 +1949,25 @@
           if (type === "port_update") this.refreshPorts()
           if (type === "inventory_update") this.refreshInventory()
         })
+
+        window.addEventListener("vendor-changed", () => {
+          this.loading = true
+          this.fetchAll()
+        })
       },
 
       async fetchAll() {
+        var vp = vendorParam();
         const [hRes, sRes, portRes, invSumRes, invOltRes] = await Promise.all([
-          fetch("/api/health"),
-          fetch("/api/power/summary"),
-          fetch("/api/ports/down"),
-          fetch("/api/inventory/summary").catch(() => ({ json: () => null })),
-          fetch("/api/inventory/olts").catch(() => ({ json: () => [] })),
+          fetch("/api/health?" + vp),
+          fetch("/api/power/summary?" + vp),
+          fetch("/api/ports/down?" + vp),
+          fetch("/api/inventory/summary?" + vp).catch(() => ({ json: () => null })),
+          fetch("/api/inventory/olts?" + vp).catch(() => ({ json: () => [] })),
         ])
         this.healthData = (await hRes.json()) || []
+        this.healthSortByIssues = false
+        this.healthDataSorted = []
         this.powerSummary = (await sRes.json()) || []
         this.downPorts = (await portRes.json()) || []
 
@@ -1653,14 +1989,16 @@
 
       async refreshHealth() {
         try {
-          var res = await fetch("/api/health")
+          var res = await fetch("/api/health?" + vendorParam())
           this.healthData = (await res.json()) || []
+          this.healthSortByIssues = false
+          this.healthDataSorted = []
         } catch (e) {}
       },
 
       async refreshPower() {
         try {
-          var res = await fetch("/api/power/summary")
+          var res = await fetch("/api/power/summary?" + vendorParam())
           this.powerSummary = (await res.json()) || []
           this.fetchReadingsPage()
           if (this.tab === "powers")
@@ -1670,28 +2008,38 @@
 
       async refreshPorts() {
         try {
-          var res = await fetch("/api/ports/down")
+          var res = await fetch("/api/ports/down?" + vendorParam())
           this.downPorts = (await res.json()) || []
         } catch (e) {}
       },
 
       async refreshInventory() {
         try {
+          var vp = vendorParam();
           const [invSumRes, invOltRes] = await Promise.all([
-            fetch("/api/inventory/summary"),
-            fetch("/api/inventory/olts"),
+            fetch("/api/inventory/summary?" + vp),
+            fetch("/api/inventory/olts?" + vp),
           ])
           this.inventorySummary = await invSumRes.json()
           this.inventoryOLTs = await invOltRes.json()
           if (!this.inventoryOLTs) this.inventoryOLTs = []
           if (this.tab === "inventory") {
-            this.$nextTick(() => this.renderInventoryCharts())
+            this.$nextTick(() => {
+              if (this.inventorySubTab === "hardware") this.renderInventoryCharts()
+              else this.renderInventorySoftwareCharts()
+            })
           }
         } catch (e) {}
       },
 
+      get displayedHealthData() {
+        return this.healthSortByIssues && this.healthDataSorted.length
+          ? this.healthDataSorted
+          : this.healthData
+      },
+
       get currentHealth() {
-        return this.healthData[this.healthIdx] || {}
+        return this.displayedHealthData[this.healthIdx] || {}
       },
 
       getCpuColor(load) {
@@ -1740,6 +2088,7 @@
         const params = new URLSearchParams({
           page: this.powerPage,
           per_page: 50,
+          vendor: Alpine.store('vendor').current,
         })
         if (this.powerDevice) params.set("device", this.powerDevice)
         if (this.powerSearch) params.set("search", this.powerSearch)
@@ -1920,6 +2269,124 @@
         }
       },
 
+      getInventorySoftwareTableData() {
+        let data = this.inventoryDevice
+          ? this.inventoryOLTs.find((o) => o.device === this.inventoryDevice)
+          : this.inventorySummary
+
+        if (!data) return { versions: [], details: [], total: 1 }
+
+        let swVer = data.sw_ver_counts || []
+        let total = data.total || 1
+
+        // Aggregate by sw_ver_act for versions table
+        let agg = {}
+        swVer.forEach(function (s) {
+          var v = s.sw_ver_act || "unknown"
+          agg[v] = (agg[v] || 0) + (s.count || 0)
+        })
+        let versions = Object.entries(agg)
+          .map(function (e) {
+            return { sw_ver_act: e[0], count: e[1] }
+          })
+          .sort(function (a, b) {
+            return b.count - a.count
+          })
+
+        // details = raw rows (version, vendor, count)
+        let details = [...swVer].sort(function (a, b) {
+          return b.count - a.count
+        })
+
+        return {
+          versions: versions,
+          details: details,
+          total: total,
+        }
+      },
+
+      renderInventorySoftwareCharts() {
+        if (this.inventorySoftwareVersionChartInst) {
+          this.inventorySoftwareVersionChartInst.destroy()
+          this.inventorySoftwareVersionChartInst = null
+        }
+
+        const isDark = document.documentElement.classList.contains("dark")
+        const canvas = document.getElementById("inventorySoftwareVersionChart")
+        if (!canvas) return
+
+        var t = this.getInventorySoftwareTableData()
+        if (!t.versions || t.versions.length === 0) return
+
+        // Limit to top 15 for cleaner display, truncate long labels
+        var maxBars = 15
+        var versions = t.versions.slice(0, maxBars)
+        var versionLabels = versions.map(function (v) {
+          var s = v.sw_ver_act || "unknown"
+          return s.length > 35 ? s.substring(0, 35) + "…" : s
+        })
+        var versionCounts = versions.map(function (v) {
+          return v.count
+        })
+
+        // Horizontal bar chart - cleaner for many versions
+        this.inventorySoftwareVersionChartInst = new Chart(canvas, {
+          type: "bar",
+          data: {
+            labels: versionLabels,
+            datasets: [
+              {
+                label: "Count",
+                data: versionCounts,
+                backgroundColor: "rgba(59, 130, 246, 0.6)",
+                borderColor: "rgba(59, 130, 246, 0.9)",
+                borderWidth: 1,
+                borderRadius: 4,
+              },
+            ],
+          },
+          options: {
+            indexAxis: "y",
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  title: function (items) {
+                    var idx = items[0].dataIndex
+                    return (versions[idx] || {}).sw_ver_act || items[0].label
+                  },
+                },
+              },
+            },
+            scales: {
+              x: {
+                beginAtZero: true,
+                ticks: {
+                  color: isDark ? "#9ca3af" : "#6b7280",
+                  font: { size: 11 },
+                  stepSize: 1,
+                },
+                grid: { color: isDark ? "#374151" : "#e5e7eb" },
+              },
+              y: {
+                ticks: {
+                  color: isDark ? "#9ca3af" : "#6b7280",
+                  font: { size: 11 },
+                  maxRotation: 0,
+                  autoSkip: false,
+                },
+                grid: { display: false },
+              },
+            },
+            layout: {
+              padding: { left: 4, right: 8, top: 4, bottom: 4 },
+            },
+          },
+        })
+      },
+
       renderInventoryCharts() {
         if (this.inventoryVendorChartInst) {
           this.inventoryVendorChartInst.destroy()
@@ -2048,6 +2515,9 @@
       },
 
       // Ports
+      get isHuawei() {
+        return (localStorage.getItem('selectedVendor') || 'nokia') === 'huawei'
+      },
       get portDevices() {
         return [...new Set(this.downPorts.map((p) => p.device))].sort()
       },
@@ -2056,6 +2526,9 @@
         return this.downPorts.filter((p) => p.device === this.portDevice)
       },
       get portGroups() {
+        if (this.isHuawei) {
+          return this.huaweiPortGroups
+        }
         const map = {}
         this.filteredPorts.forEach((p) => {
           const key = p.device + "|" + p.host
@@ -2069,6 +2542,39 @@
           map[key].ports.push(p)
         })
         return Object.values(map)
+      },
+      get huaweiPortGroups() {
+        const deviceMap = {}
+        this.filteredPorts.forEach(p => {
+          const key = p.device + '|' + p.host
+          if (!deviceMap[key]) deviceMap[key] = { device: p.device, host: p.host, site: p.site, ports: [] }
+          deviceMap[key].ports.push(p)
+        })
+        return Object.values(deviceMap).map(dev => {
+          const pairMap = {}
+          dev.ports.forEach(p => {
+            const gid = p.num_swo || 0
+            if (!pairMap[gid]) pairMap[gid] = { groupId: gid, members: [], switched: false }
+            const operation = (p.swo_reason || '').replace('switchover|', '')
+            pairMap[gid].members.push({
+              member: p.port.replace(/^group\d+\//, ''),
+              role: p.port_state,
+              state: p.paired_state,
+              operation: operation,
+              peer: ''
+            })
+            if ((p.swo_reason || '').startsWith('switchover')) pairMap[gid].switched = true
+          })
+          Object.values(pairMap).forEach(pair => {
+            if (pair.members.length === 2) {
+              pair.members[0].peer = pair.members[1].member
+              pair.members[1].peer = pair.members[0].member
+              pair.switched = pair.members[0].role !== 'work' || pair.members[1].role !== 'protect'
+            }
+          })
+          const protectPairs = Object.values(pairMap).sort((a, b) => a.groupId - b.groupId)
+          return { ...dev, protectPairs }
+        })
       },
     }
   }

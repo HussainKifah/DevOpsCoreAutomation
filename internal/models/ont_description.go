@@ -11,6 +11,7 @@ type OntDescription struct {
 	Device     string    `gorm:"index;not null" json:"device"`
 	Site       string    `gorm:"index;not null" json:"site"`
 	Host       string    `gorm:"index;not null" json:"host"`
+	Vendor     string    `gorm:"index;not null;default:'nokia'" json:"vendor"`
 	OntIdx     string    `gorm:"not null" json:"ont_idx"`
 	Desc1      string    `json:"desc1"`
 	Desc2      string    `json:"desc2"`

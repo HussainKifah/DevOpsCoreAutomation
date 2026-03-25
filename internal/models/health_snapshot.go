@@ -7,6 +7,7 @@ type HealthSnapshot struct {
 	Device       string    `gorm:"not null" json:"device"`
 	Site         string    `gorm:"not null" json:"site"`
 	Host         string    `gorm:"not null" json:"host"`
+	Vendor       string    `gorm:"index;not null;default:'nokia'" json:"vendor"`
 	Uptime       string    `json:"uptime"`
 	CpuLoads     JSONSlice `gorm:"type:jsonb" json:"cpu_loads"`
 	Temperatures JSONSlice `gorm:"type:jsonb" json:"temperatures"`

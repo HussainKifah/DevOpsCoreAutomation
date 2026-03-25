@@ -18,9 +18,9 @@ type PortProtectionRepository interface {
 	BulkInsert(device, site, host string, records []models.PortProtectionRecord) error
 	ReplaceAll(batches []PortBatch) error
 	DeleteByHost(host string) error
-	GetAll() ([]models.PortProtectionRecord, error)
-	GetByHost(host string) ([]models.PortProtectionRecord, error)
-	GetDown() ([]models.PortProtectionRecord, error)
+	GetAll(vendor string) ([]models.PortProtectionRecord, error)
+	GetByHost(host, vendor string) ([]models.PortProtectionRecord, error)
+	GetDown(vendor string) ([]models.PortProtectionRecord, error)
 }
 
 type portProtectionRepository struct {
@@ -49,7 +49,11 @@ func (r *portProtectionRepository) ReplaceAll(batches []PortBatch) error {
 	return r.DB.Transaction(func(tx *gorm.DB) error {
 		now := time.Now()
 		for _, b := range batches {
-			if err := tx.Where("host = ?", b.Host).Delete(&models.PortProtectionRecord{}).Error; err != nil {
+			vendor := "nokia"
+			if len(b.Records) > 0 && b.Records[0].Vendor != "" {
+				vendor = b.Records[0].Vendor
+			}
+			if err := tx.Where("host = ? AND vendor = ?", b.Host, vendor).Delete(&models.PortProtectionRecord{}).Error; err != nil {
 				return err
 			}
 			if len(b.Records) == 0 {
@@ -73,21 +77,25 @@ func (r *portProtectionRepository) DeleteByHost(host string) error {
 	return r.DB.Where("host = ?", host).Delete(&models.PortProtectionRecord{}).Error
 }
 
-func (r *portProtectionRepository) GetAll() ([]models.PortProtectionRecord, error) {
+func (r *portProtectionRepository) GetAll(vendor string) ([]models.PortProtectionRecord, error) {
 	var out []models.PortProtectionRecord
-	err := r.DB.Order("host, port").Find(&out).Error
+	err := r.DB.Where("vendor = ?", vendor).Order("host, port").Find(&out).Error
 	return out, err
 }
 
-func (r *portProtectionRepository) GetByHost(host string) ([]models.PortProtectionRecord, error) {
+func (r *portProtectionRepository) GetByHost(host, vendor string) ([]models.PortProtectionRecord, error) {
 	var out []models.PortProtectionRecord
-	err := r.DB.Where("host = ?", host).Order("port").Find(&out).Error
+	err := r.DB.Where("host = ? AND vendor = ?", host, vendor).Order("port").Find(&out).Error
 	return out, err
 }
 
-func (r *portProtectionRepository) GetDown() ([]models.PortProtectionRecord, error) {
+func (r *portProtectionRepository) GetDown(vendor string) ([]models.PortProtectionRecord, error) {
 	var out []models.PortProtectionRecord
-	err := r.DB.Where("port_state LIKE ? OR paired_state LIKE ?", "%down%", "%down%").
+	if vendor == "huawei" {
+		err := r.DB.Where("vendor = ?", vendor).Order("host, port").Find(&out).Error
+		return out, err
+	}
+	err := r.DB.Where("(port_state LIKE ? OR paired_state LIKE ?) AND vendor = ?", "%down%", "%down%", vendor).
 		Order("host, port").Find(&out).Error
 	return out, err
 }

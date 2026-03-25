@@ -22,10 +22,11 @@ func (h *PortHistoryHandler) GetHistory(c *gin.Context) {
 		return
 	}
 
+	vendor := c.DefaultQuery("vendor", "nokia")
 	rangeStr := c.DefaultQuery("range", "24h")
 	from, to := parseTimeRange(rangeStr)
 
-	data, err := h.Repo.GetByHostAndRange(host, from, to)
+	data, err := h.Repo.GetByHostAndRange(host, from, to, vendor)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -34,10 +35,11 @@ func (h *PortHistoryHandler) GetHistory(c *gin.Context) {
 }
 
 func (h *PortHistoryHandler) GetDownCounts(c *gin.Context) {
+	vendor := c.DefaultQuery("vendor", "nokia")
 	rangeStr := c.DefaultQuery("range", "7d")
 	from, to := parseTimeRange(rangeStr)
 
-	data, err := h.Repo.GetDownCountByRange(from, to)
+	data, err := h.Repo.GetDownCountByRange(from, to, vendor)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

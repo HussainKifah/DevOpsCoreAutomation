@@ -7,8 +7,8 @@ import (
 
 type BackupRepository interface {
 	Create(backup *models.OltBackups) error
-	GetAll() ([]models.OltBackups, error)
-	GetBySite(site string) ([]models.OltBackups, error)
+	GetAll(vendor string) ([]models.OltBackups, error)
+	GetBySite(site, vendor string) ([]models.OltBackups, error)
 	GetByID(id uint) (*models.OltBackups, error)
 }
 
@@ -24,15 +24,15 @@ func (r *backupRepository) Create(backup *models.OltBackups) error {
 	return r.DB.Create(backup).Error
 }
 
-func (r *backupRepository) GetAll() ([]models.OltBackups, error) {
+func (r *backupRepository) GetAll(vendor string) ([]models.OltBackups, error) {
 	var out []models.OltBackups
-	err := r.DB.Order("created_at DESC").Find(&out).Error
+	err := r.DB.Where("vendor = ?", vendor).Order("created_at DESC").Find(&out).Error
 	return out, err
 }
 
-func (r *backupRepository) GetBySite(site string) ([]models.OltBackups, error) {
+func (r *backupRepository) GetBySite(site, vendor string) ([]models.OltBackups, error) {
 	var out []models.OltBackups
-	err := r.DB.Where("site = ?", site).Order("created_at DESC").Find(&out).Error
+	err := r.DB.Where("site = ? AND vendor = ?", site, vendor).Order("created_at DESC").Find(&out).Error
 	return out, err
 }
 

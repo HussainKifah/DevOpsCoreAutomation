@@ -23,10 +23,11 @@ func (h *HealthHistoryHandler) GetHistory(c *gin.Context) {
 		return
 	}
 
+	vendor := c.DefaultQuery("vendor", "nokia")
 	rangeStr := c.DefaultQuery("range", "24h")
 	from, to := parseTimeRange(rangeStr)
 
-	data, err := h.Repo.GetByHostAndRange(host, from, to)
+	data, err := h.Repo.GetByHostAndRange(host, from, to, vendor)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

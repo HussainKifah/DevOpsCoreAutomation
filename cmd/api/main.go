@@ -36,6 +36,7 @@ func main() {
 	backupRepo := repository.NewBackupRepository(database)
 	userRepo := repository.NewUserRepository(database)
 	inventoryRepo := repository.NewInventoryRepo(database)
+	workflowRepo := repository.NewWorkflowRepository(database)
 
 	jwtManager := auth.NewJWTManager(auth.JWTconfig{
 		SecretKey:            []byte(cfg.JWTSecret),
@@ -51,6 +52,13 @@ func main() {
 
 	sched := scheduler.New(cfg, hub, sshPool, powerRepo, descRepo, healthRepo, historyRepo, portRepo, portHistRepo, backupRepo, inventoryRepo)
 	sched.Start()
+
+	cryptoKey := []byte(cfg.JWTSecret)
+	wfSched, err := scheduler.NewWorkflowScheduler(workflowRepo, cryptoKey)
+	if err != nil {
+		log.Fatalf("failed to create workflow scheduler: %v", err)
+	}
+	wfSched.Start()
 
 	server := gin.Default()
 
@@ -78,10 +86,11 @@ func main() {
 	authH := handlers.NewAuthHandler(userRepo, jwtManager)
 	inventoryH := handlers.NewInventoryHandler(inventoryRepo)
 	scanH := handlers.NewScanHandler(sched)
+	workflowH := handlers.NewWorkflowHandler(workflowRepo, wfSched, cryptoKey)
 
-	pageH := handlers.NewPageHandler(filepath.Join(projectRoot, "templates"))
+	pageH := handlers.NewPageHandler(filepath.Join(projectRoot, "templates"), userRepo)
 
-	router.Setup(server, jwtManager, hub, powerH, descH, healthH, healthHistoryH, portH, portHistoryH, calendarH, backupH, userH, authH, pageH, inventoryH, scanH)
+	router.Setup(server, jwtManager, hub, powerH, descH, healthH, healthHistoryH, portH, portHistoryH, calendarH, backupH, userH, authH, pageH, inventoryH, scanH, workflowH)
 
 	// Graceful shutdown
 	srv := &http.Server{
@@ -89,9 +98,17 @@ func main() {
 		Handler: server,
 	}
 	go func() {
-		log.Printf("server starting on :%s", cfg.ServerPort)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server failed: %v", err)
+		addr := ":" + cfg.ServerPort
+		if cfg.TLSCertFile != "" && cfg.TLSKeyFile != "" {
+			log.Printf("server starting HTTPS on %s", addr)
+			if err := srv.ListenAndServeTLS(cfg.TLSCertFile, cfg.TLSKeyFile); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("server failed: %v", err)
+			}
+		} else {
+			log.Printf("server starting HTTP on %s", addr)
+			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("server failed: %v", err)
+			}
 		}
 	}()
 	quit := make(chan os.Signal, 1)
@@ -101,6 +118,7 @@ func main() {
 	log.Println("shutdown signal received, stopping...")
 
 	sched.FlushHealthBuffer()
+	wfSched.Stop()
 	sshPool.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

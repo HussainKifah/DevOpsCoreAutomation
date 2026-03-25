@@ -19,8 +19,9 @@ func NewBackupHandler(r repository.BackupRepository) *BackupHandler {
 }
 
 func (h *BackupHandler) GetAll(c *gin.Context) {
+	vendor := c.DefaultQuery("vendor", "nokia")
 	if site := c.Query("site"); site != "" {
-		data, err := h.Repo.GetBySite(site)
+		data, err := h.Repo.GetBySite(site, vendor)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -29,7 +30,7 @@ func (h *BackupHandler) GetAll(c *gin.Context) {
 		return
 	}
 
-	data, err := h.Repo.GetAll()
+	data, err := h.Repo.GetAll(vendor)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

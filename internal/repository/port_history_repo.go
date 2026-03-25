@@ -21,11 +21,11 @@ type PortHourEntry struct {
 
 type PortHistoryRepository interface {
 	BulkInsert(records []models.PortSnapshot) error
-	GetByHostAndRange(host string, from, to time.Time) ([]models.PortSnapshot, error)
-	GetDownCountByRange(from, to time.Time) ([]PortDownCount, error)
+	GetByHostAndRange(host string, from, to time.Time, vendor string) ([]models.PortSnapshot, error)
+	GetDownCountByRange(from, to time.Time, vendor string) ([]PortDownCount, error)
 	DeleteOlderThan(cutoff time.Time) (int64, error)
-	GetCalendarDays(from, to time.Time) ([]PortCalendarDay, error)
-	GetSnapshotsForDate(date time.Time) ([]models.PortSnapshot, error)
+	GetCalendarDays(from, to time.Time, vendor string) ([]PortCalendarDay, error)
+	GetSnapshotsForDate(date time.Time, vendor string) ([]models.PortSnapshot, error)
 }
 
 type PortDownCount struct {
@@ -50,20 +50,20 @@ func (r *portHistoryRepository) BulkInsert(records []models.PortSnapshot) error 
 	return r.DB.CreateInBatches(records, 100).Error
 }
 
-func (r *portHistoryRepository) GetByHostAndRange(host string, from, to time.Time) ([]models.PortSnapshot, error) {
+func (r *portHistoryRepository) GetByHostAndRange(host string, from, to time.Time, vendor string) ([]models.PortSnapshot, error) {
 	var out []models.PortSnapshot
 	err := r.DB.
-		Where("host = ? AND measured_at >= ? AND measured_at < ?", host, from, to).
+		Where("host = ? AND measured_at >= ? AND measured_at < ? AND vendor = ?", host, from, to, vendor).
 		Order("measured_at, port").
 		Find(&out).Error
 	return out, err
 }
 
-func (r *portHistoryRepository) GetDownCountByRange(from, to time.Time) ([]PortDownCount, error) {
+func (r *portHistoryRepository) GetDownCountByRange(from, to time.Time, vendor string) ([]PortDownCount, error) {
 	var out []PortDownCount
 	err := r.DB.Model(&models.PortSnapshot{}).
 		Select("TO_CHAR(measured_at, 'YYYY-MM-DD') as date, host, device, COUNT(DISTINCT port) as down_count").
-		Where("measured_at >= ? AND measured_at < ?", from, to).
+		Where("measured_at >= ? AND measured_at < ? AND vendor = ?", from, to, vendor).
 		Group("TO_CHAR(measured_at, 'YYYY-MM-DD'), host, device").
 		Order("date, host").
 		Find(&out).Error
@@ -75,22 +75,22 @@ func (r *portHistoryRepository) DeleteOlderThan(cutoff time.Time) (int64, error)
 	return result.RowsAffected, result.Error
 }
 
-func (r *portHistoryRepository) GetCalendarDays(from, to time.Time) ([]PortCalendarDay, error) {
+func (r *portHistoryRepository) GetCalendarDays(from, to time.Time, vendor string) ([]PortCalendarDay, error) {
 	var out []PortCalendarDay
 	err := r.DB.Model(&models.PortSnapshot{}).
 		Select("TO_CHAR(measured_at, 'YYYY-MM-DD') as date, COUNT(*) as down_count").
-		Where("measured_at >= ? AND measured_at < ?", from, to).
+		Where("measured_at >= ? AND measured_at < ? AND vendor = ?", from, to, vendor).
 		Group("TO_CHAR(measured_at, 'YYYY-MM-DD')").
 		Order("date").
 		Find(&out).Error
 	return out, err
 }
 
-func (r *portHistoryRepository) GetSnapshotsForDate(date time.Time) ([]models.PortSnapshot, error) {
+func (r *portHistoryRepository) GetSnapshotsForDate(date time.Time, vendor string) ([]models.PortSnapshot, error) {
 	nextDay := date.AddDate(0, 0, 1)
 	var out []models.PortSnapshot
 	err := r.DB.
-		Where("measured_at >= ? AND measured_at < ?", date, nextDay).
+		Where("measured_at >= ? AND measured_at < ? AND vendor = ?", date, nextDay, vendor).
 		Order("measured_at, host, port").
 		Find(&out).Error
 	return out, err

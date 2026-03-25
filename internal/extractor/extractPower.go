@@ -70,8 +70,13 @@ func ExtractAllOntPower(output string) []OntPower {
 
 func ExtractOntPowerBelowOltRx(output string, threshold float64) []OntPower {
 	all := ExtractAllOntPower(output)
+	return FilterOntPowerBelow(all, threshold)
+}
+
+// FilterOntPowerBelow returns ONTs with OltRx below threshold.
+func FilterOntPowerBelow(powers []OntPower, threshold float64) []OntPower {
 	var out []OntPower
-	for _, p := range all {
+	for _, p := range powers {
 		if p.OltRx < threshold {
 			out = append(out, p)
 		}

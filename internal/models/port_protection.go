@@ -11,6 +11,7 @@ type PortProtectionRecord struct {
 	Device      string    `gorm:"index;not null" json:"device"`
 	Site        string    `gorm:"index;not null" json:"site"`
 	Host        string    `gorm:"index;not null" json:"host"`
+	Vendor      string    `gorm:"index;not null;default:'nokia'" json:"vendor"`
 	Port        string    `gorm:"not null" json:"port"`
 	PortState   string    `json:"port_state"`
 	PairedState string    `json:"paired_state"`

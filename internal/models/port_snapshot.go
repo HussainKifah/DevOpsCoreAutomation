@@ -7,6 +7,7 @@ type PortSnapshot struct {
 	Device      string    `gorm:"not null" json:"device"`
 	Site        string    `gorm:"not null" json:"site"`
 	Host        string    `gorm:"not null" json:"host"`
+	Vendor      string    `gorm:"index;not null;default:'nokia'" json:"vendor"`
 	Port        string    `gorm:"not null" json:"port"`
 	PortState   string    `json:"port_state"`
 	PairedState string    `json:"paired_state"`

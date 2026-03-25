@@ -1,0 +1,263 @@
+{{define "content"}}
+<div x-data="workflowsPage()" x-init="init()">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-[#f1f5f9]">Workflows</h1>
+      <p class="text-sm text-[#94a3b8] mt-0.5">Manage BNG devices and scheduled backup / command jobs</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button @click="openDeviceModal()" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9] hover:border-[#3b82f6]/50 transition-all btn-press">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3"/></svg>
+        Add Device
+      </button>
+      <button @click="openJobModal()" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-[#3b82f6] text-white hover:bg-[#2563eb] transition-all btn-press">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+        New Job
+      </button>
+    </div>
+  </div>
+
+  <template x-if="loading">
+    <div class="space-y-4"><div class="h-28 rounded-xl bg-[#1a2236] animate-pulse"></div><div class="h-48 rounded-xl bg-[#1a2236] animate-pulse"></div></div>
+  </template>
+
+  <template x-if="!loading">
+    <div class="space-y-8">
+      <!-- Devices -->
+      <section>
+        <h2 class="text-xs font-semibold uppercase tracking-widest text-[#475569] mb-3">Registered Devices</h2>
+        <template x-if="devices.length === 0">
+          <div class="flex flex-col items-center py-10 rounded-xl bg-[#1a2236] border border-[rgba(255,255,255,0.08)] text-[#94a3b8]">
+            <svg class="w-10 h-10 mb-2 opacity-30" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3"/></svg>
+            <p class="text-sm">No devices yet.</p>
+          </div>
+        </template>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <template x-for="d in devices" :key="d.ID">
+            <div class="mission-card relative bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] p-4 group">
+              <div class="flex items-center justify-between mb-3">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full uppercase"
+                  :class="{'bg-[#3b82f6]/20 text-[#3b82f6]':d.vendor==='nokia','bg-[#10b981]/20 text-[#10b981]':d.vendor==='cisco','bg-[#f59e0b]/20 text-[#f59e0b]':d.vendor==='mikrotik','bg-[#ef4444]/20 text-[#ef4444]':d.vendor==='huawei'}">
+                  <span class="w-1.5 h-1.5 rounded-full" :class="{'bg-[#3b82f6]':d.vendor==='nokia','bg-[#10b981]':d.vendor==='cisco','bg-[#f59e0b]':d.vendor==='mikrotik','bg-[#ef4444]':d.vendor==='huawei'}"></span>
+                  <span x-text="d.vendor"></span>
+                </span>
+                <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button @click="openDeviceModal(d)" class="p-1.5 rounded-lg text-[#94a3b8] hover:text-[#3b82f6] hover:bg-[#3b82f6]/10"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg></button>
+                  <button @click="confirmDelete({type:'device',id:d.ID,label:d.name})" class="p-1.5 rounded-lg text-[#94a3b8] hover:text-[#ef4444] hover:bg-[#ef4444]/10"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916"/></svg></button>
+                </div>
+              </div>
+              <p class="text-sm font-semibold text-[#f1f5f9] truncate" x-text="d.name"></p>
+              <p class="text-xs font-mono text-[#94a3b8] mt-0.5 truncate" x-text="d.host"></p>
+              <div class="mt-3 flex items-center gap-1.5">
+                <svg class="w-3 h-3 text-[#475569]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/></svg>
+                <span class="text-[10px] text-[#475569]">AES-256 encrypted</span>
+              </div>
+            </div>
+          </template>
+        </div>
+      </section>
+
+      <!-- Jobs -->
+      <section>
+        <h2 class="text-xs font-semibold uppercase tracking-widest text-[#475569] mb-3">Scheduled Jobs</h2>
+        <template x-if="jobs.length === 0">
+          <div class="flex flex-col items-center py-10 rounded-xl bg-[#1a2236] border border-[rgba(255,255,255,0.08)] text-[#94a3b8]">
+            <svg class="w-10 h-10 mb-2 opacity-30" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <p class="text-sm">No jobs yet.</p>
+          </div>
+        </template>
+        <div class="space-y-3">
+          <template x-for="j in jobs" :key="j.ID">
+            <div class="mission-card bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] overflow-hidden">
+              <div class="flex items-center gap-4 px-5 py-4">
+                <span class="w-2.5 h-2.5 rounded-full shrink-0"
+                  :class="{'bg-[#10b981]':j.last_status==='ok','bg-[#ef4444]':j.last_status==='error','bg-[#f59e0b] animate-pulse':j.last_status==='pending'}"></span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-sm font-semibold text-[#f1f5f9]" x-text="j.device?.name||'—'"></span>
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold uppercase rounded-full"
+                      :class="j.job_type==='backup'?'bg-[#10b981]/20 text-[#10b981]':'bg-[#8b5cf6]/20 text-[#8b5cf6]'"
+                      x-text="j.job_type"></span>
+                    <span x-show="!j.enabled" class="px-1.5 py-0.5 text-[10px] rounded bg-[#475569]/30 text-[#94a3b8]">PAUSED</span>
+                    <span x-show="j.schedule==='once'" class="px-1.5 py-0.5 text-[10px] rounded bg-[#8b5cf6]/20 text-[#8b5cf6]">ONE-TIME</span>
+                  </div>
+                  <div class="flex items-center gap-3 mt-0.5 flex-wrap text-xs text-[#94a3b8]">
+                    <span class="font-mono" x-text="j.device?.host||'—'"></span>
+                    <span class="text-[#475569]">·</span>
+                    <span x-text="j.schedule==='once'?'Run once':j.schedule"></span>
+                    <template x-if="j.job_type==='command'&&j.command">
+                      <code class="text-[#60a5fa] bg-[#3b82f6]/10 px-1.5 py-0.5 rounded font-mono truncate max-w-xs" x-text="j.command"></code>
+                    </template>
+                  </div>
+                  <div class="mt-0.5 text-[10px] text-[#475569]" x-show="j.last_run_at">
+                    Last run: <span class="text-[#94a3b8]" x-text="j.last_run_at?new Date(j.last_run_at).toLocaleString():'—'"></span>
+                    <span x-show="j.last_status==='error'" class="ml-2 text-[#ef4444]" x-text="j.last_message"></span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <button @click="viewRuns(j)" class="p-2 rounded-lg text-[#94a3b8] hover:text-[#f1f5f9] hover:bg-white/5 transition-colors" title="History">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z"/></svg>
+                  </button>
+                  <button @click="runNow(j)" :disabled="runningJobs[j.ID]" class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-[#3b82f6]/20 text-[#3b82f6] hover:bg-[#3b82f6]/30 transition-colors disabled:opacity-50">
+                    <svg x-show="!runningJobs[j.ID]" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"/></svg>
+                    <svg x-show="runningJobs[j.ID]" class="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 019.95 9" stroke-linecap="round"/></svg>
+                    <span x-text="runningJobs[j.ID]?'Running...':'Run Now'"></span>
+                  </button>
+                  <button x-show="j.schedule!=='once'" @click="toggleJob(j)" class="p-2 rounded-lg text-[#94a3b8] hover:text-[#f59e0b] hover:bg-[#f59e0b]/10 transition-colors">
+                    <svg x-show="j.enabled" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5"/></svg>
+                    <svg x-show="!j.enabled" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"/></svg>
+                  </button>
+                  <button @click="confirmDelete({type:'job',id:j.ID,label:(j.device?.name||'?')+' '+j.job_type})" class="p-2 rounded-lg text-[#94a3b8] hover:text-[#ef4444] hover:bg-[#ef4444]/10 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </section>
+    </div>
+  </template>
+
+  <!-- Device Modal -->
+  <div x-show="showDeviceModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" @click="showDeviceModal=false"></div>
+    <div class="relative bg-[#1a2236] rounded-2xl border border-[rgba(255,255,255,0.08)] w-full max-w-md mx-4 p-6 shadow-2xl">
+      <h2 class="text-lg font-semibold text-[#f1f5f9] mb-1" x-text="editingDevice?'Edit Device':'Add Device'"></h2>
+      <p class="text-xs text-[#94a3b8] mb-5">Credentials stored with AES-256-GCM encryption — never exposed via API.</p>
+      <div class="space-y-4">
+        <div><label class="block text-sm font-medium text-[#94a3b8] mb-1">Device Name</label><input type="text" x-model="deviceForm.name" placeholder="BNG-Basra-01" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] px-3 py-2 text-sm placeholder-[#475569] focus:ring-2 focus:ring-[#3b82f6]"></div>
+        <div><label class="block text-sm font-medium text-[#94a3b8] mb-1">Host / IP</label><input type="text" x-model="deviceForm.host" placeholder="10.80.6.1" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] px-3 py-2 text-sm placeholder-[#475569] focus:ring-2 focus:ring-[#3b82f6]"></div>
+        <div><label class="block text-sm font-medium text-[#94a3b8] mb-1">Vendor</label><select x-model="deviceForm.vendor" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] px-3 py-2 text-sm focus:ring-2 focus:ring-[#3b82f6]"><option value="nokia">Nokia</option><option value="cisco">Cisco</option><option value="mikrotik">MikroTik</option><option value="huawei">Huawei</option></select></div>
+        <div><label class="block text-sm font-medium text-[#94a3b8] mb-1">Username<span x-show="editingDevice" class="text-[#475569] font-normal ml-1">(blank = keep)</span></label><input type="text" x-model="deviceForm.username" autocomplete="off" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] px-3 py-2 text-sm focus:ring-2 focus:ring-[#3b82f6]"></div>
+        <div><label class="block text-sm font-medium text-[#94a3b8] mb-1">Password<span x-show="editingDevice" class="text-[#475569] font-normal ml-1">(blank = keep)</span></label>
+          <div class="relative"><input :type="showDevicePass?'text':'password'" x-model="deviceForm.password" autocomplete="new-password" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] px-3 py-2 text-sm pr-10 focus:ring-2 focus:ring-[#3b82f6]">
+            <button type="button" @click="showDevicePass=!showDevicePass" class="absolute right-3 top-1/2 -translate-y-1/2 text-[#475569] hover:text-[#94a3b8]"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg></button>
+          </div>
+        </div>
+      </div>
+      <template x-if="deviceFormError"><p class="mt-3 text-sm text-[#ef4444]" x-text="deviceFormError"></p></template>
+      <div class="flex justify-end gap-3 mt-6">
+        <button @click="showDeviceModal=false" class="px-4 py-2 text-sm rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] hover:bg-white/5 btn-press">Cancel</button>
+        <button @click="submitDevice()" :disabled="deviceSubmitting" class="px-4 py-2 text-sm font-medium rounded-lg bg-[#3b82f6] text-white hover:bg-[#2563eb] disabled:opacity-50 btn-press"><span x-text="deviceSubmitting?'Saving...':(editingDevice?'Update':'Add Device')"></span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Job Modal -->
+  <div x-show="showJobModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" @click="showJobModal=false"></div>
+    <div class="relative bg-[#1a2236] rounded-2xl border border-[rgba(255,255,255,0.08)] w-full max-w-lg mx-4 p-6 shadow-2xl">
+      <h2 class="text-lg font-semibold text-[#f1f5f9] mb-5">New Workflow Job</h2>
+      <div class="space-y-4">
+        <div><label class="block text-sm font-medium text-[#94a3b8] mb-1">Device</label><select x-model="jobForm.device_id" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] px-3 py-2 text-sm focus:ring-2 focus:ring-[#3b82f6]"><option value="">— select a device —</option><template x-for="d in devices" :key="d.ID"><option :value="d.ID" x-text="d.name+' ('+d.host+')'"></option></template></select></div>
+        <div>
+          <label class="block text-sm font-medium text-[#94a3b8] mb-2">Job Type</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button @click="jobForm.job_type='backup'" :class="jobForm.job_type==='backup'?'border-[#10b981] bg-[#10b981]/10 text-[#10b981]':'border-[rgba(255,255,255,0.08)] text-[#94a3b8]'" class="flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition-all">Backup Config</button>
+            <button @click="jobForm.job_type='command'" :class="jobForm.job_type==='command'?'border-[#8b5cf6] bg-[#8b5cf6]/10 text-[#8b5cf6]':'border-[rgba(255,255,255,0.08)] text-[#94a3b8]'" class="flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition-all">Custom Command</button>
+          </div>
+        </div>
+        <template x-if="jobForm.job_type==='command'"><div><label class="block text-sm font-medium text-[#94a3b8] mb-1">Command</label><input type="text" x-model="jobForm.command" placeholder="show ip bgp summary" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] font-mono px-3 py-2 text-sm placeholder-[#475569] focus:ring-2 focus:ring-[#3b82f6]"></div></template>
+        <div>
+          <label class="block text-sm font-medium text-[#94a3b8] mb-1">Schedule</label>
+          <input type="text" x-model="jobForm.schedule" placeholder="24h, 0 21 * * *, or once" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] font-mono px-3 py-2 text-sm placeholder-[#475569] focus:ring-2 focus:ring-[#3b82f6]">
+          <div class="flex flex-wrap gap-1.5 mt-2">
+            <template x-for="p in [{l:'Run Once',v:'once'},{l:'30m',v:'30m'},{l:'1h',v:'1h'},{l:'6h',v:'6h'},{l:'Daily',v:'24h'},{l:'9PM',v:'0 21 * * *'},{l:'Weekly',v:'0 21 * * 0'}]" :key="p.v">
+              <button @click="jobForm.schedule=p.v" :class="jobForm.schedule===p.v?'bg-[#3b82f6] text-white border-[#3b82f6]':'bg-[#111827] text-[#94a3b8] border-[rgba(255,255,255,0.08)]'" class="px-2.5 py-1 text-xs rounded-lg border transition-colors" x-text="p.l"></button>
+            </template>
+          </div>
+        </div>
+      </div>
+      <template x-if="jobFormError"><p class="mt-3 text-sm text-[#ef4444]" x-text="jobFormError"></p></template>
+      <div class="flex justify-end gap-3 mt-6">
+        <button @click="showJobModal=false" class="px-4 py-2 text-sm rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] hover:bg-white/5 btn-press">Cancel</button>
+        <button @click="submitJob()" :disabled="jobSubmitting" class="px-4 py-2 text-sm font-medium rounded-lg bg-[#3b82f6] text-white hover:bg-[#2563eb] disabled:opacity-50 btn-press"><span x-text="jobSubmitting?'Creating...':'Create Job'"></span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Runs Modal -->
+  <div x-show="showRunsModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" @click="showRunsModal=false"></div>
+    <div class="relative bg-[#1a2236] rounded-2xl border border-[rgba(255,255,255,0.08)] w-full max-w-3xl mx-4 shadow-2xl flex flex-col max-h-[80vh]">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-[rgba(255,255,255,0.08)]">
+        <div><h2 class="text-base font-semibold text-[#f1f5f9]">Run History</h2><p class="text-xs text-[#94a3b8]" x-text="selectedJob?(selectedJob.device?.name+' · '+selectedJob.job_type):''"></p></div>
+        <button @click="showRunsModal=false" class="p-1.5 rounded-lg hover:bg-white/5 text-[#94a3b8]"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      </div>
+      <div class="flex-1 overflow-y-auto p-5 space-y-2">
+        <template x-if="runsLoading"><div class="flex justify-center py-8"><div class="animate-spin h-6 w-6 rounded-full border-b-2 border-[#3b82f6]"></div></div></template>
+        <template x-if="!runsLoading&&runs.length===0"><p class="text-center text-sm text-[#94a3b8] py-8">No runs yet.</p></template>
+        <template x-for="r in runs" :key="r.id">
+          <div class="rounded-xl border overflow-hidden" :class="r.status==='ok'?'border-[#10b981]/25':'border-[#ef4444]/25'">
+            <div class="flex items-center gap-3 px-4 py-3 bg-[#111827]">
+              <span class="w-2 h-2 rounded-full" :class="{'bg-[#10b981]':r.status==='ok','bg-[#ef4444]':r.status==='error','bg-[#f59e0b]':r.status==='pending'}"></span>
+              <span class="text-sm font-medium" :class="{'text-[#10b981]':r.status==='ok','text-[#ef4444]':r.status==='error','text-[#f59e0b]':r.status==='pending'}" x-text="r.status.toUpperCase()"></span>
+              <span class="text-xs text-[#94a3b8] font-mono ml-auto" x-text="new Date(r.started_at).toLocaleString()"></span>
+              <span class="text-xs text-[#475569]" x-text="r.finished_at?((new Date(r.finished_at)-new Date(r.started_at))/1000).toFixed(1)+'s':'running'"></span>
+            </div>
+            <template x-if="r.error_msg"><div class="px-4 py-2 bg-[#ef4444]/5"><p class="text-xs text-[#ef4444] font-mono" x-text="r.error_msg"></p></div></template>
+            <template x-if="r.output"><details class="group"><summary class="px-4 py-2 text-xs text-[#94a3b8] cursor-pointer list-none flex items-center gap-1.5 hover:text-[#f1f5f9]"><svg class="w-3.5 h-3.5 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>View output <span class="text-[#475569]" x-text="'('+r.output.length+' chars)'"></span></summary><pre class="px-4 py-3 text-xs text-[#94a3b8] font-mono overflow-x-auto bg-[#0a0e1a] max-h-64 whitespace-pre-wrap" x-text="r.output"></pre></details></template>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirm -->
+  <div x-show="showDeleteModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="fixed inset-0 bg-black/60" @click="showDeleteModal=false"></div>
+    <div class="relative bg-[#1a2236] rounded-2xl border border-[rgba(255,255,255,0.08)] w-full max-w-sm mx-4 p-6 shadow-2xl">
+      <h2 class="text-base font-semibold text-[#f1f5f9] mb-2">Confirm Delete</h2>
+      <p class="text-sm text-[#94a3b8] mb-6">Delete <strong class="text-[#f1f5f9]" x-text="deleteTarget?.label"></strong>? This cannot be undone.</p>
+      <div class="flex justify-end gap-3">
+        <button @click="showDeleteModal=false" class="px-4 py-2 text-sm rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] hover:bg-white/5 btn-press">Cancel</button>
+        <button @click="executeDelete()" class="px-4 py-2 text-sm font-medium rounded-lg bg-[#ef4444] text-white hover:bg-[#dc2626] btn-press">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function workflowsPage() {
+  return {
+    loading:true,devices:[],jobs:[],runs:[],runningJobs:{},
+    showDeviceModal:false,editingDevice:null,
+    deviceForm:{name:'',host:'',vendor:'nokia',username:'',password:''},
+    deviceFormError:'',deviceSubmitting:false,showDevicePass:false,
+    showJobModal:false,jobForm:{device_id:'',job_type:'backup',command:'',schedule:'24h'},
+    jobFormError:'',jobSubmitting:false,
+    showRunsModal:false,selectedJob:null,runsLoading:false,
+    showDeleteModal:false,deleteTarget:null,
+    async init(){await this.fetchAll();this.loading=false;},
+    async fetchAll(){const[d,j]=await Promise.all([fetch('/api/workflows/devices'),fetch('/api/workflows/jobs')]);this.devices=(await d.json())||[];this.jobs=(await j.json())||[];},
+    openDeviceModal(d){this.editingDevice=d||null;this.deviceForm=d?{name:d.name,host:d.host,vendor:d.vendor,username:'',password:''}:{name:'',host:'',vendor:'nokia',username:'',password:''};this.deviceFormError='';this.showDeviceModal=true;},
+    async submitDevice(){this.deviceSubmitting=true;this.deviceFormError='';try{const url=this.editingDevice?'/api/workflows/devices/'+this.editingDevice.ID:'/api/workflows/devices';const res=await fetch(url,{method:this.editingDevice?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.deviceForm)});const data=await res.json();if(!res.ok){this.deviceFormError=data.error||'Failed';}else{this.showDeviceModal=false;await this.fetchAll();}}catch(e){this.deviceFormError='Network error';}this.deviceSubmitting=false;},
+    openJobModal(){this.jobForm={device_id:'',job_type:'backup',command:'',schedule:'24h'};this.jobFormError='';this.showJobModal=true;},
+    async submitJob(){this.jobSubmitting=true;this.jobFormError='';try{const res=await fetch('/api/workflows/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...this.jobForm,device_id:parseInt(this.jobForm.device_id,10)})});const data=await res.json();if(!res.ok){this.jobFormError=data.error||'Failed';}else{this.showJobModal=false;await this.fetchAll();}}catch(e){this.jobFormError='Network error';}this.jobSubmitting=false;},
+    async toggleJob(j){await fetch('/api/workflows/jobs/'+j.ID,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!j.enabled})});await this.fetchAll();},
+    async runNow(j){
+      this.runningJobs={...this.runningJobs,[j.ID]:true};
+      var prevRunAt=j.last_run_at||'';
+      try{
+        var res=await fetch('/api/workflows/jobs/'+j.ID+'/run',{method:'POST'});
+        if(!res.ok){this.runningJobs={...this.runningJobs,[j.ID]:false};alert('Failed to start job');return;}
+      }catch(e){this.runningJobs={...this.runningJobs,[j.ID]:false};alert('Network error');return;}
+      var self=this;var polls=0;var maxPolls=60;
+      var pollInterval=setInterval(async function(){
+        polls++;
+        try{await self.fetchAll();}catch(e){}
+        var updated=self.jobs.find(function(x){return x.ID===j.ID;});
+        var runChanged=updated&&updated.last_run_at&&updated.last_run_at!==prevRunAt;
+        if((runChanged&&updated.last_status!=='pending')||polls>=maxPolls){
+          clearInterval(pollInterval);
+          self.runningJobs={...self.runningJobs,[j.ID]:false};
+        }
+      },3000);
+    },
+    confirmDelete(t){this.deleteTarget=t;this.showDeleteModal=true;},
+    async executeDelete(){const url=this.deleteTarget.type==='device'?'/api/workflows/devices/'+this.deleteTarget.id:'/api/workflows/jobs/'+this.deleteTarget.id;await fetch(url,{method:'DELETE'});this.showDeleteModal=false;this.deleteTarget=null;await this.fetchAll();},
+    async viewRuns(j){this.selectedJob=j;this.runs=[];this.showRunsModal=true;this.runsLoading=true;const res=await fetch('/api/workflows/jobs/'+j.ID+'/runs');this.runs=(await res.json())||[];this.runsLoading=false;},
+  };
+}
+</script>
+{{end}}

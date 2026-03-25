@@ -17,10 +17,16 @@ func NewPowerHandler(powerRepo repository.PowerRepository) *PowerHandler {
 }
 
 func (h *PowerHandler) GetAll(c *gin.Context) {
+	vendor := c.DefaultQuery("vendor", "nokia")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "50"))
 	device := c.Query("device")
 	search := c.Query("search")
+	sortBy := c.DefaultQuery("sort_by", "olt_rx")
+	sortOrder := c.DefaultQuery("sort_order", "asc")
+	if sortOrder != "desc" {
+		sortOrder = "asc"
+	}
 
 	if page < 1 {
 		page = 1
@@ -31,7 +37,7 @@ func (h *PowerHandler) GetAll(c *gin.Context) {
 		perPage = 50
 	}
 
-	data, err := h.PowerRepo.GetPaginated(page, perPage, device, search)
+	data, err := h.PowerRepo.GetPaginated(page, perPage, device, search, sortBy, sortOrder, vendor)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -40,13 +46,14 @@ func (h *PowerHandler) GetAll(c *gin.Context) {
 }
 
 func (h *PowerHandler) GetWeak(c *gin.Context) {
+	vendor := c.DefaultQuery("vendor", "nokia")
 	threshold := -24.0
 	if q := c.Query("threshold"); q != "" {
 		if v, err := strconv.ParseFloat(q, 64); err == nil {
 			threshold = v
 		}
 	}
-	data, err := h.PowerRepo.GetWeak(threshold)
+	data, err := h.PowerRepo.GetWeak(threshold, vendor)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -55,13 +62,14 @@ func (h *PowerHandler) GetWeak(c *gin.Context) {
 }
 
 func (h *PowerHandler) GetSummary(c *gin.Context) {
+	vendor := c.DefaultQuery("vendor", "nokia")
 	threshold := -24.0
 	if q := c.Query("threshold"); q != "" {
 		if v, err := strconv.ParseFloat(q, 64); err == nil {
 			threshold = v
 		}
 	}
-	data, err := h.PowerRepo.GetSummary(threshold)
+	data, err := h.PowerRepo.GetSummary(threshold, vendor)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -70,7 +78,8 @@ func (h *PowerHandler) GetSummary(c *gin.Context) {
 }
 
 func (h *PowerHandler) GetDevices(c *gin.Context) {
-	data, err := h.PowerRepo.GetDevices()
+	vendor := c.DefaultQuery("vendor", "nokia")
+	data, err := h.PowerRepo.GetDevices(vendor)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

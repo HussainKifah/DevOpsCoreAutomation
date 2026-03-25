@@ -18,8 +18,8 @@ type DescriptionRepository interface {
 	BulkInsert(device, site, host string, descs []models.OntDescription) error
 	ReplaceAll(batches []DescBatch) error
 	DeleteByHost(host string) error
-	GetAll() ([]models.OntDescription, error)
-	GetByHost(host string) ([]models.OntDescription, error)
+	GetAll(vendor string) ([]models.OntDescription, error)
+	GetByHost(host, vendor string) ([]models.OntDescription, error)
 }
 
 type descriptionRepository struct {
@@ -48,7 +48,11 @@ func (r *descriptionRepository) ReplaceAll(batches []DescBatch) error {
 	return r.DB.Transaction(func(tx *gorm.DB) error {
 		now := time.Now()
 		for _, b := range batches {
-			if err := tx.Where("host = ?", b.Host).Delete(&models.OntDescription{}).Error; err != nil {
+			vendor := "nokia"
+			if len(b.Records) > 0 && b.Records[0].Vendor != "" {
+				vendor = b.Records[0].Vendor
+			}
+			if err := tx.Where("host = ? AND vendor = ?", b.Host, vendor).Delete(&models.OntDescription{}).Error; err != nil {
 				return err
 			}
 			if len(b.Records) == 0 {
@@ -72,14 +76,14 @@ func (r *descriptionRepository) DeleteByHost(host string) error {
 	return r.DB.Where("host = ?", host).Delete(&models.OntDescription{}).Error
 }
 
-func (r *descriptionRepository) GetAll() ([]models.OntDescription, error) {
+func (r *descriptionRepository) GetAll(vendor string) ([]models.OntDescription, error) {
 	var out []models.OntDescription
-	err := r.DB.Order("host, ont_idx").Find(&out).Error
+	err := r.DB.Where("vendor = ?", vendor).Order("host, ont_idx").Find(&out).Error
 	return out, err
 }
 
-func (r *descriptionRepository) GetByHost(host string) ([]models.OntDescription, error) {
+func (r *descriptionRepository) GetByHost(host, vendor string) ([]models.OntDescription, error) {
 	var out []models.OntDescription
-	err := r.DB.Where("host = ?", host).Order("ont_idx").Find(&out).Error
+	err := r.DB.Where("host = ? AND vendor = ?", host, vendor).Order("ont_idx").Find(&out).Error
 	return out, err
 }

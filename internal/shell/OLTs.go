@@ -55,3 +55,24 @@ func OLTsData() (nokia OLTs, huawei OLTs, err error) {
 
 	return nokia, huawei, nil
 }
+
+// GetHuaweiOLTs returns Huawei OLTs from OLTsData (OLTs_API_ENV) when available, else from HW_OLT_HOSTS or default.
+func GetHuaweiOLTs() []OLT {
+	_, hw, err := OLTsData()
+	if err == nil && len(hw) > 0 {
+		return hw
+	}
+	hosts := os.Getenv("HW_OLT_HOSTS")
+	if hosts == "" {
+		hosts = "10.250.0.178,10.202.160.3,10.90.3.101,10.90.3.102,10.90.3.103,10.90.3.104,10.80.2.161"
+	}
+	var out []OLT
+	for _, ip := range strings.Split(hosts, ",") {
+		ip = strings.TrimSpace(ip)
+		if ip == "" {
+			continue
+		}
+		out = append(out, OLT{Ip: ip, Name: "OLT-" + strings.ReplaceAll(ip, ".", "-"), Site: "site", Vendor: "huawei"})
+	}
+	return out
+}
