@@ -19,8 +19,8 @@ type DescriptionRepository interface {
 	ReplaceAll(batches []DescBatch) error
 	DeleteByHost(host string) error
 	DeleteExceptHosts(hosts []string) error
-	GetAll() ([]models.OntDescription, error)
-	GetByHost(host string) ([]models.OntDescription, error)
+	GetAll(vendor string) ([]models.OntDescription, error)
+	GetByHost(host, vendor string) ([]models.OntDescription, error)
 }
 
 type descriptionRepository struct {
@@ -80,7 +80,7 @@ func (r *descriptionRepository) DeleteExceptHosts(hosts []string) error {
 	return r.DB.Unscoped().Where("host NOT IN ?", hosts).Delete(&models.OntDescription{}).Error
 }
 
-func (r *descriptionRepository) GetAll() ([]models.OntDescription, error) {
+func (r *descriptionRepository) GetAll(vendor string) ([]models.OntDescription, error) {
 	var out []models.OntDescription
 	err := r.DB.Where("vendor = ?", vendor).Order("host, ont_idx").Find(&out).Error
 	return out, err

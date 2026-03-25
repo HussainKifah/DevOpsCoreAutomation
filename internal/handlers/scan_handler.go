@@ -11,6 +11,11 @@ type Scanner interface {
 	RunPowerScan() bool
 	RunPortScan() bool
 	RunInventoryScan() bool
+	RunHuaweiHealthScan()
+	RunHuaweiPowerScan()
+	RunHuaweiPortScan()
+	RunHuaweiBackup()
+	RunHuaweiInventoryScan()
 }
 
 type ScanHandler struct {
@@ -22,33 +27,30 @@ func NewScanHandler(s Scanner) *ScanHandler {
 }
 
 func (h *ScanHandler) RunHealth(c *gin.Context) {
-	if !h.scanner.RunHealthScan() {
-		c.JSON(http.StatusConflict, gin.H{"error": "another scan is already running"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"status": "health scan started"})
+	h.scanner.RunHealthScan()
+	h.scanner.RunHuaweiHealthScan()
+	c.JSON(http.StatusOK, gin.H{"status": "health scan started (nokia + huawei)"})
 }
 
 func (h *ScanHandler) RunPower(c *gin.Context) {
-	if !h.scanner.RunPowerScan() {
-		c.JSON(http.StatusConflict, gin.H{"error": "another scan is already running"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"status": "power scan started"})
+	h.scanner.RunPowerScan()
+	h.scanner.RunHuaweiPowerScan()
+	c.JSON(http.StatusOK, gin.H{"status": "power scan started (nokia + huawei)"})
 }
 
 func (h *ScanHandler) RunPorts(c *gin.Context) {
-	if !h.scanner.RunPortScan() {
-		c.JSON(http.StatusConflict, gin.H{"error": "another scan is already running"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"status": "port scan started"})
+	h.scanner.RunPortScan()
+	h.scanner.RunHuaweiPortScan()
+	c.JSON(http.StatusOK, gin.H{"status": "port scan started (nokia + huawei)"})
 }
 
 func (h *ScanHandler) RunInventory(c *gin.Context) {
-	if !h.scanner.RunInventoryScan() {
-		c.JSON(http.StatusConflict, gin.H{"error": "another scan is already running"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"status": "inventory scan started"})
+	h.scanner.RunInventoryScan()
+	h.scanner.RunHuaweiInventoryScan()
+	c.JSON(http.StatusOK, gin.H{"status": "inventory scan started (nokia + huawei)"})
+}
+
+func (h *ScanHandler) RunBackup(c *gin.Context) {
+	h.scanner.RunHuaweiBackup()
+	c.JSON(http.StatusOK, gin.H{"status": "huawei backup started"})
 }

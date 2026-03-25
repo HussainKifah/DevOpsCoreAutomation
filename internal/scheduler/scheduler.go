@@ -743,7 +743,7 @@ func (s *Scheduler) runInventoryScanWork() {
 			}
 		}
 		if len(toStore) > 0 {
-			if err := s.inventoryRepo.ReplaceOntInventoryByHost(r.Host, toStore); err != nil {
+			if err := s.inventoryRepo.ReplaceOntInventoryByHost(r.Host, "nokia", toStore); err != nil {
 				log.Printf("[job] inventory-scan: per-ONT inventory for %s: %v", r.Host, err)
 			}
 		}

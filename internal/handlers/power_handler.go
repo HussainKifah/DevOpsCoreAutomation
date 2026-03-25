@@ -37,7 +37,7 @@ func (h *PowerHandler) GetAll(c *gin.Context) {
 		perPage = 50
 	}
 
-	data, err := h.PowerRepo.GetPaginated(page, perPage, device, search, sortBy, sortOrder)
+	data, err := h.PowerRepo.GetPaginated(page, perPage, vendor, device, search, sortBy, sortOrder)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

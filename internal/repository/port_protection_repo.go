@@ -19,9 +19,9 @@ type PortProtectionRepository interface {
 	ReplaceAll(batches []PortBatch) error
 	DeleteByHost(host string) error
 	DeleteExceptHosts(hosts []string) error
-	GetAll() ([]models.PortProtectionRecord, error)
-	GetByHost(host string) ([]models.PortProtectionRecord, error)
-	GetDown() ([]models.PortProtectionRecord, error)
+	GetAll(vendor string) ([]models.PortProtectionRecord, error)
+	GetByHost(host, vendor string) ([]models.PortProtectionRecord, error)
+	GetDown(vendor string) ([]models.PortProtectionRecord, error)
 }
 
 type portProtectionRepository struct {
@@ -81,7 +81,7 @@ func (r *portProtectionRepository) DeleteExceptHosts(hosts []string) error {
 	return r.DB.Unscoped().Where("host NOT IN ?", hosts).Delete(&models.PortProtectionRecord{}).Error
 }
 
-func (r *portProtectionRepository) GetAll() ([]models.PortProtectionRecord, error) {
+func (r *portProtectionRepository) GetAll(vendor string) ([]models.PortProtectionRecord, error) {
 	var out []models.PortProtectionRecord
 	err := r.DB.Where("vendor = ?", vendor).Order("host, port").Find(&out).Error
 	return out, err

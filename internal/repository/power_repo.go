@@ -55,14 +55,13 @@ type PowerRepository interface {
 	BulkInsert(device, site, host string, readings []models.PowerReading) error
 	ReplaceAll(batches []PowerBatch) error
 	DeleteByHost(host string) error
-	// DeleteExceptHosts removes readings for hosts not in the list (hard delete). Use after a full scan to drop removed OLTs.
 	DeleteExceptHosts(hosts []string) error
-	GetAll() ([]models.PowerReading, error)
-	GetPaginated(page, perPage int, device, search, sortBy, sortOrder string) (*PaginatedReadings, error)
-	GetByHost(host string) ([]models.PowerReading, error)
-	GetWeak(threshold float64) ([]models.PowerReading, error)
-	GetDevices() ([]DeviceInfo, error)
-	GetSummary(threshold float64) ([]DevicePowerSummary, error)
+	GetAll(vendor string) ([]models.PowerReading, error)
+	GetPaginated(page, perPage int, vendor, device, search, sortBy, sortOrder string) (*PaginatedReadings, error)
+	GetByHost(host, vendor string) ([]models.PowerReading, error)
+	GetWeak(threshold float64, vendor string) ([]models.PowerReading, error)
+	GetDevices(vendor string) ([]DeviceInfo, error)
+	GetSummary(threshold float64, vendor string) ([]DevicePowerSummary, error)
 	GetOntIndicesByHost(host string) ([]string, error)
 }
 type powerRepository struct {
@@ -122,13 +121,13 @@ func (r *powerRepository) DeleteExceptHosts(hosts []string) error {
 	return r.DB.Unscoped().Where("host NOT IN ?", hosts).Delete(&models.PowerReading{}).Error
 }
 
-func (r *powerRepository) GetAll() ([]models.PowerReading, error) {
+func (r *powerRepository) GetAll(vendor string) ([]models.PowerReading, error) {
 	var out []models.PowerReading
 	err := r.DB.Where("vendor = ?", vendor).Order("host, ont_idx").Find(&out).Error
 	return out, err
 }
 
-func (r *powerRepository) GetPaginated(page, perPage int, device, search, sortBy, sortOrder string) (*PaginatedReadings, error) {
+func (r *powerRepository) GetPaginated(page, perPage int, vendor, device, search, sortBy, sortOrder string) (*PaginatedReadings, error) {
 	descJoin := "LEFT JOIN ont_descriptions ON power_readings.ont_idx = ont_descriptions.ont_idx AND power_readings.host = ont_descriptions.host AND ont_descriptions.deleted_at IS NULL"
 	invJoin := "LEFT JOIN ont_inventory_items ON power_readings.ont_idx = ont_inventory_items.ont_idx AND power_readings.host = ont_inventory_items.host AND ont_inventory_items.deleted_at IS NULL"
 
