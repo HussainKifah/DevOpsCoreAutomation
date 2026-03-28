@@ -16,8 +16,29 @@ type HuaweiOntOptical struct {
 	Vendor        string // From "Vendor PN" in raw output
 }
 
+// ExtractHuaweiOntOpticalForCommand parses the CLI output of one
+// "display ont optical-info <pon> <ont>" command. Use this when outputs are
+// not concatenated; it avoids index skew when some ONTs return errors/empty blocks.
+func ExtractHuaweiOntOpticalForCommand(output string, slot, pon, ont int) (HuaweiOntOptical, bool) {
+	blocks := splitHuaweiOpticalBlocks(output)
+	for _, block := range blocks {
+		if rx, tx, oltRx, vendor, ok := parseHuaweiOpticalBlock(block); ok {
+			return HuaweiOntOptical{
+				Slot: slot, Pon: pon, Ont: ont,
+				RxPower: rx, TxPower: tx, OltRxOntPower: oltRx, Vendor: vendor,
+			}, true
+		}
+	}
+	out := extractPowersFromWholeOutput(output, []struct{ Slot, Pon, Ont int }{{slot, pon, ont}})
+	if len(out) > 0 {
+		return out[0], true
+	}
+	return HuaweiOntOptical{}, false
+}
+
 // ExtractAllHuaweiOntOptical parses the "display ont optical-info" output and returns
 // power values. Blocks are matched to indices in order (slot, pon, ont).
+// Note: if any block fails to parse, the index must still advance (one block per command).
 func ExtractAllHuaweiOntOptical(output string, indices []struct{ Slot, Pon, Ont int }) []HuaweiOntOptical {
 	blocks := splitHuaweiOpticalBlocks(output)
 	var out []HuaweiOntOptical
@@ -27,11 +48,11 @@ func ExtractAllHuaweiOntOptical(output string, indices []struct{ Slot, Pon, Ont 
 			break
 		}
 		rx, tx, oltRx, vendor, ok := parseHuaweiOpticalBlock(block)
+		i := indices[idx]
+		idx++
 		if !ok {
 			continue
 		}
-		i := indices[idx]
-		idx++
 		out = append(out, HuaweiOntOptical{
 			Slot:          i.Slot,
 			Pon:           i.Pon,

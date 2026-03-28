@@ -31,6 +31,7 @@ func Setup(
 	r.GET("/ws", websocket.ServerWs(hub, jwtManager))
 
 	// Public routes
+	r.GET("/", func(c *gin.Context) { c.Redirect(302, "/login") })
 	r.GET("/login", pageH.Login)
 
 	// Auth API (public)
@@ -132,6 +133,7 @@ func Setup(
 			scan.POST("/power", scanH.RunPower)
 			scan.POST("/ports", scanH.RunPorts)
 			scan.POST("/inventory", scanH.RunInventory)
+			scan.POST("/backup", scanH.RunBackup)
 		}
 
 		// Admin-only API routes

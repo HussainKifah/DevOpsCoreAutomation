@@ -70,6 +70,9 @@ func (p *ConnectionPool) dial(host string) (*generic.Driver, error) {
 		options.WithPromptPattern(regexp.MustCompile(`(?m)(>#)\s*$`)),
 		options.WithTransportType(transport.StandardTransport),
 		options.WithSSHConfigFile(""),
+		options.WithTimeoutSocket(60*time.Second),
+		options.WithStandardTransportExtraKexs(scrapligoWideKEX),
+		options.WithStandardTransportExtraCiphers(scrapligoWideCiphers),
 		options.WithTimeoutOps(120*time.Minute),
 		options.WithTermWidth(500),
 	)

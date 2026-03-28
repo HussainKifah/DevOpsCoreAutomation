@@ -86,21 +86,45 @@ func hwCommandPreGap() time.Duration {
 	return time.Duration(ms) * time.Millisecond
 }
 
-var hwSSHConfig = ssh.Config{
-	KeyExchanges: []string{
-		ssh.InsecureKeyExchangeDHGEXSHA1,
-		ssh.InsecureKeyExchangeDH1SHA1,
-		ssh.InsecureKeyExchangeDH14SHA1,
-		ssh.KeyExchangeDH14SHA256,
-	},
-	Ciphers: []string{
-		ssh.CipherAES128CTR, ssh.CipherAES192CTR, ssh.CipherAES256CTR,
-		ssh.InsecureCipherAES128CBC, ssh.InsecureCipherTripleDESCBC,
-	},
-	MACs: []string{
-		ssh.HMACSHA256, ssh.HMACSHA512, ssh.HMACSHA1, ssh.InsecureHMACSHA196,
-	},
+// hwOpticalSleep is the post-command delay after each "display ont optical-info" (default low;
+// full prompt sync already waits for output). Override with HW_OPTICAL_SLEEP_MS.
+func hwOpticalSleep() time.Duration {
+	ms := 4
+	if v := os.Getenv("HW_OPTICAL_SLEEP_MS"); v != "" {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n >= 0 && n <= 2000 {
+			ms = n
+		}
+	}
+	return time.Duration(ms) * time.Millisecond
 }
+
+// hwOpticalGap is the pre-command delay before optical-info lines. Override with HW_OPTICAL_GAP_MS.
+func hwOpticalGap() time.Duration {
+	ms := 2
+	if v := os.Getenv("HW_OPTICAL_GAP_MS"); v != "" {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n >= 0 && n <= 500 {
+			ms = n
+		}
+	}
+	return time.Duration(ms) * time.Millisecond
+}
+
+func hwPacingGap(cmd string) time.Duration {
+	if strings.HasPrefix(cmd, "display ont optical-info") {
+		return hwOpticalGap()
+	}
+	return hwCommandPreGap()
+}
+
+func hwPacingSleep(cmd string) time.Duration {
+	if strings.HasPrefix(cmd, "display ont optical-info") {
+		return hwOpticalSleep()
+	}
+	return hwCommandSleep()
+}
+
+// Huawei OLT / BNG sessions: use the same wide algorithm set as IP-team SSH (legacy + modern).
+var hwSSHConfig = wideSSHConfig()
 
 type HwSession struct {
 	host    string
@@ -177,10 +201,19 @@ func HwOpenSession(host, user, pass string) (*HwSession, error) {
 }
 
 func (s *HwSession) SendCommands(cmds ...string) (string, error) {
-	sleep := hwCommandSleep()
-	gap := hwCommandPreGap()
-	var fullOut strings.Builder
+	parts, err := s.SendCommandsResponses(cmds...)
+	if err != nil {
+		return strings.Join(parts, ""), err
+	}
+	return strings.Join(parts, ""), nil
+}
+
+// SendCommandsResponses runs commands sequentially like SendCommands but returns one stdout
+// capture per command (for parsers that must align each answer with its slot/pon/ont).
+func (s *HwSession) SendCommandsResponses(cmds ...string) ([]string, error) {
+	var parts []string
 	for _, cmd := range cmds {
+		gap := hwPacingGap(cmd)
 		if gap > 0 {
 			time.Sleep(gap)
 		}
@@ -188,14 +221,15 @@ func (s *HwSession) SendCommands(cmds ...string) (string, error) {
 
 		log.Printf("[%s] >>> %s", s.host, cmd)
 		if _, err := s.stdin.Write([]byte(cmd + "\r\n")); err != nil {
-			return fullOut.String(), fmt.Errorf("write %q: %w", cmd, err)
+			return parts, fmt.Errorf("write %q: %w", cmd, err)
 		}
 		cmdCtx, cmdCancel := context.WithTimeout(s.ctx, 5*time.Minute)
 		if err := waitForPromptWithMore(cmdCtx, s.outBuf, s.stdin, s.host); err != nil {
 			cmdCancel()
 			resp := s.outBuf.String()
 			log.Printf("[%s] <<< TIMEOUT\n%s", s.host, resp)
-			return fullOut.String() + resp, fmt.Errorf("prompt after %q: %w", cmd, err)
+			parts = append(parts, resp)
+			return parts, fmt.Errorf("prompt after %q: %w", cmd, err)
 		}
 		cmdCancel()
 		resp := s.outBuf.String()
@@ -208,11 +242,13 @@ func (s *HwSession) SendCommands(cmds ...string) (string, error) {
 			}
 			log.Printf("[%s] <<< %s", s.host, preview)
 		}
-		fullOut.WriteString(resp)
+		parts = append(parts, resp)
 		s.outBuf.Reset()
-		time.Sleep(sleep)
+		if sl := hwPacingSleep(cmd); sl > 0 {
+			time.Sleep(sl)
+		}
 	}
-	return fullOut.String(), nil
+	return parts, nil
 }
 
 func (s *HwSession) Close() {

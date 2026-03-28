@@ -11,6 +11,7 @@ type Scanner interface {
 	RunPowerScan() bool
 	RunPortScan() bool
 	RunInventoryScan() bool
+	RunBackup()
 	RunHuaweiHealthScan()
 	RunHuaweiPowerScan()
 	RunHuaweiPortScan()
@@ -51,6 +52,7 @@ func (h *ScanHandler) RunInventory(c *gin.Context) {
 }
 
 func (h *ScanHandler) RunBackup(c *gin.Context) {
+	h.scanner.RunBackup()
 	h.scanner.RunHuaweiBackup()
-	c.JSON(http.StatusOK, gin.H{"status": "huawei backup started"})
+	c.JSON(http.StatusOK, gin.H{"status": "backup started (nokia + huawei)"})
 }

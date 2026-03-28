@@ -120,6 +120,30 @@
       </a>
       {{end}}
 
+      {{if or (eq .UserRole "ip") (eq .UserRole "admin")}}
+      <div class="pt-4 mt-4 border-t border-[rgba(255,255,255,0.08)]">
+        <div class="px-3 pb-2 mb-1 hidden lg:block">
+          <span class="text-xs font-semibold uppercase tracking-[0.2em] text-teal-400">IP TEAM</span>
+        </div>
+      </div>
+      <a href="/workflows" class="sidebar-link flex items-center justify-center lg:justify-start gap-2 lg:gap-3 px-2 lg:px-3 py-2.5 rounded-r-lg text-sm font-medium text-[#94a3b8] lg:pl-4 {{if eq .Page "workflows"}}active{{end}}" title="Workflows">
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z"/></svg>
+        <span class="hidden lg:inline">Workflows</span>
+      </a>
+      <a href="/ip-backups" class="sidebar-link flex items-center justify-center lg:justify-start gap-2 lg:gap-3 px-2 lg:px-3 py-2.5 rounded-r-lg text-sm font-medium text-[#94a3b8] lg:pl-4 {{if eq .Page "ip-backups"}}active{{end}}" title="IP Backups">
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
+        <span class="hidden lg:inline">IP Backups</span>
+      </a>
+      <a href="/ip-cmd-output" class="sidebar-link flex items-center justify-center lg:justify-start gap-2 lg:gap-3 px-2 lg:px-3 py-2.5 rounded-r-lg text-sm font-medium text-[#94a3b8] lg:pl-4 {{if eq .Page "ip-cmd-output"}}active{{end}}" title="CMD Output">
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m6.75 7.5 3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v12a2.25 2.25 0 0 0 2.25 2.25Z"/></svg>
+        <span class="hidden lg:inline">CMD Output</span>
+      </a>
+      <a href="/ip-activity-log" class="sidebar-link flex items-center justify-center lg:justify-start gap-2 lg:gap-3 px-2 lg:px-3 py-2.5 rounded-r-lg text-sm font-medium text-[#94a3b8] lg:pl-4 {{if eq .Page "ip-activity-log"}}active{{end}}" title="Activity Log">
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+        <span class="hidden lg:inline">Activity Log</span>
+      </a>
+      {{end}}
+
       {{if eq .UserRole "admin"}}
       <div class="pt-4 mt-4 border-t border-[rgba(255,255,255,0.08)]">
         <span class="px-3 text-xs font-semibold uppercase tracking-wider text-[#475569]">Administration</span>
@@ -201,6 +225,19 @@
           <span id="ws-label">● OFFLINE</span>
           <span id="ws-retry" class="text-[#94a3b8] hidden"></span>
         </div>
+        <div class="flex items-center gap-3">
+        {{if or (eq .UserRole "excess") (eq .UserRole "admin") (eq .UserRole "viewer")}}
+        <button @click="Alpine.store('vendor').toggle()"
+          class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 border"
+          :class="Alpine.store('vendor').current === 'nokia'
+            ? 'bg-[#3b82f6]/15 text-[#3b82f6] border-[#3b82f6]/30 hover:bg-[#3b82f6]/25'
+            : 'bg-[#ef4444]/15 text-[#ef4444] border-[#ef4444]/30 hover:bg-[#ef4444]/25'">
+          <span class="w-2 h-2 rounded-full"
+            :class="Alpine.store('vendor').current === 'nokia' ? 'bg-[#3b82f6]' : 'bg-[#ef4444]'"></span>
+          <span x-text="Alpine.store('vendor').current === 'nokia' ? 'Nokia' : 'Huawei'"></span>
+          <svg class="w-3.5 h-3.5 opacity-60" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>
+        </button>
+        {{end}}
         <div class="relative">
           <button @click="open = !open" class="relative p-2 rounded-lg hover:bg-white/5 transition-colors">
             <svg class="w-5 h-5 text-[#94a3b8]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">

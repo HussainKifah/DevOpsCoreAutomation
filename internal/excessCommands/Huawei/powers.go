@@ -16,7 +16,8 @@ import (
 
 const (
 	maxSlots = 16
-	maxPons  = 8
+	// maxPons: many Huawei GPON line cards expose 16 PON ports (0–15). Override with HW_POWER_PONS.
+	maxPons  = 16
 	maxOnts  = 128
 )
 
@@ -33,12 +34,14 @@ func SlotForOLT(host string) int {
 type PowerScanConfig struct {
 	Slots  []int
 	Pons   []int
-	OntMax int
+	OntMin int
+	OntMax int // inclusive ONT index per PON (Huawei CLI ont-id)
 	Chunk  int
 }
 
 func loadPowerConfig() PowerScanConfig {
 	cfg := PowerScanConfig{
+		OntMin: 0,
 		OntMax: maxOnts - 1,
 		Chunk:  64,
 	}
@@ -47,10 +50,18 @@ func loadPowerConfig() PowerScanConfig {
 			cfg.Chunk = n
 		}
 	}
+	if v := os.Getenv("HW_POWER_ONT_MIN"); v != "" {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n >= 0 && n < maxOnts {
+			cfg.OntMin = n
+		}
+	}
 	if v := os.Getenv("HW_POWER_ONT_MAX"); v != "" {
-		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n >= 1 && n <= 128 {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n >= 1 && n <= maxOnts {
 			cfg.OntMax = n - 1
 		}
+	}
+	if cfg.OntMin > cfg.OntMax {
+		cfg.OntMin, cfg.OntMax = cfg.OntMax, cfg.OntMin
 	}
 	if v := os.Getenv("HW_POWER_SLOTS"); v != "" {
 		v = strings.TrimSpace(strings.Split(v, "#")[0])
@@ -76,8 +87,11 @@ func loadPowerConfig() PowerScanConfig {
 
 func (c PowerScanConfig) slotsFor(host string) []int {
 	if len(c.Slots) == 1 && c.Slots[0] == -1 {
-		// "all" — Hafriya starts from slot 0, others from slot 1
-		start := SlotForOLT(host)
+		// "all" — GPON slots on frame 0: 1..15 by default; Hafriya also uses slot 0.
+		start := 1
+		if host == HafriyaHost {
+			start = 0
+		}
 		slots := make([]int, 0, maxSlots-start)
 		for i := start; i < maxSlots; i++ {
 			slots = append(slots, i)
@@ -87,7 +101,16 @@ func (c PowerScanConfig) slotsFor(host string) []int {
 	if len(c.Slots) > 0 {
 		return c.Slots
 	}
-	return []int{SlotForOLT(host)}
+	// Default: scan every installed-slot candidate (skip 0 except Hafriya).
+	start := 1
+	if host == HafriyaHost {
+		start = 0
+	}
+	slots := make([]int, 0, maxSlots-start)
+	for i := start; i < maxSlots; i++ {
+		slots = append(slots, i)
+	}
+	return slots
 }
 
 func (c PowerScanConfig) ponList() []int {
@@ -201,12 +224,15 @@ func CollectOpticalPowers(host, user, pass, device, site string) (*OpticalPowerR
 
 	slots := cfg.slotsFor(host)
 	pons := cfg.ponList()
-	ontEnd := cfg.OntMax + 1
 	chunk := cfg.Chunk
 
-	maxChunksPerSlot := len(pons) * ((ontEnd + chunk - 1) / chunk)
-	log.Printf("[hw-power] LIVE %s (%s): start — %d slot(s) × %d PON × ONT 0-%d chunk=%d (up to ~%d chunks per slot)",
-		device, host, len(slots), len(pons), cfg.OntMax, chunk, maxChunksPerSlot)
+	ontSpan := cfg.OntMax - cfg.OntMin + 1
+	if ontSpan < 1 {
+		ontSpan = 1
+	}
+	maxChunksPerSlot := len(pons) * ((ontSpan + chunk - 1) / chunk)
+	log.Printf("[hw-power] LIVE %s (%s): start — %d slot(s) × %d PON(s) × ONT %d-%d chunk=%d (~%d chunks/slot)",
+		device, host, len(slots), len(pons), cfg.OntMin, cfg.OntMax, chunk, maxChunksPerSlot)
 
 	chunkNum := 0
 	for _, slot := range slots {
@@ -225,10 +251,10 @@ func CollectOpticalPowers(host, user, pass, device, site string) (*OpticalPowerR
 		log.Printf("[hw-power] LIVE %s: slot %d OK — scanning PONs", host, slot)
 
 		for _, pon := range pons {
-			for ontStart := 0; ontStart < ontEnd; ontStart += chunk {
+			for ontStart := cfg.OntMin; ontStart <= cfg.OntMax; ontStart += chunk {
 				end := ontStart + chunk
-				if end > ontEnd {
-					end = ontEnd
+				if end > cfg.OntMax+1 {
+					end = cfg.OntMax + 1
 				}
 
 				cmds := make([]string, 0, end-ontStart)
@@ -241,27 +267,35 @@ func CollectOpticalPowers(host, user, pass, device, site string) (*OpticalPowerR
 				log.Printf("[hw-power] LIVE %s: chunk %d slot=%d pon=%d ONT %d-%d (%d cmds) running…",
 					host, chunkNum, slot, pon, ontStart, end-1, len(cmds))
 
-				raw, err := sess.SendCommands(cmds...)
+				responses, err := sess.SendCommandsResponses(cmds...)
 				elapsed := time.Since(t0)
-				rawParts = append(rawParts, raw)
+				for _, r := range responses {
+					rawParts = append(rawParts, r)
+				}
+				nFound := 0
+				for i := range responses {
+					ont := ontStart + i
+					if ont >= end {
+						break
+					}
+					o, ok := extractor.ExtractHuaweiOntOpticalForCommand(responses[i], slot, pon, ont)
+					if ok {
+						powers = append(powers, o)
+						nFound++
+					}
+				}
 				if err != nil {
 					res.ChunksFailed++
-					log.Printf("[hw-power] LIVE %s: chunk %d FAIL after %s — %v", host, chunkNum, elapsed.Round(time.Millisecond), err)
+					log.Printf("[hw-power] LIVE %s: chunk %d FAIL after %s — %v (parsed %d/%d in partial output)",
+						host, chunkNum, elapsed.Round(time.Millisecond), err, nFound, len(responses))
 					if res.Err == nil {
 						res.Err = err
 					}
 					continue
 				}
 				res.ChunksOK++
-
-				indices := make([]struct{ Slot, Pon, Ont int }, 0, end-ontStart)
-				for ont := ontStart; ont < end; ont++ {
-					indices = append(indices, struct{ Slot, Pon, Ont int }{slot, pon, ont})
-				}
-				parsed := extractor.ExtractAllHuaweiOntOptical(raw, indices)
-				powers = append(powers, parsed...)
-				log.Printf("[hw-power] LIVE %s: chunk %d OK in %s — +%d readings this chunk (total %d) raw+%d bytes",
-					host, chunkNum, elapsed.Round(time.Millisecond), len(parsed), len(powers), len(raw))
+				log.Printf("[hw-power] LIVE %s: chunk %d OK in %s — +%d readings (total %d)",
+					host, chunkNum, elapsed.Round(time.Millisecond), nFound, len(powers))
 			}
 		}
 

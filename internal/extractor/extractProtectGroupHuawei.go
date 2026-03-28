@@ -26,10 +26,10 @@ var reGroupID = regexp.MustCompile(`(?m)Group ID\s*:\s*(\d+)`)
 var reAdminState = regexp.MustCompile(`(?m)Admin State\s*:\s*(\S+)`)
 
 // Member row: "  0/0/6         work         auto switch src   standby       0/3/6"
-// Supports: none, auto switch src, auto switch dst for Operation
-var reMemberRow = regexp.MustCompile(`(?m)^\s*(\d+/\d+/\d+)\s+(work|protect)\s+(none|auto\s+switch\s+(?:src|dst))\s+(active|standby)\s+(\S+)\s*$`)
+// Supports: none, auto switch src/dst, force switch src/dst for Operation
+var reMemberRow = regexp.MustCompile(`(?m)^\s*(\d+/\d+/\d+)\s+(work|protect)\s+(none|(?:auto|force)\s+switch\s+(?:src|dst))\s+(active|standby)\s+(\S+)\s*$`)
 // Fallback: allow optional spaces in slot (e.g. "0/ 0/ 6") and trailing junk (ANSI, etc.)
-var reMemberRowFlex = regexp.MustCompile(`(?m)^\s*(\d+\s*/\s*\d+\s*/\s*\d+)\s+(work|protect)\s+(none|auto\s+switch\s+(?:src|dst))\s+(active|standby)\s+(\S+)`)
+var reMemberRowFlex = regexp.MustCompile(`(?m)^\s*(\d+\s*/\s*\d+\s*/\s*\d+)\s+(work|protect)\s+(none|(?:auto|force)\s+switch\s+(?:src|dst))\s+(active|standby)\s+(\S+)`)
 
 // stripANSICodes removes CSI escape sequences that may appear in SSH output.
 func stripANSICodes(s string) string {

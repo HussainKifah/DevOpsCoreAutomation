@@ -72,11 +72,12 @@ func mikrotikSSH(host, user, pass string, timeout time.Duration, cmds ...string)
 			}),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         30 * time.Second,
+		Timeout:         60 * time.Second,
+		Config:          wideSSHConfig(),
 	}
 
 	log.Printf("[ip-ssh] %s (mikrotik): dialing %s ...", host, addr)
-	conn, err := net.DialTimeout("tcp", addr, 30*time.Second)
+	conn, err := net.DialTimeout("tcp", addr, cfg.Timeout)
 	if err != nil {
 		log.Printf("[ip-ssh] %s (mikrotik): ✘ TCP dial failed: %v", host, err)
 		return "", fmt.Errorf("tcp dial: %w", err)
@@ -170,23 +171,12 @@ func huaweiWorkflowSSH(host, user, pass string, cmds ...string) (string, error) 
 			}),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         30 * time.Second,
-		Config: ssh.Config{
-			KeyExchanges: []string{
-				"diffie-hellman-group-exchange-sha1",
-				"diffie-hellman-group1-sha1",
-				"diffie-hellman-group14-sha1",
-				"diffie-hellman-group14-sha256",
-			},
-			Ciphers: []string{
-				"aes128-ctr", "aes192-ctr", "aes256-ctr",
-				"aes128-cbc", "3des-cbc",
-			},
-		},
+		Timeout:         60 * time.Second,
+		Config:          wideSSHConfig(),
 	}
 
 	log.Printf("[hw-bng] %s: dialing TCP %s ...", host, addr)
-	tcpConn, err := net.DialTimeout("tcp", addr, 30*time.Second)
+	tcpConn, err := net.DialTimeout("tcp", addr, cfg.Timeout)
 	if err != nil {
 		log.Printf("[hw-bng] %s: ✘ TCP dial failed: %v", host, err)
 		return "", fmt.Errorf("tcp dial: %w", err)
@@ -392,6 +382,9 @@ func IPSendCommand(host, user, pass, vendor string, cmds ...string) (string, err
 		options.WithAuthPassword(pass),
 		options.WithPromptPattern(profile.PromptPattern),
 		options.WithTransportType(tp),
+		options.WithTimeoutSocket(60*time.Second),
+		options.WithStandardTransportExtraKexs(scrapligoWideKEX),
+		options.WithStandardTransportExtraCiphers(scrapligoWideCiphers),
 		options.WithTimeoutOps(profile.TimeoutOps),
 		options.WithTermWidth(511),
 	)

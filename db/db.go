@@ -40,6 +40,10 @@ func Connect(cfg *config.Config) *gorm.DB {
 		&models.InventorySummary{},
 		&models.OltInventory{},
 		&models.OntInventoryItem{},
+		&models.WorkflowDevice{},
+		&models.WorkflowJob{},
+		&models.WorkflowRun{},
+		&models.WorkflowLog{},
 	); err != nil {
 		log.Fatalf("failed to migrate database: %v", err)
 	}

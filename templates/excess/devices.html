@@ -70,10 +70,10 @@
               <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('serial_no')">
                 <span class="inline-flex items-center gap-1">Serial <span class="text-[#3b82f6]" x-show="sortColumn === 'serial_no'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
               </th>
-              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('desc1')">
+              <th x-show="!isHuawei" class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('desc1')">
                 <span class="inline-flex items-center gap-1">Desc 1 <span class="text-[#3b82f6]" x-show="sortColumn === 'desc1'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
               </th>
-              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('desc2')">
+              <th x-show="!isHuawei" class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('desc2')">
                 <span class="inline-flex items-center gap-1">Desc 2 <span class="text-[#3b82f6]" x-show="sortColumn === 'desc2'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
               </th>
               <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('device')">
@@ -113,8 +113,8 @@
                 </td>
                 <td class="px-4 py-2.5 font-mono text-xs text-[#f1f5f9]" x-text="r.equip_id || '—'"></td>
                 <td class="px-4 py-2.5 font-mono text-xs text-[#94a3b8]" x-text="r.serial_no || '—'"></td>
-                <td class="px-4 py-2.5 text-xs text-[#94a3b8]" x-text="r.desc1 || '—'"></td>
-                <td class="px-4 py-2.5 text-xs text-[#94a3b8]" x-text="r.desc2 || '—'"></td>
+                <td x-show="!isHuawei" class="px-4 py-2.5 text-xs text-[#94a3b8]" x-text="r.desc1 || '—'"></td>
+                <td x-show="!isHuawei" class="px-4 py-2.5 text-xs text-[#94a3b8]" x-text="r.desc2 || '—'"></td>
                 <td class="px-4 py-2.5 text-xs text-[#f1f5f9]" x-text="r.device"></td>
                 <td class="px-4 py-2.5 text-xs text-[#94a3b8]" x-text="r.site"></td>
                 <td class="px-4 py-2.5 font-mono text-xs text-[#94a3b8]" x-text="r.host"></td>
@@ -170,6 +170,10 @@ function devicesPage() {
       await this.fetchPage();
       this.loading = false;
       window.addEventListener('vendor-changed', () => { this.init(); });
+    },
+
+    get isHuawei() {
+      return (localStorage.getItem('selectedVendor') || 'nokia') === 'huawei';
     },
 
     get uniqueDevices() {

@@ -158,7 +158,8 @@ func (r *powerRepository) GetPaginated(page, perPage int, vendor, device, search
 
 	dataQ := r.DB.Model(&models.PowerReading{}).
 		Select("power_readings.id, power_readings.device, power_readings.site, power_readings.host, power_readings.ont_idx, power_readings.olt_rx, power_readings.ont_rx, power_readings.measured_at, COALESCE(ont_descriptions.desc1, '') as desc1, COALESCE(ont_descriptions.desc2, '') as desc2, COALESCE(ont_inventory_items.equip_id, '') as equip_id, COALESCE(ont_inventory_items.serial_no, '') as serial_no").
-		Joins(descJoin).Joins(invJoin)
+		Joins(descJoin).Joins(invJoin).
+		Where("power_readings.vendor = ?", vendor)
 	if device != "" {
 		dataQ = dataQ.Where("power_readings.device = ?", device)
 	}
@@ -228,7 +229,7 @@ func (r *powerRepository) GetByHost(host, vendor string) ([]models.PowerReading,
 
 func (r *powerRepository) GetWeak(threshold float64, vendor string) ([]models.PowerReading, error) {
 	var out []models.PowerReading
-	err := r.DB.Where("ont_rx < ?", threshold).Order("ont_rx").Find(&out).Error
+	err := r.DB.Where("ont_rx < ? AND vendor = ?", threshold, vendor).Order("ont_rx").Find(&out).Error
 	return out, err
 }
 
@@ -246,6 +247,7 @@ func (r *powerRepository) GetSummary(threshold float64, vendor string) ([]Device
 	var out []DevicePowerSummary
 	err := r.DB.Model(&models.PowerReading{}).
 		Select("device, site, host, COUNT(*) as total, SUM(CASE WHEN ont_rx < ? THEN 1 ELSE 0 END) as weak_count", threshold).
+		Where("vendor = ?", vendor).
 		Group("device, site, host").
 		Order("site, device").
 		Find(&out).Error

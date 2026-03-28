@@ -4,14 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/Flafl/DevOpsCore/config"
 	huawei "github.com/Flafl/DevOpsCore/internal/excessCommands/Huawei"
+	nokiabackup "github.com/Flafl/DevOpsCore/internal/excessCommands/Nokia"
 	"github.com/Flafl/DevOpsCore/internal/extractor"
 	"github.com/Flafl/DevOpsCore/internal/models"
 	"github.com/Flafl/DevOpsCore/internal/repository"
@@ -90,7 +89,8 @@ func (s *Scheduler) Start() {
 	 mustAdd(sched, s.cfg.PowerScanInterval, s.runHuaweiPowerScan, "huawei-power-scan")
 	 mustAdd(sched, s.cfg.PortScanInterval, s.runHuaweiPortScan, "huawei-port-scan")
 
-	 //mustAddCron(sched, "0 21 * * *", s.runBackup, "backup") // 9:00 PM daily (3 hours before midnight)
+	 mustAddCron(sched, "0 21 * * *", s.runBackup, "backup") // 9:00 PM daily
+	 mustAddCron(sched, "0 21 * * *", s.runHuaweiBackup, "backup") // 9:00 PM daily
 	 mustAddCron(sched, "0 1 * * *", s.runHistoryCleanup, "history-cleanup")
 	 mustAddCron(sched, "0 2 1 * *", s.runInventoryScan, "inventory-scan") // Runs at 02:00 on the 1st of every month
 	 mustAddCron(sched, "0 2 1 * *", s.runHuaweiInventoryScan, "huawei-inventory-scan")
@@ -102,14 +102,16 @@ func (s *Scheduler) Start() {
 	go func() {
 		log.Println("[startup] running all jobs immediately")
 		// Nokia
-		s.runPowerScan()
-		s.runDescScan()
-		s.runHealthScan()
-		s.runPortScan()
+		// s.runPowerScan()
+		// s.runDescScan()
+		// s.runHealthScan()
+		// s.runPortScan()
+		// s.runBackup()
 		// Huawei
-		s.runHuaweiHealthScan()
+		// s.runHuaweiHealthScan()
 		s.runHuaweiPowerScan()
-		s.runHuaweiPortScan()
+		// s.runHuaweiPortScan()
+		// s.runHuaweiInventoryScan()
 		log.Println("[startup] initial scan complete")
 	}()
 }
@@ -408,6 +410,7 @@ func (s *Scheduler) RunHealthScan() bool    { return s.tryRun(s.runHealthScanWor
 func (s *Scheduler) RunPowerScan() bool     { return s.tryRun(s.runPowerScanWork) }
 func (s *Scheduler) RunPortScan() bool      { return s.tryRun(s.runPortScanWork) }
 func (s *Scheduler) RunInventoryScan() bool { return s.tryRun(s.runInventoryScanWork) }
+func (s *Scheduler) RunBackup()             { go s.runBackup() }
 
 func (s *Scheduler) tryRun(work func()) bool {
 	select {
@@ -613,43 +616,25 @@ func (s *Scheduler) runBackup() {
 	s.scanSem <- struct{}{}
 	defer func() { <-s.scanSem }()
 	log.Println("[job] backup: starting")
-	cmd := "info configure flat"
 
-	for r := range shell.SendCommandNokiaOLTs(s.cfg.OLTUser, s.cfg.OLTPass, cmd) {
+	results := nokiabackup.BackupsWithPool(s.pool, false, nil)
+	for _, r := range results {
 		if r.Err != nil {
-			log.Printf("[job] backup: ERROR %s: %v", r.Host, r.Err)
+			log.Printf("[job] backup: %s: %v", r.Host, r.Err)
+		}
+		if r.FilePath == "" {
 			continue
 		}
-
 		site := strings.ReplaceAll(r.Site, "/", "-")
 		if site == "" {
 			site = "unknown"
 		}
-
-		folder := filepath.Join("backups", site, time.Now().Format("2006-01-02"))
-		if err := os.MkdirAll(folder, 0o755); err != nil {
-			log.Printf("[job] backup: mkdir %s: %v", folder, err)
-			continue
-		}
-
-		cleaned := extractor.CleanBackupOutput(r.Data)
-
-		name := strings.ReplaceAll(r.Device, "/", "-")
-		filename := fmt.Sprintf("%s_%s.txt", name, r.Host)
-		path := filepath.Join(folder, filename)
-
-		if err := os.WriteFile(path, []byte(cleaned), 0o644); err != nil {
-			log.Printf("[job] backup: write %s: %v", path, err)
-			continue
-		}
-		log.Printf("[job] backup: saved %s", path)
-
 		if err := s.backupRepo.Create(&models.OltBackups{
 			Device:   r.Device,
 			Site:     site,
 			Host:     r.Host,
 			Vendor:   "nokia",
-			FilePath: path,
+			FilePath: r.FilePath,
 		}); err != nil {
 			log.Printf("[job] backup: db %s: %v", r.Host, err)
 		}
@@ -962,6 +947,7 @@ func (s *Scheduler) runHuaweiPowerScan() {
 			for i, p := range res.Powers {
 				records[i] = models.PowerReading{
 					OntIdx: fmt.Sprintf("0/%d/%d/%d", p.Slot, p.Pon, p.Ont),
+					OntRx:  p.RxPower,
 					OltRx:  p.OltRxOntPower,
 					Vendor: "huawei",
 				}
@@ -983,6 +969,12 @@ func (s *Scheduler) runHuaweiPowerScan() {
 		log.Println("[job] huawei-power-scan: no results")
 		return
 	}
+
+	var totalOntReadings int
+	for _, b := range batches {
+		totalOntReadings += len(b.Records)
+	}
+	log.Printf("[job] huawei-power-scan: total ONT power readings (all OLTs): %d", totalOntReadings)
 
 	log.Printf("[job] huawei-power-scan: collected %d OLTs, writing to DB", len(batches))
 	if err := s.powerRepo.ReplaceAll(batches); err != nil {
