@@ -74,7 +74,9 @@ func (r *userRepository) Update(user *models.User) error {
 }
 
 func (r *userRepository) Delete(id uint) error {
-	return r.db.Delete(&models.User{}, id).Error
+	// Hard delete: soft-delete would leave the row and keep unique emais in the DB,
+	// so recreating the same user fails after "delete" from the admin panel.
+	return r.db.Unscoped().Delete(&models.User{}, id).Error
 }
 
 func (r *userRepository) List(offset, limit int) ([]models.User, int64, error) {

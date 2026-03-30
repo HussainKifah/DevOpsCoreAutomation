@@ -15,9 +15,10 @@ type PageHandler struct {
 	templates    map[string]*template.Template
 	loginTmpl    *template.Template
 	userRepo     repository.UserRepository
+	jwtManager   *auth.JWTManager
 }
 
-func NewPageHandler(templateDir string, userRepo repository.UserRepository) *PageHandler {
+func NewPageHandler(templateDir string, userRepo repository.UserRepository, jwtManager *auth.JWTManager) *PageHandler {
 	base := filepath.Join(templateDir, "layout", "base.html")
 	pages := map[string]string{
 		"dashboard":   filepath.Join(templateDir, "excess", "dashboard.html"),
@@ -29,6 +30,8 @@ func NewPageHandler(templateDir string, userRepo repository.UserRepository) *Pag
 		"ip-backups":      filepath.Join(templateDir, "ip", "backups.html"),
 		"ip-cmd-output":   filepath.Join(templateDir, "ip", "cmd_output.html"),
 		"ip-activity-log": filepath.Join(templateDir, "ip", "activity_log.html"),
+		"ip-syslog-alerts": filepath.Join(templateDir, "ip", "syslog_alerts.html"),
+		"noc-pass":        filepath.Join(templateDir, "noc", "noc_pass.html"),
 	}
 
 	tmpl := make(map[string]*template.Template, len(pages))
@@ -45,7 +48,7 @@ func NewPageHandler(templateDir string, userRepo repository.UserRepository) *Pag
 		log.Fatalf("failed to parse login template: %v", err)
 	}
 
-	return &PageHandler{templates: tmpl, loginTmpl: loginTmpl, userRepo: userRepo}
+	return &PageHandler{templates: tmpl, loginTmpl: loginTmpl, userRepo: userRepo, jwtManager: jwtManager}
 }
 
 func (h *PageHandler) render(c *gin.Context, name string, data gin.H) {
@@ -81,8 +84,16 @@ func (h *PageHandler) render(c *gin.Context, name string, data gin.H) {
 
 func (h *PageHandler) Login(c *gin.Context) {
 	if cookie, err := c.Cookie("access_token"); err == nil && cookie != "" {
-		c.Redirect(http.StatusFound, "/dashboard")
-		return
+		if claims, err := h.jwtManager.ValidateToken(cookie); err == nil && claims.TokenType == "access" {
+			if claims.Role == "noc" {
+				c.Redirect(http.StatusFound, "/noc-pass")
+			} else {
+				c.Redirect(http.StatusFound, "/dashboard")
+			}
+			return
+		}
+		c.SetCookie("access_token", "", -1, "/", "", false, true)
+		c.SetCookie("refresh_token", "", -1, "/", "", false, true)
 	}
 	c.Header("Content-Type", "text/html; charset=utf-8")
 	if err := h.loginTmpl.Execute(c.Writer, nil); err != nil {
@@ -99,3 +110,5 @@ func (h *PageHandler) Workflows(c *gin.Context)   { h.render(c, "workflows", nil
 func (h *PageHandler) IPBackups(c *gin.Context)    { h.render(c, "ip-backups", nil) }
 func (h *PageHandler) IPCmdOutput(c *gin.Context)  { h.render(c, "ip-cmd-output", nil) }
 func (h *PageHandler) IPActivityLog(c *gin.Context) { h.render(c, "ip-activity-log", nil) }
+func (h *PageHandler) IPSyslogAlerts(c *gin.Context) { h.render(c, "ip-syslog-alerts", nil) }
+func (h *PageHandler) NocPass(c *gin.Context)        { h.render(c, "noc-pass", nil) }

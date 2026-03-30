@@ -109,7 +109,7 @@ func (s *Scheduler) Start() {
 		// s.runBackup()
 		// Huawei
 		// s.runHuaweiHealthScan()
-		s.runHuaweiPowerScan()
+		// s.runHuaweiPowerScan()
 		// s.runHuaweiPortScan()
 		// s.runHuaweiInventoryScan()
 		log.Println("[startup] initial scan complete")
@@ -544,6 +544,7 @@ func (s *Scheduler) runPortScanWork() {
 			if strings.Contains(p.PortState, "down") || strings.Contains(p.PairedState, "down") {
 				filtered = append(filtered, models.PortProtectionRecord{
 					Port:        p.Port,
+					PairedPort:  p.PairedPort,
 					PortState:   p.PortState,
 					PairedState: p.PairedState,
 					SwoReason:   p.SwoReason,
@@ -556,6 +557,7 @@ func (s *Scheduler) runPortScanWork() {
 					Host:        r.Host,
 					Vendor:      "nokia",
 					Port:        p.Port,
+					PairedPort:  p.PairedPort,
 					PortState:   p.PortState,
 					PairedState: p.PairedState,
 					SwoReason:   p.SwoReason,

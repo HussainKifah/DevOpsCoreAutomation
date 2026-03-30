@@ -1,0 +1,260 @@
+{{define "content"}}
+<div x-data="ipSyslogPage()" x-init="init()" class="max-w-6xl mx-auto">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-[#f1f5f9]">Syslog alerts</h1>
+  </div>
+
+  <!-- Sub-tabs -->
+  <div class="flex gap-1 p-1 rounded-xl bg-[#1a2236] border border-[rgba(255,255,255,0.08)] w-fit mb-6">
+    <button type="button" @click="sub = 'alerts'"
+      class="px-4 py-2 text-sm font-semibold rounded-lg transition-colors"
+      :class="sub === 'alerts' ? 'bg-teal-500/20 text-teal-300' : 'text-[#94a3b8] hover:text-[#f1f5f9]'">Alerts</button>
+    <button type="button" @click="sub = 'filters'"
+      class="px-4 py-2 text-sm font-semibold rounded-lg transition-colors"
+      :class="sub === 'filters' ? 'bg-teal-500/20 text-teal-300' : 'text-[#94a3b8] hover:text-[#f1f5f9]'">Filters</button>
+  </div>
+
+  <!-- Alerts tab -->
+  <div x-show="sub === 'alerts'" x-cloak class="space-y-4">
+    <template x-if="filters.length === 0 && !loadingFilters">
+      <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+        No filters configured. Open the <button type="button" class="underline font-semibold" @click="sub = 'filters'">Filters</button> tab and add at least one message query — alerts will stay empty until then.
+      </div>
+    </template>
+    <template x-if="filters.length > 0 && !anyFilterEnabled() && !loadingFilters">
+      <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+        All filters are disabled. Enable at least one in the <button type="button" class="underline font-semibold" @click="sub = 'filters'">Filters</button> tab to collect alerts.
+      </div>
+    </template>
+    <div class="flex items-center justify-between gap-2 flex-wrap">
+      <button type="button" @click="loadAlerts()" class="text-xs px-3 py-1.5 rounded-lg bg-[#1a2236] border border-[rgba(255,255,255,0.08)] text-[#f1f5f9] hover:border-teal-500/40">Refresh</button>
+    </div>
+    <template x-if="loadingAlerts">
+      <div class="h-40 rounded-xl bg-[#1a2236] animate-pulse border border-[rgba(255,255,255,0.08)]"></div>
+    </template>
+    <template x-if="!loadingAlerts && anyFilterEnabled() && alerts.length === 0">
+      <p class="text-sm text-[#64748b] py-8 text-center">No matching alerts in the database yet — wait for the next poll or widen your filters.</p>
+    </template>
+    <div class="space-y-3" x-show="!loadingAlerts && alerts.length > 0">
+      <template x-for="a in alerts" :key="a.id">
+        <article class="mission-card rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] overflow-hidden">
+          <div class="h-0.5 bg-gradient-to-r from-teal-500/60 to-cyan-500/40"></div>
+          <div class="p-4 space-y-3">
+            <div class="flex flex-wrap items-center gap-2 justify-between">
+              <div class="flex flex-wrap items-center gap-2 text-xs">
+                <span class="font-mono text-teal-300/90" x-text="fmtTs(a.timestamp_utc)"></span>
+                <span class="text-[#475569]">·</span>
+                <span class="font-mono text-[#94a3b8]" x-text="a.host || '—'"></span>
+                <span class="text-[#475569]">·</span>
+                <span class="font-semibold text-[#f1f5f9]" x-text="a.device_name || '—'"></span>
+              </div>
+              <span class="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-300 border border-teal-500/25 truncate max-w-[200px]" x-text="a.filter_label || ('Filter #' + a.filter_id)"></span>
+            </div>
+            <p class="text-sm text-[#e2e8f0] leading-relaxed font-mono text-[13px] break-words" x-text="a.message"></p>
+          </div>
+        </article>
+      </template>
+    </div>
+    <div class="flex justify-center gap-2 pt-2" x-show="alertPages > 1">
+      <button type="button" :disabled="alertPage <= 1" @click="alertPage--; loadAlerts()" class="px-3 py-1 text-xs rounded-lg border border-[rgba(255,255,255,0.08)] disabled:opacity-40">Prev</button>
+      <span class="text-xs text-[#94a3b8] self-center" x-text="alertPage + ' / ' + alertPages"></span>
+      <button type="button" :disabled="alertPage >= alertPages" @click="alertPage++; loadAlerts()" class="px-3 py-1 text-xs rounded-lg border border-[rgba(255,255,255,0.08)] disabled:opacity-40">Next</button>
+    </div>
+  </div>
+
+  <!-- Filters tab -->
+  <div x-show="sub === 'filters'" x-cloak class="space-y-4">
+    <div class="flex justify-between items-center flex-wrap gap-2">
+      <button type="button" @click="openFilterModal()" class="px-3 py-2 text-sm font-semibold rounded-lg bg-teal-600 hover:bg-teal-500 text-white">Add filter</button>
+    </div>
+    <template x-if="loadingFilters">
+      <div class="h-32 rounded-xl bg-[#1a2236] animate-pulse border border-[rgba(255,255,255,0.08)]"></div>
+    </template>
+    <template x-if="!loadingFilters && filters.length === 0">
+      <p class="text-sm text-[#64748b] py-6">No filters yet.</p>
+    </template>
+    <div class="space-y-2" x-show="!loadingFilters && filters.length > 0">
+      <template x-for="f in filters" :key="f.id">
+        <div class="flex flex-wrap items-start gap-3 p-4 rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236]">
+          <div class="flex-1 min-w-0 space-y-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-sm font-semibold text-[#f1f5f9]" x-text="f.label || '(no label)'"></span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full" :class="f.enabled ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[#475569]/30 text-[#94a3b8]'" x-text="f.enabled ? 'enabled' : 'disabled'"></span>
+              <span class="text-[10px] text-[#475569]">order <span x-text="f.sort_order"></span></span>
+            </div>
+            <p class="text-xs font-mono text-[#94a3b8] break-all" x-text="f.query_text"></p>
+          </div>
+          <div class="flex gap-2 shrink-0">
+            <button type="button" @click="openFilterModal(f)" class="text-xs text-teal-400 hover:underline">Edit</button>
+            <button type="button" @click="toggleFilter(f)" class="text-xs text-[#94a3b8] hover:underline" x-text="f.enabled ? 'Disable' : 'Enable'"></button>
+            <button type="button" @click="deleteFilter(f)" class="text-xs text-red-400 hover:underline">Delete</button>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- Filter modal -->
+  <div x-show="filterModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+    <div @click.away="filterModal = false" class="w-full max-w-lg rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-2xl">
+      <h3 class="text-lg font-semibold text-[#f1f5f9] mb-4" x-text="editFilter?.id ? 'Edit filter' : 'New filter'"></h3>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">Label (optional)</label>
+          <input x-model="form.label" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+        </div>
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">Message query <span class="text-[#475569]">(required)</span></label>
+          <textarea x-model="form.query_text" rows="3" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9] font-mono" placeholder="e.g. PPPoE session failure"></textarea>
+        </div>
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">Sort order</label>
+          <input type="number" x-model.number="form.sort_order" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+        </div>
+        <label class="flex items-center gap-2 text-sm text-[#94a3b8]">
+          <input type="checkbox" x-model="form.enabled" class="rounded border-[rgba(255,255,255,0.2)]">
+          Enabled
+        </label>
+        <p class="text-xs text-red-400" x-show="formError" x-text="formError"></p>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" @click="filterModal = false" class="px-4 py-2 text-sm text-[#94a3b8]">Cancel</button>
+          <button type="button" @click="saveFilter()" class="px-4 py-2 text-sm rounded-lg bg-teal-600 text-white font-semibold">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function ipSyslogPage() {
+  return {
+    sub: 'alerts',
+    alerts: [],
+    filters: [],
+    loadingAlerts: true,
+    loadingFilters: true,
+    alertPage: 1,
+    alertPages: 1,
+    filterModal: false,
+    editFilter: null,
+    form: { label: '', query_text: '', sort_order: 0, enabled: true },
+    formError: '',
+
+    anyFilterEnabled() {
+      return (this.filters || []).some(f => f.enabled);
+    },
+
+    async init() {
+      await Promise.all([this.loadFilters(), this.loadAlerts()]);
+    },
+
+    async loadFilters() {
+      this.loadingFilters = true;
+      try {
+        const res = await fetch('/api/ip/syslog/filters', { credentials: 'same-origin' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'failed');
+        this.filters = data.filters || [];
+      } catch (e) {
+        console.error(e);
+        this.filters = [];
+      }
+      this.loadingFilters = false;
+    },
+
+    async loadAlerts() {
+      this.loadingAlerts = true;
+      try {
+        const params = new URLSearchParams({ page: String(this.alertPage), limit: '30' });
+        const res = await fetch('/api/ip/syslog/alerts?' + params, { credentials: 'same-origin' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'failed');
+        this.alerts = data.alerts || [];
+        const p = data.pagination || {};
+        this.alertPages = Math.max(1, Number(p.total_pages) || 1);
+        this.alertPage = Number(p.page) || 1;
+      } catch (e) {
+        console.error(e);
+        this.alerts = [];
+      }
+      this.loadingAlerts = false;
+    },
+
+    fmtTs(iso) {
+      if (!iso) return '—';
+      try {
+        const d = new Date(iso);
+        return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'medium' });
+      } catch (_) { return iso; }
+    },
+
+    openFilterModal(f) {
+      this.formError = '';
+      if (f) {
+        this.editFilter = f;
+        this.form = { label: f.label || '', query_text: f.query_text || '', sort_order: f.sort_order ?? 0, enabled: !!f.enabled };
+      } else {
+        this.editFilter = null;
+        this.form = { label: '', query_text: '', sort_order: (this.filters.length ? Math.max(...this.filters.map(x => x.sort_order || 0)) + 1 : 0), enabled: true };
+      }
+      this.filterModal = true;
+    },
+
+    async saveFilter() {
+      this.formError = '';
+      const body = {
+        label: this.form.label,
+        query_text: this.form.query_text,
+        sort_order: this.form.sort_order,
+        enabled: this.form.enabled
+      };
+      try {
+        let res;
+        if (this.editFilter?.id) {
+          res = await fetch('/api/ip/syslog/filters/' + this.editFilter.id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify(body)
+          });
+        } else {
+          res = await fetch('/api/ip/syslog/filters', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify(body)
+          });
+        }
+        const data = await res.json();
+        if (!res.ok) {
+          this.formError = data.error || 'Save failed';
+          return;
+        }
+        this.filterModal = false;
+        await this.loadFilters();
+        await this.loadAlerts();
+      } catch (e) {
+        this.formError = 'Network error';
+      }
+    },
+
+    async toggleFilter(f) {
+      await fetch('/api/ip/syslog/filters/' + f.id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ enabled: !f.enabled })
+      });
+      await this.loadFilters();
+    },
+
+    async deleteFilter(f) {
+      if (!confirm('Delete this filter?')) return;
+      await fetch('/api/ip/syslog/filters/' + f.id, { method: 'DELETE', credentials: 'same-origin' });
+      await this.loadFilters();
+      await this.loadAlerts();
+    }
+  };
+}
+</script>
+{{end}}

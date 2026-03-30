@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,10 +36,18 @@ var vendorProfiles = map[string]VendorProfile{
 		TimeoutOps:    10 * time.Minute,
 		TransportType: "standard",
 	},
+	// Prompt must match exec (# / >) and config submodes: hostname(config)#, (config-line)#, etc.
+	// Parentheses are required — without them scrapligo never sees the prompt after "configure terminal".
 	"cisco": {
-		PromptPattern: regexp.MustCompile(`(?m)[a-zA-Z0-9._\-]+[#>]\s*$`),
+		PromptPattern: regexp.MustCompile(`(?m)[a-zA-Z0-9._():\/@\-]+[#>]\s*$`),
 		SetupCmds:     []string{"terminal length 0", "terminal width 0"},
 		BackupCmd:     "show running-config",
+		TimeoutOps:    5 * time.Minute,
+		TransportType: "standard",
+	},
+	"nexus": {
+		PromptPattern: regexp.MustCompile(`(?m)[a-zA-Z0-9._():\/@\-]+[#>]\s*$`),
+		SetupCmds:     []string{"terminal length 0", "terminal width 0"},
 		TimeoutOps:    5 * time.Minute,
 		TransportType: "standard",
 	},
@@ -150,6 +160,126 @@ func mikrotikSSH(host, user, pass string, timeout time.Duration, cmds ...string)
 		client.Close()
 		return "", fmt.Errorf("timeout after %s: command never returned", timeout)
 	}
+}
+
+// MikrotikNocPassSSH connects with the admin username as entered (no +cet511w4098h IP-workflow suffix).
+// Uses a longer TCP dial timeout than IP backups (helps slow links; override with NOCPASS_SSH_DIAL_TIMEOUT_SEC).
+func MikrotikNocPassSSH(host, user, pass string, cmds ...string) (string, error) {
+	profile, ok := vendorProfiles["mikrotik"]
+	if !ok {
+		return "", fmt.Errorf("mikrotik profile missing")
+	}
+	host = strings.TrimSpace(host)
+	user = strings.TrimSpace(user)
+	pass = strings.TrimSpace(pass)
+	addr := JoinSSHAddr(host)
+	if addr == "" {
+		return "", fmt.Errorf("empty host")
+	}
+
+	dialTimeout := 120 * time.Second
+	if v := os.Getenv("NOCPASS_SSH_DIAL_TIMEOUT_SEC"); v != "" {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n >= 5 && n <= 600 {
+			dialTimeout = time.Duration(n) * time.Second
+		}
+	}
+
+	log.Printf("[noc-pass-mikrotik] %s: dial %s user=%q dialTimeout=%s cmds=%d", host, addr, user, dialTimeout, len(cmds))
+
+	cfg := &ssh.ClientConfig{
+		User: user,
+		Auth: []ssh.AuthMethod{
+			ssh.Password(pass),
+			ssh.KeyboardInteractive(func(name, instruction string, questions []string, echos []bool) ([]string, error) {
+				answers := make([]string, len(questions))
+				for i := range answers {
+					answers[i] = pass
+				}
+				return answers, nil
+			}),
+		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         dialTimeout,
+		Config:          wideSSHConfig(),
+	}
+
+	log.Printf("[noc-pass-mikrotik] %s: TCP connect...", host)
+	conn, err := net.DialTimeout("tcp", addr, dialTimeout)
+	if err != nil {
+		log.Printf("[noc-pass-mikrotik] %s: ✘ TCP dial failed: %v", host, err)
+		return "", fmt.Errorf("tcp dial: %w", err)
+	}
+	log.Printf("[noc-pass-mikrotik] %s: ✔ TCP connected to %s — SSH handshake...", host, addr)
+
+	sshConn, chans, reqs, err := ssh.NewClientConn(conn, addr, cfg)
+	if err != nil {
+		conn.Close()
+		log.Printf("[noc-pass-mikrotik] %s: ✘ SSH handshake failed: %v", host, err)
+		return "", fmt.Errorf("ssh handshake: %w", err)
+	}
+	client := ssh.NewClient(sshConn, chans, reqs)
+	defer client.Close()
+	log.Printf("[noc-pass-mikrotik] %s: ✔ SSH connected", host)
+
+	fullCmd := strings.Join(cmds, "; ")
+	execTimeout := profile.TimeoutOps
+
+	ctx, cancel := context.WithTimeout(context.Background(), execTimeout)
+	defer cancel()
+
+	type result struct {
+		output string
+		err    error
+	}
+	ch := make(chan result, 1)
+
+	go func() {
+		session, sErr := client.NewSession()
+		if sErr != nil {
+			ch <- result{"", fmt.Errorf("new session: %w", sErr)}
+			return
+		}
+		defer session.Close()
+
+		var stdout, stderr bytes.Buffer
+		session.Stdout = &stdout
+		session.Stderr = &stderr
+
+		log.Printf("[noc-pass-mikrotik] %s: exec: %q", host, fullCmd)
+		runErr := session.Run(fullCmd)
+		out := stdout.String()
+		if runErr != nil && out == "" {
+			errStr := stderr.String()
+			if errStr != "" {
+				log.Printf("[noc-pass-mikrotik] %s: stderr: %s", host, errStr)
+			}
+			ch <- result{"", fmt.Errorf("exec: %w", runErr)}
+			return
+		}
+		ch <- result{out, nil}
+	}()
+
+	select {
+	case res := <-ch:
+		if res.err != nil {
+			return "", res.err
+		}
+		return res.output, nil
+	case <-ctx.Done():
+		client.Close()
+		return "", fmt.Errorf("timeout after %s: command never returned", execTimeout)
+	}
+}
+
+// NocPassSendCommand uses plain-username Mikrotik SSH for NOC Pass; Cisco IOS/Nexus use scrapligo via IPSendCommand.
+func NocPassSendCommand(host, user, pass, vendor string, cmds ...string) (string, error) {
+	host = strings.TrimSpace(host)
+	user = strings.TrimSpace(user)
+	pass = strings.TrimSpace(pass)
+	if strings.EqualFold(strings.TrimSpace(vendor), "mikrotik") {
+		return MikrotikNocPassSSH(host, user, pass, cmds...)
+	}
+	return IPSendCommand(host, user, pass, vendor, cmds...)
 }
 
 func huaweiWorkflowSSH(host, user, pass string, cmds ...string) (string, error) {
@@ -432,16 +562,24 @@ func IPSendCommand(host, user, pass, vendor string, cmds ...string) (string, err
 			log.Printf("[ip-ssh] %s (%s): ✔ command done — %d bytes", host, vendor, len(r.Result))
 			ch <- result{r.Result, nil}
 		} else {
-			log.Printf("[ip-ssh] %s (%s): sending %d commands: %v", host, vendor, len(cmds), cmds)
-			rs, cmdErr := d.SendCommands(cmds)
-			if cmdErr != nil {
-				log.Printf("[ip-ssh] %s (%s): ✘ commands failed: %v", host, vendor, cmdErr)
-				ch <- result{"", cmdErr}
-				return
+			// One SendCommand per line: batched SendCommands can hit "channel timeout sending input"
+			// on IOS when write memory or config mode is slow — each call waits for prompt before the next.
+			log.Printf("[ip-ssh] %s (%s): sending %d commands sequentially: %v", host, vendor, len(cmds), cmds)
+			var out strings.Builder
+			for i, cmd := range cmds {
+				log.Printf("[ip-ssh] %s (%s): cmd %d/%d: %q", host, vendor, i+1, len(cmds), cmd)
+				r, cmdErr := d.SendCommand(cmd)
+				if cmdErr != nil {
+					log.Printf("[ip-ssh] %s (%s): ✘ cmd %d/%d failed: %v", host, vendor, i+1, len(cmds), cmdErr)
+					ch <- result{out.String(), cmdErr}
+					return
+				}
+				log.Printf("[ip-ssh] %s (%s): ✔ cmd %d/%d OK — %d bytes", host, vendor, i+1, len(cmds), len(r.Result))
+				out.WriteString(r.Result)
 			}
-			out := rs.JoinedResult()
-			log.Printf("[ip-ssh] %s (%s): ✔ commands done — %d bytes", host, vendor, len(out))
-			ch <- result{out, nil}
+			joined := out.String()
+			log.Printf("[ip-ssh] %s (%s): ✔ all commands done — %d bytes", host, vendor, len(joined))
+			ch <- result{joined, nil}
 		}
 	}()
 

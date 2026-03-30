@@ -123,6 +123,45 @@ func hwPacingSleep(cmd string) time.Duration {
 	return hwCommandSleep()
 }
 
+// hwPerCommandPromptTimeout is how long we wait for the CLI prompt after each command
+// (Huawei OLT/BNG). Default 5m. Override with HW_SSH_CMD_TIMEOUT_SEC (30–7200).
+func hwPerCommandPromptTimeout() time.Duration {
+	const def = 5 * time.Minute
+	if v := os.Getenv("HW_SSH_CMD_TIMEOUT_SEC"); v != "" {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n >= 30 && n <= 7200 {
+			return time.Duration(n) * time.Second
+		}
+	}
+	return def
+}
+
+// hwRecoveryPromptTimeout is how long we wait for a prompt after sending Ctrl+C following a
+// per-command timeout. Default 60s. Override with HW_SSH_RECOVERY_TIMEOUT_SEC (15–300).
+func hwRecoveryPromptTimeout() time.Duration {
+	const def = 60 * time.Second
+	if v := os.Getenv("HW_SSH_RECOVERY_TIMEOUT_SEC"); v != "" {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n >= 15 && n <= 300 {
+			return time.Duration(n) * time.Second
+		}
+	}
+	return def
+}
+
+// hwResyncCLIPrompt aborts a stuck command (Ctrl+C + Enter) and waits for a normal prompt.
+// outBuf is reset so prompt detection uses only post-recovery output.
+func hwResyncCLIPrompt(ctx context.Context, host string, stdin io.Writer, outBuf *safeBuffer) error {
+	if stdin == nil {
+		return fmt.Errorf("no stdin")
+	}
+	outBuf.Reset()
+	_, _ = stdin.Write([]byte("\x03"))
+	time.Sleep(250 * time.Millisecond)
+	_, _ = stdin.Write([]byte("\x03"))
+	time.Sleep(250 * time.Millisecond)
+	_, _ = stdin.Write([]byte("\r\n"))
+	return waitForPromptWithMore(ctx, outBuf, stdin, host)
+}
+
 // Huawei OLT / BNG sessions: use the same wide algorithm set as IP-team SSH (legacy + modern).
 var hwSSHConfig = wideSSHConfig()
 
@@ -223,12 +262,22 @@ func (s *HwSession) SendCommandsResponses(cmds ...string) ([]string, error) {
 		if _, err := s.stdin.Write([]byte(cmd + "\r\n")); err != nil {
 			return parts, fmt.Errorf("write %q: %w", cmd, err)
 		}
-		cmdCtx, cmdCancel := context.WithTimeout(s.ctx, 5*time.Minute)
+		cmdCtx, cmdCancel := context.WithTimeout(s.ctx, hwPerCommandPromptTimeout())
 		if err := waitForPromptWithMore(cmdCtx, s.outBuf, s.stdin, s.host); err != nil {
 			cmdCancel()
 			resp := s.outBuf.String()
 			log.Printf("[%s] <<< TIMEOUT\n%s", s.host, resp)
 			parts = append(parts, resp)
+			// Same SSH session keeps running: try to break out of a hung/partial command so the
+			// next chunk (powers.go continues on error) can still use this session.
+			recCtx, recCancel := context.WithTimeout(s.ctx, hwRecoveryPromptTimeout())
+			recErr := hwResyncCLIPrompt(recCtx, s.host, s.stdin, s.outBuf)
+			recCancel()
+			if recErr != nil {
+				log.Printf("[%s] CLI resync after timeout failed: %v (later commands may fail until reconnect)", s.host, recErr)
+			} else {
+				log.Printf("[%s] CLI resynced after timeout; session kept open for remaining chunks", s.host)
+			}
 			return parts, fmt.Errorf("prompt after %q: %w", cmd, err)
 		}
 		cmdCancel()
@@ -330,10 +379,19 @@ func HwSendCommandOLT(host, user, pass string, cmds ...string) (string, error) {
 		if _, err := stdin.Write([]byte(cmd + "\r\n")); err != nil {
 			return fullOut.String(), fmt.Errorf("write %q: %w", cmd, err)
 		}
-		cmdCtx, cmdCancel := context.WithTimeout(ctx, 5*time.Minute)
+		cmdCtx, cmdCancel := context.WithTimeout(ctx, hwPerCommandPromptTimeout())
 		if err := waitForPromptWithMore(cmdCtx, &outBuf, stdin, host); err != nil {
 			cmdCancel()
-			return fullOut.String() + outBuf.String(), fmt.Errorf("prompt after %q: %w", cmd, err)
+			fullOut.WriteString(outBuf.String())
+			recCtx, recCancel := context.WithTimeout(ctx, hwRecoveryPromptTimeout())
+			recErr := hwResyncCLIPrompt(recCtx, host, stdin, &outBuf)
+			recCancel()
+			if recErr != nil {
+				log.Printf("[%s] CLI resync after timeout failed: %v", host, recErr)
+			} else {
+				log.Printf("[%s] CLI resynced after timeout (one-shot session)", host)
+			}
+			return fullOut.String(), fmt.Errorf("prompt after %q: %w", cmd, err)
 		}
 		cmdCancel()
 		fullOut.WriteString(outBuf.String())

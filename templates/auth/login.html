@@ -180,7 +180,8 @@ function loginPage() {
         if (!res.ok) {
           this.error = data.error || 'Login failed';
         } else {
-          window.location.href = '/dashboard';
+          const role = data.user && data.user.role;
+          window.location.href = role === 'noc' ? '/noc-pass' : '/dashboard';
         }
       } catch (e) {
         this.error = 'Network error. Please try again.';

@@ -1,10 +1,24 @@
 package shell
 
 import (
+	"net"
 	"slices"
+	"strings"
 
 	"golang.org/x/crypto/ssh"
 )
+
+// JoinSSHAddr returns host:port for ssh.Dial. If host already includes a port (e.g. 10.0.0.1:2222), it is preserved; otherwise :22 is appended.
+func JoinSSHAddr(host string) string {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return ""
+	}
+	if h, port, err := net.SplitHostPort(host); err == nil {
+		return net.JoinHostPort(h, port)
+	}
+	return net.JoinHostPort(host, "22")
+}
 
 // wideSSHConfig returns KEX/cipher/MAC lists that include both modern algorithms and legacy
 // ones implemented by golang.org/x/crypto/ssh (InsecureAlgorithms). Many Nokia SR / old routers

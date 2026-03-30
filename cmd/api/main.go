@@ -37,6 +37,7 @@ func main() {
 	userRepo := repository.NewUserRepository(database)
 	inventoryRepo := repository.NewInventoryRepo(database)
 	workflowRepo := repository.NewWorkflowRepository(database)
+	nocPassRepo := repository.NewNocPassRepository(database)
 
 	jwtManager := auth.NewJWTManager(auth.JWTconfig{
 		SecretKey:            []byte(cfg.JWTSecret),
@@ -59,6 +60,9 @@ func main() {
 		log.Fatalf("failed to create workflow scheduler: %v", err)
 	}
 	wfSched.Start()
+
+	nocPassRotator := scheduler.NewNocPassRotator(nocPassRepo, cryptoKey)
+	nocPassRotator.Start()
 
 	server := gin.Default()
 
@@ -87,10 +91,16 @@ func main() {
 	inventoryH := handlers.NewInventoryHandler(inventoryRepo)
 	scanH := handlers.NewScanHandler(sched)
 	workflowH := handlers.NewWorkflowHandler(workflowRepo, wfSched, cryptoKey)
+	nocPassH := handlers.NewNocPassHandler(nocPassRepo, cryptoKey)
+	esSyslogRepo := repository.NewEsSyslogRepository(database)
+	esSyslogH := handlers.NewEsSyslogHandler(esSyslogRepo)
 
-	pageH := handlers.NewPageHandler(filepath.Join(projectRoot, "templates"), userRepo)
+	pageH := handlers.NewPageHandler(filepath.Join(projectRoot, "templates"), userRepo, jwtManager)
 
-	router.Setup(server, jwtManager, hub, powerH, descH, healthH, healthHistoryH, portH, portHistoryH, calendarH, backupH, userH, authH, pageH, inventoryH, scanH, workflowH)
+	router.Setup(server, jwtManager, hub, powerH, descH, healthH, healthHistoryH, portH, portHistoryH, calendarH, backupH, userH, authH, pageH, inventoryH, scanH, workflowH, nocPassH, esSyslogH)
+
+	esSyslogPoller := scheduler.NewEsSyslogPoller(cfg, esSyslogRepo)
+	esSyslogPoller.Start()
 
 	// Graceful shutdown
 	srv := &http.Server{
@@ -123,6 +133,8 @@ func main() {
 
 	sched.FlushHealthBuffer()
 	wfSched.Stop()
+	nocPassRotator.Stop()
+	esSyslogPoller.Stop()
 	sshPool.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

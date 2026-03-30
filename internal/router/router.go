@@ -26,6 +26,8 @@ func Setup(
 	inventoryH *handlers.InventoryHandler,
 	scanH *handlers.ScanHandler,
 	workflowH *handlers.WorkflowHandler,
+	nocPassH *handlers.NocPassHandler,
+	esSyslogH *handlers.EsSyslogHandler,
 ) {
 	// WebSocket endpoint (auth inside handler)
 	r.GET("/ws", websocket.ServerWs(hub, jwtManager))
@@ -155,6 +157,25 @@ func Setup(
 		ipPages.GET("/ip-backups", pageH.IPBackups)
 		ipPages.GET("/ip-cmd-output", pageH.IPCmdOutput)
 		ipPages.GET("/ip-activity-log", pageH.IPActivityLog)
+		ipPages.GET("/ip-syslog-alerts", pageH.IPSyslogAlerts)
+	}
+
+	// NOC Pass pages (role: noc, admin)
+	nocPages := r.Group("/")
+	nocPages.Use(middleware.PageAuthMiddleware(jwtManager), middleware.PageRoleGuard("noc", "admin"))
+	{
+		nocPages.GET("/noc-pass", pageH.NocPass)
+	}
+
+	// NOC Pass API (role: noc, admin)
+	nocAPI := r.Group("/api/noc-pass")
+	nocAPI.Use(middleware.AuthMiddleware(jwtManager), middleware.RoleGuard("noc", "admin"))
+	{
+		nocAPI.GET("/devices", nocPassH.ListDevices)
+		nocAPI.POST("/devices", nocPassH.CreateDevice)
+		nocAPI.DELETE("/devices/:id", nocPassH.DeleteDevice)
+		nocAPI.GET("/devices/:id/credential", nocPassH.Credential)
+		nocAPI.POST("/devices/:id/rotate", nocPassH.RotateNow)
 	}
 
 	// IP Team API routes (role: ip, admin)
@@ -177,5 +198,16 @@ func Setup(
 		wfAPI.GET("/runs/:id/output", workflowH.GetRunOutput)
 
 		wfAPI.GET("/logs", workflowH.GetLogs)
+	}
+
+	// IP Team — Elasticsearch syslog alerts (role: ip, admin)
+	esAPI := r.Group("/api/ip/syslog")
+	esAPI.Use(middleware.AuthMiddleware(jwtManager), middleware.RoleGuard("ip", "admin"))
+	{
+		esAPI.GET("/alerts", esSyslogH.ListAlerts)
+		esAPI.GET("/filters", esSyslogH.ListFilters)
+		esAPI.POST("/filters", esSyslogH.CreateFilter)
+		esAPI.PUT("/filters/:id", esSyslogH.UpdateFilter)
+		esAPI.DELETE("/filters/:id", esSyslogH.DeleteFilter)
 	}
 }

@@ -143,6 +143,10 @@ func PageRoleGuard(allowedRoles ...string) gin.HandlerFunc {
 				ctx.Redirect(http.StatusFound, "/dashboard")
 			case "admin":
 				ctx.Redirect(http.StatusFound, "/dashboard")
+			case "noc":
+				ctx.Redirect(http.StatusFound, "/noc-pass")
+			case "viewer":
+				ctx.Redirect(http.StatusFound, "/dashboard")
 			default:
 				ctx.Redirect(http.StatusFound, "/login")
 			}

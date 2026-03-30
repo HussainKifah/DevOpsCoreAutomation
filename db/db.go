@@ -44,6 +44,9 @@ func Connect(cfg *config.Config) *gorm.DB {
 		&models.WorkflowJob{},
 		&models.WorkflowRun{},
 		&models.WorkflowLog{},
+		&models.NocPassDevice{},
+		&models.EsSyslogFilter{},
+		&models.EsSyslogAlert{},
 	); err != nil {
 		log.Fatalf("failed to migrate database: %v", err)
 	}

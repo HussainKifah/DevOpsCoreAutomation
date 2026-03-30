@@ -1,0 +1,259 @@
+{{define "content"}}
+<div x-data="nocPassPage()" x-init="init()" class="max-w-6xl mx-auto">
+  <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-[#f1f5f9]">NOC Pass</h1>
+    </div>
+    <button @click="showAdd = true"
+      class="px-4 py-2 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white text-sm font-semibold transition-colors btn-press">
+      Add device
+    </button>
+  </div>
+
+  <div class="mb-4">
+    <input type="search" x-model.debounce.300ms="q" @input="fetchList()"
+      placeholder="Search name or IP / host…"
+      class="w-full max-w-md rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] text-[#f1f5f9] placeholder-[#475569] px-3 py-2 text-sm focus:ring-2 focus:ring-[#f97316] focus:border-[#f97316]">
+  </div>
+
+  <template x-if="loading">
+    <div class="h-40 rounded-xl bg-[#1a2236] animate-pulse border border-[rgba(255,255,255,0.08)]"></div>
+  </template>
+
+  <template x-if="!loading && devices.length === 0">
+    <p class="text-[#94a3b8] text-sm py-8">No devices yet. Add one with admin SSH access.</p>
+  </template>
+
+  <div class="grid gap-3 sm:grid-cols-2" x-show="!loading && devices.length > 0">
+    <template x-for="d in devices" :key="d.id">
+      <button type="button" @click="openDetail(d)"
+        class="mission-card text-left rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] p-4 hover:border-[#f97316]/40 transition-colors">
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <p class="font-semibold text-[#f1f5f9]" x-text="d.display_name"></p>
+            <p class="text-xs font-mono text-[#94a3b8] mt-0.5" x-text="d.host"></p>
+            <p class="text-[11px] text-[#475569] mt-1">
+              <span x-text="d.vendor"></span>
+              <span> · </span>
+              <span class="font-mono" x-text="(d.accounts || []).map(a => a.username).join(' · ')"></span>
+            </p>
+          </div>
+          <span class="shrink-0 text-[10px] uppercase font-bold px-2 py-0.5 rounded"
+            :class="d.last_apply_ok ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'"
+            x-text="d.last_apply_ok ? 'OK' : 'Issue'"></span>
+        </div>
+      </button>
+    </template>
+  </div>
+
+  <!-- Add modal -->
+  <div x-show="showAdd" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" @keydown.escape.window="showAdd = false">
+    <div @click.away="showAdd = false" class="w-full max-w-lg rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-2xl">
+      <h2 class="text-lg font-semibold text-[#f1f5f9] mb-4">Add NOC Pass device</h2>
+      <form @submit.prevent="submitAdd()" class="space-y-3">
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">Display name</label>
+          <input x-model="form.display_name" required class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+        </div>
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">Host (IP or DNS)</label>
+          <input x-model="form.host" required class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9] font-mono">
+        </div>
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">Vendor</label>
+          <select x-model="form.vendor" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+            <option value="cisco_ios">Cisco IOS / IOS-XE</option>
+            <option value="cisco_nexus">Cisco Nexus</option>
+            <option value="mikrotik">MikroTik</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">Admin SSH username</label>
+          <input x-model="form.admin_username" required autocomplete="off" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+        </div>
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">Admin SSH password</label>
+          <input type="password" x-model="form.admin_password" required autocomplete="new-password" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+        </div>
+        <p class="text-xs text-[#ef4444]" x-show="formError" x-text="formError"></p>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" @click="showAdd = false" class="px-4 py-2 text-sm rounded-lg text-[#94a3b8] hover:bg-white/5">Cancel</button>
+          <button type="submit" :disabled="saving" class="px-4 py-2 text-sm rounded-lg bg-[#f97316] text-white font-semibold disabled:opacity-50">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Detail modal -->
+  <div x-show="detail" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+    <div @click.away="detail = null" class="w-full max-w-lg rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-2xl">
+      <template x-if="detail">
+        <div>
+          <h2 class="text-lg font-semibold text-[#f1f5f9]" x-text="detail.display_name"></h2>
+          <p class="text-xs font-mono text-[#94a3b8] mt-1" x-text="detail.host"></p>
+          <div class="mt-4 space-y-3">
+            <template x-if="cred.pending">
+              <p class="text-sm text-amber-400">Provisioning… refresh in a moment. <span x-show="detail.last_apply_error" class="block text-xs text-[#94a3b8] mt-1" x-text="detail.last_apply_error"></span></p>
+            </template>
+            <template x-if="!cred.pending">
+              <div class="space-y-3">
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between gap-2">
+                    <p class="text-xs text-[#94a3b8]">NOC logins <span class="text-[#475569]">(same 15-char password on both; rotates every 24h)</span></p>
+                    <button type="button" @click="showPass = !showPass" class="text-xs text-[#f97316] hover:underline shrink-0" x-text="showPass ? 'Hide passwords' : 'Show passwords'"></button>
+                  </div>
+                  <template x-for="a in (cred.accounts || [])" :key="a.username">
+                    <div class="rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#1a2236]/80 px-3 py-2.5 space-y-1">
+                      <p class="font-mono text-sm text-[#f1f5f9] select-all" x-text="a.username"></p>
+                      <p class="text-[11px] text-[#64748b]" x-text="a.hint"></p>
+                      <p class="text-[11px] text-[#94a3b8] pt-1 border-t border-[rgba(255,255,255,0.06)]">
+                        <span class="text-[#64748b]">Password</span>
+                        <span class="font-mono text-sm text-[#f1f5f9] ml-2 break-all select-all" x-text="showPass ? (cred.password || '—') : '•••••••••••••••'"></span>
+                      </p>
+                    </div>
+                  </template>
+                </div>
+                <p class="text-[11px] text-[#475569]" x-show="cred.next_rotation_at">
+                  Next rotation (approx): <span x-text="fmtTime(cred.next_rotation_at)"></span>
+                </p>
+              </div>
+            </template>
+          </div>
+          <div class="flex flex-wrap gap-2 mt-6">
+            <button type="button" @click="refreshCred()" class="px-3 py-1.5 text-xs rounded-lg bg-[#1a2236] border border-[rgba(255,255,255,0.08)] text-[#f1f5f9]">Refresh</button>
+            <button type="button" @click="rotateNow()" class="px-3 py-1.5 text-xs rounded-lg bg-[#3b82f6]/20 text-[#60a5fa] border border-[#3b82f6]/30">Rotate now</button>
+            <button type="button" @click="deleteDevice()" class="px-3 py-1.5 text-xs rounded-lg text-[#ef4444] hover:bg-red-500/10 ml-auto">Remove</button>
+            <button type="button" @click="detail = null" class="px-3 py-1.5 text-xs rounded-lg text-[#94a3b8]">Close</button>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+</div>
+
+<script>
+function nocPassPage() {
+  return {
+    q: '',
+    devices: [],
+    loading: true,
+    showAdd: false,
+    saving: false,
+    formError: '',
+    form: {
+      display_name: '',
+      host: '',
+      vendor: 'cisco_ios',
+      admin_username: '',
+      admin_password: ''
+    },
+    detail: null,
+    cred: { pending: true, accounts: [], password: '', next_rotation_at: null },
+    showPass: false,
+
+    async init() {
+      await this.fetchList();
+    },
+
+    async fetchList() {
+      this.loading = true;
+      try {
+        const res = await fetch('/api/noc-pass/devices?q=' + encodeURIComponent(this.q));
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load');
+        this.devices = data.devices || [];
+      } catch (e) {
+        console.error(e);
+        this.devices = [];
+      }
+      this.loading = false;
+    },
+
+    async submitAdd() {
+      this.formError = '';
+      this.saving = true;
+      const body = {
+        display_name: this.form.display_name,
+        host: this.form.host,
+        vendor: this.form.vendor,
+        admin_username: this.form.admin_username,
+        admin_password: this.form.admin_password
+      };
+      try {
+        const res = await fetch('/api/noc-pass/devices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          this.formError = data.error || 'Save failed';
+          return;
+        }
+        this.showAdd = false;
+        this.form = { display_name: '', host: '', vendor: 'cisco_ios', admin_username: '', admin_password: '' };
+        await this.fetchList();
+      } catch (e) {
+        this.formError = 'Network error';
+      } finally {
+        this.saving = false;
+      }
+    },
+
+    async openDetail(d) {
+      this.detail = d;
+      this.showPass = false;
+      await this.refreshCred();
+    },
+
+    async refreshCred() {
+      if (!this.detail) return;
+      const res = await fetch('/api/noc-pass/devices/' + this.detail.id + '/credential');
+      const data = await res.json();
+      this.cred = {
+        pending: data.pending === true,
+        accounts: data.accounts || [],
+        password: data.password || '',
+        next_rotation_at: data.next_rotation_at || null
+      };
+      if (this.detail) {
+        this.detail.last_apply_error = data.last_apply_error || this.detail.last_apply_error;
+        this.detail.last_apply_ok = data.last_apply_ok !== false;
+      }
+    },
+
+    fmtTime(iso) {
+      if (!iso) return '';
+      try {
+        return new Date(iso).toLocaleString();
+      } catch (_) { return iso; }
+    },
+
+    async rotateNow() {
+      if (!this.detail) return;
+      const res = await fetch('/api/noc-pass/devices/' + this.detail.id + '/rotate', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Rotate failed');
+        return;
+      }
+      if (data.device) this.detail = data.device;
+      await this.refreshCred();
+      await this.fetchList();
+    },
+
+    async deleteDevice() {
+      if (!this.detail || !confirm('Remove this device from NOC Pass?')) return;
+      const res = await fetch('/api/noc-pass/devices/' + this.detail.id, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || 'Delete failed');
+        return;
+      }
+      this.detail = null;
+      await this.fetchList();
+    }
+  };
+}
+</script>
+{{end}}
