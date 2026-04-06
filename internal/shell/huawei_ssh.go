@@ -124,11 +124,12 @@ func hwPacingSleep(cmd string) time.Duration {
 }
 
 // hwPerCommandPromptTimeout is how long we wait for the CLI prompt after each command
-// (Huawei OLT/BNG). Default 5m. Override with HW_SSH_CMD_TIMEOUT_SEC (30–7200).
+// (Huawei OLT/BNG). Default 30s — "display ont optical-info" returns quickly.
+// Override with HW_SSH_CMD_TIMEOUT_SEC (5–7200).
 func hwPerCommandPromptTimeout() time.Duration {
-	const def = 5 * time.Minute
+	const def = 30 * time.Second
 	if v := os.Getenv("HW_SSH_CMD_TIMEOUT_SEC"); v != "" {
-		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n >= 30 && n <= 7200 {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n >= 5 && n <= 7200 {
 			return time.Duration(n) * time.Second
 		}
 	}
@@ -136,11 +137,11 @@ func hwPerCommandPromptTimeout() time.Duration {
 }
 
 // hwRecoveryPromptTimeout is how long we wait for a prompt after sending Ctrl+C following a
-// per-command timeout. Default 60s. Override with HW_SSH_RECOVERY_TIMEOUT_SEC (15–300).
+// per-command timeout. Default 10s. Override with HW_SSH_RECOVERY_TIMEOUT_SEC (5–300).
 func hwRecoveryPromptTimeout() time.Duration {
-	const def = 60 * time.Second
+	const def = 30 * time.Second
 	if v := os.Getenv("HW_SSH_RECOVERY_TIMEOUT_SEC"); v != "" {
-		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n >= 15 && n <= 300 {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n >= 5 && n <= 300 {
 			return time.Duration(n) * time.Second
 		}
 	}

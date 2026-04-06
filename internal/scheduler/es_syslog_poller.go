@@ -12,19 +12,26 @@ import (
 	"github.com/Flafl/DevOpsCore/internal/syslog"
 )
 
-// EsSyslogPoller polls Elasticsearch per enabled filter every EsSyslogPollInterval and stores deduplicated alerts.
-type EsSyslogPoller struct {
-	cfg  *config.Config
-	repo *repository.EsSyslogRepository
-	stop    chan struct{}
-	stopOnce sync.Once
-	wg      sync.WaitGroup
-	mu      sync.Mutex
-	lastRet time.Time
+// EsSyslogSlackBatcher is implemented by syslog.SlackSyslogBatcher (optional).
+type EsSyslogSlackBatcher interface {
+	Enqueue(a models.EsSyslogAlert)
+	Stop()
 }
 
-func NewEsSyslogPoller(cfg *config.Config, repo *repository.EsSyslogRepository) *EsSyslogPoller {
-	return &EsSyslogPoller{cfg: cfg, repo: repo, stop: make(chan struct{})}
+// EsSyslogPoller polls Elasticsearch per enabled filter every EsSyslogPollInterval and stores deduplicated alerts.
+type EsSyslogPoller struct {
+	cfg          *config.Config
+	repo         *repository.EsSyslogRepository
+	slackBatcher EsSyslogSlackBatcher
+	stop         chan struct{}
+	stopOnce     sync.Once
+	wg           sync.WaitGroup
+	mu           sync.Mutex
+	lastRet      time.Time
+}
+
+func NewEsSyslogPoller(cfg *config.Config, repo *repository.EsSyslogRepository, slack EsSyslogSlackBatcher) *EsSyslogPoller {
+	return &EsSyslogPoller{cfg: cfg, repo: repo, slackBatcher: slack, stop: make(chan struct{})}
 }
 
 func (p *EsSyslogPoller) Start() {
@@ -44,6 +51,9 @@ func (p *EsSyslogPoller) Stop() {
 		close(p.stop)
 		p.wg.Wait()
 	})
+	if p.slackBatcher != nil {
+		p.slackBatcher.Stop()
+	}
 }
 
 func (p *EsSyslogPoller) loop() {
@@ -139,8 +149,13 @@ func (p *EsSyslogPoller) tick(ctx context.Context) {
 				FilterLabel:      label,
 				DedupFingerprint: fp,
 			}
-			if err := p.repo.InsertAlertIfNew(a); err != nil {
+			inserted, err := p.repo.InsertAlertIfNew(a)
+			if err != nil {
 				log.Printf("[es-syslog] insert: %v", err)
+				continue
+			}
+			if inserted && p.slackBatcher != nil && p.cfg != nil && p.cfg.SlackSyslogConfigured() {
+				p.slackBatcher.Enqueue(*a)
 			}
 		}
 	}

@@ -43,7 +43,7 @@ func loadPowerConfig() PowerScanConfig {
 	cfg := PowerScanConfig{
 		OntMin: 0,
 		OntMax: maxOnts - 1,
-		Chunk:  64,
+		Chunk:  128, // default: max chunk — fewer CLI commands per PON
 	}
 	if v := os.Getenv("HW_POWER_ONT_CHUNK"); v != "" {
 		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n >= 1 && n <= 128 {

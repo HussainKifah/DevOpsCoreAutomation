@@ -17,9 +17,12 @@ import (
 	"github.com/Flafl/DevOpsCore/internal/repository"
 	"github.com/Flafl/DevOpsCore/internal/router"
 	"github.com/Flafl/DevOpsCore/internal/scheduler"
+	slackalarms "github.com/Flafl/DevOpsCore/internal/SlackRemindersAndAlarms"
 	"github.com/Flafl/DevOpsCore/internal/shell"
+	"github.com/Flafl/DevOpsCore/internal/syslog"
 	websocket "github.com/Flafl/DevOpsCore/internal/webSocket"
 	"github.com/gin-gonic/gin"
+	"github.com/slack-go/slack"
 )
 
 func main() {
@@ -95,11 +98,45 @@ func main() {
 	esSyslogRepo := repository.NewEsSyslogRepository(database)
 	esSyslogH := handlers.NewEsSyslogHandler(esSyslogRepo)
 
+	var slackAPI *slack.Client
+	var slackBatcher *syslog.SlackSyslogBatcher
+	var slackReminder *syslog.SlackReminderWorker
+	var slackAlarmsWorker *slackalarms.Worker
+	var slackAlarmsH *slackalarms.Handler
+	var slackEventsH *handlers.SlackEventsHandler
+	if cfg.SlackSyslogConfigured() {
+		slackAPI = slack.New(cfg.SlackBotToken)
+		slackBatcher = syslog.NewSlackSyslogBatcher(cfg, esSyslogRepo, slackAPI)
+		slackBatcher.Start()
+		slackReminder = syslog.NewSlackReminderWorker(cfg, esSyslogRepo, slackAPI)
+		slackReminder.Start()
+		log.Printf("[slack-syslog] enabled channel=%s batch=%s reminder=%s", cfg.SlackChannelID, cfg.SlackSyslogBatchWindow, cfg.SlackReminderInterval)
+	}
+	if cfg.SlackBotToken != "" && cfg.SlackSigningSecret != "" {
+		api := slackAPI
+		if api == nil {
+			api = slack.New(cfg.SlackBotToken)
+		}
+		slackEventsH = handlers.NewSlackEventsHandler(cfg, esSyslogRepo, api)
+	}
+
+	if cfg.SlackAlarmsReminderConfigured() {
+		saStore := slackalarms.NewStore(database)
+		slackAlarmsH = slackalarms.NewHandler(saStore)
+		api := slackAPI
+		if api == nil {
+			api = slack.New(cfg.SlackBotToken)
+		}
+		slackAlarmsWorker = slackalarms.NewWorker(cfg, saStore, api)
+		slackAlarmsWorker.Start()
+		log.Printf("[slack-alarms] generic reminders enabled tick=%s", cfg.SlackAlarmsTickInterval)
+	}
+
 	pageH := handlers.NewPageHandler(filepath.Join(projectRoot, "templates"), userRepo, jwtManager)
 
-	router.Setup(server, jwtManager, hub, powerH, descH, healthH, healthHistoryH, portH, portHistoryH, calendarH, backupH, userH, authH, pageH, inventoryH, scanH, workflowH, nocPassH, esSyslogH)
+	router.Setup(server, jwtManager, hub, powerH, descH, healthH, healthHistoryH, portH, portHistoryH, calendarH, backupH, userH, authH, pageH, inventoryH, scanH, workflowH, nocPassH, esSyslogH, slackEventsH, slackAlarmsH)
 
-	esSyslogPoller := scheduler.NewEsSyslogPoller(cfg, esSyslogRepo)
+	esSyslogPoller := scheduler.NewEsSyslogPoller(cfg, esSyslogRepo, slackBatcher)
 	esSyslogPoller.Start()
 
 	// Graceful shutdown
@@ -135,6 +172,12 @@ func main() {
 	wfSched.Stop()
 	nocPassRotator.Stop()
 	esSyslogPoller.Stop()
+	if slackReminder != nil {
+		slackReminder.Stop()
+	}
+	if slackAlarmsWorker != nil {
+		slackAlarmsWorker.Stop()
+	}
 	sshPool.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

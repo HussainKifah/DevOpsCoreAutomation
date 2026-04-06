@@ -39,6 +39,25 @@ type Config struct {
 	EsSyslogRetentionDays     int // hard-delete alerts older than this (default 30)
 	EsSyslogDedupWindow       time.Duration // suppress same host+device+normalized message within this window (default 1h)
 
+	// Slack syslog alerts (optional). Requires SLACK_BOT_TOKEN + SLACK_CHANNEL_ID and Events URL for "fixed"/"done".
+	SlackSyslogEnabled       bool
+	SlackBotToken            string
+	SlackChannelID           string
+	SlackSigningSecret       string
+	SlackReminderInterval    time.Duration // default 12h
+	SlackSyslogBatchWindow   time.Duration // coalesce alerts per device before post; default 45s
+	// SlackSyslogDisplayOffset shifts stored UTC timestamps shown in Slack (e.g. 3h for UTC+3).
+	SlackSyslogDisplayOffset time.Duration
+	// SlackSyslogTeamMention is raw mrkdwn for pings, e.g. <!subteam^S01234|ip-core> (from Slack user group).
+	SlackSyslogTeamMention string
+
+	// SlackAlarmsReminderEnabled runs generic thread reminders (SlackAlarmReminder table); uses SLACK_BOT_TOKEN.
+	SlackAlarmsReminderEnabled bool
+	// SlackAlarmsDefaultTeamMention is used when a reminder row has no TeamMention set.
+	SlackAlarmsDefaultTeamMention string
+	// SlackAlarmsTickInterval is how often the worker polls for due reminders (default 2m).
+	SlackAlarmsTickInterval time.Duration
+
 	PowerScanInterval  time.Duration
 	HealthScanInterval time.Duration
 	DescScanInterval   time.Duration
@@ -79,6 +98,19 @@ func Load() *Config {
 		EsSyslogRetentionDays:     parseRetentionDays("ES_SYSLOG_RETENTION_DAYS", 30),
 		EsSyslogDedupWindow:       parseDuration(getEnv("ES_SYSLOG_DEDUP_WINDOW", "1h")),
 
+		SlackSyslogEnabled:     getEnv("SLACK_SYSLOG_ENABLED", "") == "1" || getEnv("SLACK_SYSLOG_ENABLED", "") == "true",
+		SlackBotToken:          getEnv("SLACK_BOT_TOKEN", ""),
+		SlackChannelID:         strings.TrimSpace(getEnv("SLACK_CHANNEL_ID", "")),
+		SlackSigningSecret:     getEnv("SLACK_SIGNING_SECRET", ""),
+		SlackReminderInterval:  parseDurationWithFallback(getEnv("SLACK_REMINDER_INTERVAL", "6h"), 6*time.Hour),
+		SlackSyslogBatchWindow: parseDurationWithFallback(getEnv("SLACK_SYSLOG_BATCH_WINDOW", "45s"), 45*time.Second),
+		SlackSyslogDisplayOffset: parseDurationWithFallback(getEnv("SLACK_SYSLOG_DISPLAY_OFFSET", "3h"), 3*time.Hour),
+		SlackSyslogTeamMention:   strings.TrimSpace(getEnv("SLACK_SYSLOG_TEAM_MENTION", "")),
+
+		SlackAlarmsReminderEnabled:     getEnv("SLACK_ALARMS_REMINDER_ENABLED", "") == "1" || getEnv("SLACK_ALARMS_REMINDER_ENABLED", "") == "true",
+		SlackAlarmsDefaultTeamMention: strings.TrimSpace(getEnv("SLACK_ALARMS_DEFAULT_TEAM_MENTION", "")),
+		SlackAlarmsTickInterval:       parseDurationWithFallback(getEnv("SLACK_ALARMS_TICK_INTERVAL", "2m"), 2*time.Minute),
+
 		PowerScanInterval:  parseDuration(getEnv("POWER_SCAN_INTERVAL", "6h")),
 		HealthScanInterval: parseDuration(getEnv("HEALTH_SCAN_INTERVAL", "0.5h")),
 		DescScanInterval:   parseDuration(getEnv("DESC_SCAN_INTERVAL", "6h")),
@@ -107,6 +139,24 @@ func parseDuration(s string) time.Duration {
 	d, err := time.ParseDuration(s)
 	if err != nil {
 		return time.Hour
+	}
+	return d
+}
+
+// SlackSyslogConfigured is true when posting to Slack should run (token + channel).
+func (c *Config) SlackSyslogConfigured() bool {
+	return c != nil && c.SlackSyslogEnabled && c.SlackBotToken != "" && c.SlackChannelID != ""
+}
+
+// SlackAlarmsReminderConfigured is true when the generic Slack reminder worker should run.
+func (c *Config) SlackAlarmsReminderConfigured() bool {
+	return c != nil && c.SlackAlarmsReminderEnabled && c.SlackBotToken != ""
+}
+
+func parseDurationWithFallback(s string, fallback time.Duration) time.Duration {
+	d, err := time.ParseDuration(strings.TrimSpace(s))
+	if err != nil || d < time.Second {
+		return fallback
 	}
 	return d
 }

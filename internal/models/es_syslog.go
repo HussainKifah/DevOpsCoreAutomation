@@ -30,4 +30,6 @@ type EsSyslogAlert struct {
 	FilterLabel  string    `gorm:"size:200" json:"filter_label"`
 	// SHA256 hex (64); same host+device+normalized-message within dedup window → skip insert
 	DedupFingerprint string `gorm:"size:64;index" json:"-"`
+	// Slack: optional link to EsSyslogSlackIncident when posted to Slack
+	SlackIncidentID *uint `gorm:"index" json:"-"`
 }
