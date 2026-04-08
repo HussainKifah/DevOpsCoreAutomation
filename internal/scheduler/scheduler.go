@@ -78,22 +78,23 @@ func (s *Scheduler) Start() {
 		log.Fatalf("scheduler: %v", err)
 	}
 
-	 // Nokia jobs
-	 mustAdd(sched, s.cfg.PowerScanInterval, s.runPowerScan, "power-scan")
-	 mustAdd(sched, s.cfg.DescScanInterval, s.runDescScan, "desc-scan")
-	 mustAdd(sched, s.cfg.HealthScanInterval, s.runHealthScan, "health-scan")
-	 mustAdd(sched, s.cfg.PortScanInterval, s.runPortScan, "port-scan")
+	// Nokia jobs
+	mustAdd(sched, s.cfg.PowerScanInterval, s.runPowerScan, "power-scan")
+	mustAdd(sched, s.cfg.DescScanInterval, s.runDescScan, "desc-scan")
+	mustAdd(sched, s.cfg.HealthScanInterval, s.runHealthScan, "health-scan")
+	mustAdd(sched, s.cfg.PortScanInterval, s.runPortScan, "port-scan")
 
-	 // Huawei jobs (same intervals as Nokia)
-	 mustAdd(sched, s.cfg.HealthScanInterval, s.runHuaweiHealthScan, "huawei-health-scan")
-	 mustAdd(sched, s.cfg.PowerScanInterval, s.runHuaweiPowerScan, "huawei-power-scan")
-	 mustAdd(sched, s.cfg.PortScanInterval, s.runHuaweiPortScan, "huawei-port-scan")
+	// Huawei jobs (same intervals as Nokia)
+	mustAdd(sched, s.cfg.HealthScanInterval, s.runHuaweiHealthScan, "huawei-health-scan")
+	mustAdd(sched, s.cfg.PowerScanInterval, s.runHuaweiPowerScan, "huawei-power-scan")
+	mustAdd(sched, s.cfg.PortScanInterval, s.runHuaweiPortScan, "huawei-port-scan")
 
-	 mustAddCron(sched, "0 21 * * *", s.runBackup, "backup") // 9:00 PM daily
-	 mustAddCron(sched, "0 21 * * *", s.runHuaweiBackup, "backup") // 9:00 PM daily
-	 mustAddCron(sched, "0 1 * * *", s.runHistoryCleanup, "history-cleanup")
-	 mustAddCron(sched, "0 2 1 * *", s.runInventoryScan, "inventory-scan") // Runs at 02:00 on the 1st of every month
-	 mustAddCron(sched, "0 2 1 * *", s.runHuaweiInventoryScan, "huawei-inventory-scan")
+	mustAddCron(sched, "0 21 * * *", s.runBackup, "backup")       // 9:00 PM daily
+	mustAddCron(sched, "0 21 * * *", s.runHuaweiBackup, "backup") // 9:00 PM daily
+	mustAddCron(sched, "0 1 * * *", s.runHistoryCleanup, "history-cleanup")
+	mustAddCron(sched, "0 2 1 * *", s.runInventoryScan, "inventory-scan") // Runs at 02:00 on the 1st of every month
+	mustAddCron(sched, "0 3 1 * *", s.runOntInterfaceScan, "ont-interface-scan")
+	mustAddCron(sched, "0 2 1 * *", s.runHuaweiInventoryScan, "huawei-inventory-scan")
 
 	sched.Start()
 	log.Println("scheduler started")
@@ -102,6 +103,7 @@ func (s *Scheduler) Start() {
 	go func() {
 		log.Println("[startup] running all jobs immediately")
 		// Nokia
+		s.runOntInterfaceScan()
 		// s.runPowerScan()
 		// s.runDescScan()
 		// s.runHealthScan()
@@ -653,6 +655,10 @@ func (s *Scheduler) runInventoryScan() {
 
 func (s *Scheduler) runInventoryScanWork() {
 	log.Println("[job] inventory-scan: starting")
+	if err := s.inventoryRepo.DeleteInventorySnapshot("nokia"); err != nil {
+		log.Printf("[job] inventory-scan: failed to delete old inventory data: %v", err)
+		return
+	}
 
 	cmd := "show equipment ont interface detail"
 
@@ -722,24 +728,8 @@ func (s *Scheduler) runInventoryScanWork() {
 				}
 			}
 		}
-		// Store only items with valid ont_idx, deduplicated by ont_idx
-		seen := make(map[string]int)
-		var toStore []models.OntInventoryItem
-		for _, it := range ontItems {
-			if it.OntIdx == "" {
-				continue
-			}
-			if idx, exists := seen[it.OntIdx]; exists {
-				toStore[idx] = it
-			} else {
-				seen[it.OntIdx] = len(toStore)
-				toStore = append(toStore, it)
-			}
-		}
-		if len(toStore) > 0 {
-			if err := s.inventoryRepo.ReplaceOntInventoryByHost(r.Host, "nokia", toStore); err != nil {
-				log.Printf("[job] inventory-scan: per-ONT inventory for %s: %v", r.Host, err)
-			}
+		if err := s.inventoryRepo.ReplaceOntInventoryByHost(r.Host, "nokia", ontItems); err != nil {
+			log.Printf("[job] inventory-scan: per-ONT inventory for %s: %v", r.Host, err)
 		}
 
 		oltInventories = append(oltInventories, models.OltInventory{
@@ -823,6 +813,54 @@ func (s *Scheduler) runInventoryScanWork() {
 
 	s.notify("inventory_update")
 	log.Println("[job] inventory-scan: done")
+}
+
+func (s *Scheduler) runOntInterfaceScan() {
+	s.scanSem <- struct{}{}
+	defer func() { <-s.scanSem }()
+	s.runOntInterfaceScanWork()
+}
+
+func (s *Scheduler) runOntInterfaceScanWork() {
+	log.Println("[job] ont-interface-scan: starting")
+	if err := s.inventoryRepo.DeleteOntInterfaces("nokia"); err != nil {
+		log.Printf("[job] ont-interface-scan: failed to delete old ONT interface data: %v", err)
+		return
+	}
+
+	cmd := "show equipment ont interface"
+	total := 0
+	for r := range shell.SendCommandNokiaOLTsPooled(s.pool, cmd) {
+		if r.Err != nil {
+			log.Printf("[job] ont-interface-scan: ERROR %s: %v", r.Host, r.Err)
+			continue
+		}
+		rows := mapNokiaOntInterfaces(extractor.ExtractOntInterfaces(r.Data))
+		total += len(rows)
+		if err := s.inventoryRepo.ReplaceOntInterfacesByHost(r.Device, r.Site, r.Host, "nokia", rows); err != nil {
+			log.Printf("[job] ont-interface-scan: store %s: %v", r.Host, err)
+		}
+	}
+	s.notify("inventory_update")
+	log.Printf("[job] ont-interface-scan: done rows=%d", total)
+}
+
+func mapNokiaOntInterfaces(rows []extractor.OntInterface) []models.OntInterface {
+	out := make([]models.OntInterface, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, models.OntInterface{
+			OntIdx:         row.OntIdx,
+			EqptVerNum:     row.EqptVerNum,
+			SwVerAct:       row.SwVerAct,
+			ActualNumSlots: row.ActualNumSlots,
+			VersionNumber:  row.VersionNumber,
+			SerNum:         row.SerNum,
+			YpSerialNo:     row.YpSerialNo,
+			CfgFile1VerAct: row.CfgFile1VerAct,
+			CfgFile2VerAct: row.CfgFile2VerAct,
+		})
+	}
+	return out
 }
 
 // ═══════════════════════════════════════════════════════════════════════

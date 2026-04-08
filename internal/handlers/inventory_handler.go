@@ -58,3 +58,32 @@ func (h *InventoryHandler) GetOltInventoryHistory(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, inventories)
 }
+
+func (h *InventoryHandler) GetOntInterfaces(c *gin.Context) {
+	vendor := c.DefaultQuery("vendor", "nokia")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "50"))
+	device := c.Query("device")
+	search := c.Query("search")
+	sortBy := c.DefaultQuery("sort_by", "ont_idx")
+	sortOrder := c.DefaultQuery("sort_order", "asc")
+	if sortOrder != "desc" {
+		sortOrder = "asc"
+	}
+
+	if page < 1 {
+		page = 1
+	}
+	if c.Query("export") == "true" {
+		perPage = 0
+	} else if perPage < 1 || perPage > 200 {
+		perPage = 50
+	}
+
+	rows, err := h.repo.GetOntInterfacesPaginated(page, perPage, vendor, device, search, sortBy, sortOrder)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch ONT interfaces"})
+		return
+	}
+	c.JSON(http.StatusOK, rows)
+}

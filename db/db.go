@@ -40,6 +40,7 @@ func Connect(cfg *config.Config) *gorm.DB {
 		&models.InventorySummary{},
 		&models.OltInventory{},
 		&models.OntInventoryItem{},
+		&models.OntInterface{},
 		&models.WorkflowDevice{},
 		&models.WorkflowJob{},
 		&models.WorkflowRun{},

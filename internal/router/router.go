@@ -120,6 +120,7 @@ func Setup(
 		{
 			inventory.GET("/summary", inventoryH.GetLatestSummary)
 			inventory.GET("/olts", inventoryH.GetLatestOltInventories)
+			inventory.GET("/onts", inventoryH.GetOntInterfaces)
 			inventory.GET("/olts/:host", inventoryH.GetOltInventoryHistory)
 		}
 	}

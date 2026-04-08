@@ -131,13 +131,14 @@ func (r *powerRepository) GetPaginated(page, perPage int, vendor, device, search
 	descJoin := "LEFT JOIN ont_descriptions ON power_readings.ont_idx = ont_descriptions.ont_idx AND power_readings.host = ont_descriptions.host AND ont_descriptions.deleted_at IS NULL"
 	invJoin := "LEFT JOIN ont_inventory_items ON power_readings.ont_idx = ont_inventory_items.ont_idx AND power_readings.host = ont_inventory_items.host AND ont_inventory_items.deleted_at IS NULL"
 
-	countQ := r.DB.Model(&models.PowerReading{}).Joins(descJoin).Where("power_readings.vendor = ?", vendor)
+	countQ := r.DB.Model(&models.PowerReading{}).Joins(descJoin).Joins(invJoin).Where("power_readings.vendor = ?", vendor)
 	if device != "" {
 		countQ = countQ.Where("power_readings.device = ?", device)
 	}
 	if search != "" {
 		pattern := "%" + search + "%"
-		countQ = countQ.Where("power_readings.ont_idx ILIKE ? OR ont_descriptions.desc1 ILIKE ? OR ont_descriptions.desc2 ILIKE ?", pattern, pattern, pattern)
+		countQ = countQ.Where("power_readings.ont_idx ILIKE ? OR CAST(power_readings.olt_rx AS TEXT) ILIKE ? OR CAST(power_readings.ont_rx AS TEXT) ILIKE ? OR ont_descriptions.desc1 ILIKE ? OR ont_descriptions.desc2 ILIKE ? OR ont_inventory_items.equip_id ILIKE ? OR ont_inventory_items.serial_no ILIKE ? OR power_readings.device ILIKE ? OR power_readings.site ILIKE ? OR power_readings.host ILIKE ?",
+			pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern)
 	}
 
 	var total int64
@@ -165,7 +166,8 @@ func (r *powerRepository) GetPaginated(page, perPage int, vendor, device, search
 	}
 	if search != "" {
 		pattern := "%" + search + "%"
-		dataQ = dataQ.Where("power_readings.ont_idx ILIKE ? OR ont_descriptions.desc1 ILIKE ? OR ont_descriptions.desc2 ILIKE ?", pattern, pattern, pattern)
+		dataQ = dataQ.Where("power_readings.ont_idx ILIKE ? OR CAST(power_readings.olt_rx AS TEXT) ILIKE ? OR CAST(power_readings.ont_rx AS TEXT) ILIKE ? OR ont_descriptions.desc1 ILIKE ? OR ont_descriptions.desc2 ILIKE ? OR ont_inventory_items.equip_id ILIKE ? OR ont_inventory_items.serial_no ILIKE ? OR power_readings.device ILIKE ? OR power_readings.site ILIKE ? OR power_readings.host ILIKE ?",
+			pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern)
 	}
 
 	if perPage > 0 {

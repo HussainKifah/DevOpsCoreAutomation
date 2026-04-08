@@ -36,6 +36,19 @@ type OntInventoryItem struct {
 	EquipID  string `json:"equip_id"`
 	SerialNo string `json:"serial_no,omitempty"`
 }
+
+type OntInterface struct {
+	OntIdx         string `json:"ont_idx"`
+	EqptVerNum     string `json:"eqpt_ver_num"`
+	SwVerAct       string `json:"sw_ver_act"`
+	ActualNumSlots string `json:"actual_num_slots"`
+	VersionNumber  string `json:"version_number"`
+	SerNum         string `json:"sernum"`
+	YpSerialNo     string `json:"yp_serial_no"`
+	CfgFile1VerAct string `json:"cfgfile1_ver_act"`
+	CfgFile2VerAct string `json:"cfgfile2_ver_act"`
+}
+
 type EquipIDCount struct {
 	ID       string `json:"equip_id"`
 	Vendor   string `json:"vendor,omitempty"`
@@ -241,4 +254,60 @@ func ExtractPerOntInventory(output string) []OntInventoryItem {
 		})
 	}
 	return out
+}
+
+func ExtractOntInterfaces(output string) []OntInterface {
+	output = strings.ReplaceAll(output, "\r\n", "\n")
+	output = strings.ReplaceAll(output, "\r", "\n")
+
+	var out []OntInterface
+	for _, raw := range strings.Split(output, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.Contains(line, "|") || strings.HasPrefix(line, "=") || strings.HasPrefix(line, "-") {
+			continue
+		}
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "interface table") || strings.HasPrefix(lower, "typ:") || strings.HasPrefix(lower, "ont-idx") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 7 || !looksLikeOntIdx(fields[0]) {
+			continue
+		}
+		row := OntInterface{
+			OntIdx:         normalizeOntIdx(fields[0]),
+			EqptVerNum:     fields[1],
+			SwVerAct:       fields[2],
+			ActualNumSlots: fields[3],
+			VersionNumber:  fields[4],
+			SerNum:         fields[5],
+			YpSerialNo:     fields[6],
+		}
+		if len(fields) > 7 {
+			row.CfgFile1VerAct = fields[7]
+		}
+		if len(fields) > 8 {
+			row.CfgFile2VerAct = fields[8]
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
+func looksLikeOntIdx(s string) bool {
+	parts := strings.Split(s, "/")
+	if len(parts) < 3 {
+		return false
+	}
+	for _, part := range parts {
+		if part == "" {
+			return false
+		}
+		for _, r := range part {
+			if r < '0' || r > '9' {
+				return false
+			}
+		}
+	}
+	return true
 }

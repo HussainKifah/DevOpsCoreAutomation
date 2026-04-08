@@ -2,6 +2,19 @@
 <div x-data="devicesPage()" x-init="init()">
   <h1 class="text-2xl font-bold text-[#f1f5f9] mb-6">Devices</h1>
 
+  <div class="mb-4 border-b border-[rgba(255,255,255,0.08)] flex items-center gap-2">
+    <button @click="switchTab('optics')"
+      class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+      :class="activeTab === 'optics' ? 'border-[#3b82f6] text-[#f1f5f9]' : 'border-transparent text-[#94a3b8] hover:text-[#f1f5f9]'">
+      Optics
+    </button>
+    <button @click="switchTab('onts')"
+      class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+      :class="activeTab === 'onts' ? 'border-[#3b82f6] text-[#f1f5f9]' : 'border-transparent text-[#94a3b8] hover:text-[#f1f5f9]'">
+      All ONTs
+    </button>
+  </div>
+
   <!-- Sticky filter bar -->
   <div class="sticky top-12 z-10 -mx-6 px-6 py-3 bg-[#0a0e1a]/95 backdrop-blur-sm border-b border-[rgba(255,255,255,0.08)] mb-6 flex flex-wrap items-end gap-4">
     <div class="w-56">
@@ -16,8 +29,8 @@
     </div>
     <div class="w-56">
       <label class="block text-sm font-medium mb-1 text-[#94a3b8]">Search ONT</label>
-      <input type="text" x-model.debounce.300ms="search" @input="page = 1; fetchPage()"
-        placeholder="Search ONT index or description..."
+      <input type="text" x-model="search" @input.debounce.300ms="page = 1; fetchPage()"
+        :placeholder="activeTab === 'optics' ? 'Search all optics fields...' : 'Search all ONT fields...'"
         class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] text-[#f1f5f9] placeholder-[#475569] px-3 py-2 text-sm focus:ring-2 focus:ring-[#3b82f6] focus:border-[#3b82f6]">
     </div>
     <span class="text-sm text-[#94a3b8] font-mono" x-text="total + ' ONTs'"></span>
@@ -53,7 +66,7 @@
         </div>
       </div>
 
-      <div class="overflow-x-auto">
+      <div class="overflow-x-auto" x-show="activeTab === 'optics'">
         <table class="w-full text-sm">
           <thead>
             <tr class="bg-[#111827]">
@@ -124,6 +137,72 @@
           </tbody>
         </table>
       </div>
+      <div class="overflow-x-auto" x-show="activeTab === 'onts'">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-[#111827]">
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('ont_idx')">
+                <span class="inline-flex items-center gap-1">ONT Index <span class="text-[#3b82f6]" x-show="sortColumn === 'ont_idx'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('eqpt_ver_num')">
+                <span class="inline-flex items-center gap-1">Eqpt Ver Num <span class="text-[#3b82f6]" x-show="sortColumn === 'eqpt_ver_num'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('sw_ver_act')">
+                <span class="inline-flex items-center gap-1">SW Ver Act <span class="text-[#3b82f6]" x-show="sortColumn === 'sw_ver_act'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('actual_num_slots')">
+                <span class="inline-flex items-center gap-1">Slots <span class="text-[#3b82f6]" x-show="sortColumn === 'actual_num_slots'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('version_number')">
+                <span class="inline-flex items-center gap-1">Version Number <span class="text-[#3b82f6]" x-show="sortColumn === 'version_number'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('ser_num')">
+                <span class="inline-flex items-center gap-1">Ser Num <span class="text-[#3b82f6]" x-show="sortColumn === 'ser_num'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('yp_serial_no')">
+                <span class="inline-flex items-center gap-1">YP Serial No <span class="text-[#3b82f6]" x-show="sortColumn === 'yp_serial_no'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('cfg_file1_ver_act')">
+                <span class="inline-flex items-center gap-1">Cfgfile1 Ver Act <span class="text-[#3b82f6]" x-show="sortColumn === 'cfg_file1_ver_act'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('cfg_file2_ver_act')">
+                <span class="inline-flex items-center gap-1">Cfgfile2 Ver Act <span class="text-[#3b82f6]" x-show="sortColumn === 'cfg_file2_ver_act'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('device')">
+                <span class="inline-flex items-center gap-1">Device <span class="text-[#3b82f6]" x-show="sortColumn === 'device'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('site')">
+                <span class="inline-flex items-center gap-1">Site <span class="text-[#3b82f6]" x-show="sortColumn === 'site'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('host')">
+                <span class="inline-flex items-center gap-1">Host <span class="text-[#3b82f6]" x-show="sortColumn === 'host'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-[#94a3b8] cursor-pointer hover:text-[#f1f5f9] select-none" @click="sortBy('measured_at')">
+                <span class="inline-flex items-center gap-1">Measured At <span class="text-[#3b82f6]" x-show="sortColumn === 'measured_at'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span></span>
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-[rgba(255,255,255,0.08)]">
+            <template x-for="r in interfaces" :key="r.ID">
+              <tr class="hover:bg-[#111827]/70 transition-colors">
+                <td class="px-4 py-2.5 font-mono text-xs text-[#f1f5f9]" x-text="r.ont_idx"></td>
+                <td class="px-4 py-2.5 font-mono text-xs text-[#f1f5f9]" x-text="r.eqpt_ver_num || '—'"></td>
+                <td class="px-4 py-2.5 font-mono text-xs text-[#94a3b8]" x-text="r.sw_ver_act || '—'"></td>
+                <td class="px-4 py-2.5 font-mono text-xs text-[#94a3b8]" x-text="r.actual_num_slots || '—'"></td>
+                <td class="px-4 py-2.5 font-mono text-xs text-[#94a3b8]" x-text="r.version_number || '—'"></td>
+                <td class="px-4 py-2.5 font-mono text-xs text-[#94a3b8]" x-text="r.sernum || '—'"></td>
+                <td class="px-4 py-2.5 font-mono text-xs text-[#94a3b8]" x-text="r.yp_serial_no || '—'"></td>
+                <td class="px-4 py-2.5 font-mono text-xs text-[#94a3b8]" x-text="r.cfgfile1_ver_act || '—'"></td>
+                <td class="px-4 py-2.5 font-mono text-xs text-[#94a3b8]" x-text="r.cfgfile2_ver_act || '—'"></td>
+                <td class="px-4 py-2.5 text-xs text-[#f1f5f9]" x-text="r.device"></td>
+                <td class="px-4 py-2.5 text-xs text-[#94a3b8]" x-text="r.site"></td>
+                <td class="px-4 py-2.5 font-mono text-xs text-[#94a3b8]" x-text="r.host"></td>
+                <td class="px-4 py-2.5 text-xs text-[#475569]" x-text="new Date(r.measured_at).toLocaleString()"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
     </div>
   </template>
 </div>
@@ -131,8 +210,10 @@
 <script>
 function devicesPage() {
   return {
+    activeTab: 'optics',
     devices: [],
     readings: [],
+    interfaces: [],
     selectedDevice: '',
     search: '',
     loading: true,
@@ -154,6 +235,15 @@ function devicesPage() {
       this.fetchPage();
     },
 
+    switchTab(tab) {
+      if (this.activeTab === tab) return;
+      this.activeTab = tab;
+      this.page = 1;
+      this.sortColumn = tab === 'optics' ? 'ont_rx' : 'ont_idx';
+      this.sortDir = 'asc';
+      this.fetchPage();
+    },
+
     goToPage() {
       var p = parseInt(this.pageInput, 10);
       if (!isNaN(p) && p >= 1 && p <= this.totalPages) {
@@ -169,7 +259,17 @@ function devicesPage() {
       this.devices = await devRes.json() || [];
       await this.fetchPage();
       this.loading = false;
-      window.addEventListener('vendor-changed', () => { this.init(); });
+      window.addEventListener('vendor-changed', () => {
+        this.page = 1;
+        this.selectedDevice = '';
+        this.fetchDevices();
+      });
+    },
+
+    async fetchDevices() {
+      const devRes = await fetch('/api/devices?' + vendorParam());
+      this.devices = await devRes.json() || [];
+      await this.fetchPage();
     },
 
     get isHuawei() {
@@ -185,13 +285,20 @@ function devicesPage() {
         page: this.page,
         per_page: 50,
         sort_by: this.sortColumn,
-        sort_order: this.sortDir
+        sort_order: this.sortDir,
+        vendor: localStorage.getItem('selectedVendor') || 'nokia'
       });
       if (this.selectedDevice) params.set('device', this.selectedDevice);
-      if (this.search) params.set('search', this.search);
-      const res = await fetch('/api/power/readings?' + params);
+      const term = (this.search || '').trim();
+      if (term) params.set('search', term);
+      const endpoint = this.activeTab === 'optics' ? '/api/power/readings' : '/api/inventory/onts';
+      const res = await fetch(endpoint + '?' + params);
       const json = await res.json();
-      this.readings = json.data || [];
+      if (this.activeTab === 'optics') {
+        this.readings = json.data || [];
+      } else {
+        this.interfaces = json.data || [];
+      }
       this.total = json.total || 0;
       this.totalPages = json.total_pages || 1;
       this.page = json.page || 1;
