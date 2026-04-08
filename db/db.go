@@ -48,7 +48,9 @@ func Connect(cfg *config.Config) *gorm.DB {
 		&models.EsSyslogFilter{},
 		&models.EsSyslogAlert{},
 		&models.EsSyslogSlackIncident{},
-		&models.SlackAlarmReminder{},
+		&models.SlackTicketReminder{},
+		&models.RuijieMailAlert{},
+		&models.RuijieSlackIncident{},
 	); err != nil {
 		log.Fatalf("failed to migrate database: %v", err)
 	}

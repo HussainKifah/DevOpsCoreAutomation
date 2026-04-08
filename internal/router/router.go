@@ -4,7 +4,6 @@ import (
 	auth "github.com/Flafl/DevOpsCore/internal/Auth"
 	"github.com/Flafl/DevOpsCore/internal/handlers"
 	"github.com/Flafl/DevOpsCore/internal/middleware"
-	slackalarms "github.com/Flafl/DevOpsCore/internal/SlackRemindersAndAlarms"
 	websocket "github.com/Flafl/DevOpsCore/internal/webSocket"
 	"github.com/gin-gonic/gin"
 )
@@ -30,7 +29,6 @@ func Setup(
 	nocPassH *handlers.NocPassHandler,
 	esSyslogH *handlers.EsSyslogHandler,
 	slackEventsH *handlers.SlackEventsHandler,
-	slackAlarmsH *slackalarms.Handler,
 ) {
 	// WebSocket endpoint (auth inside handler)
 	r.GET("/ws", websocket.ServerWs(hub, jwtManager))
@@ -153,16 +151,6 @@ func Setup(
 			users.POST("", userH.Create)
 			users.PUT("/:id", userH.UpdateUser)
 			users.DELETE("/:id", userH.DeleteUser)
-		}
-
-		if slackAlarmsH != nil {
-			alarms := writeAPI.Group("/admin/slack-alarms")
-			alarms.Use(middleware.RoleGuard("admin"))
-			{
-				alarms.GET("/reminders", slackAlarmsH.ListOpen)
-				alarms.POST("/reminders", slackAlarmsH.Create)
-				alarms.DELETE("/reminders/:id", slackAlarmsH.Resolve)
-			}
 		}
 	}
 

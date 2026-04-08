@@ -13,11 +13,12 @@ import (
 	"github.com/Flafl/DevOpsCore/config"
 	"github.com/Flafl/DevOpsCore/db"
 	auth "github.com/Flafl/DevOpsCore/internal/Auth"
+	ruijie "github.com/Flafl/DevOpsCore/internal/Ruijie"
+	slackreminders "github.com/Flafl/DevOpsCore/internal/SlackReminders"
 	"github.com/Flafl/DevOpsCore/internal/handlers"
 	"github.com/Flafl/DevOpsCore/internal/repository"
 	"github.com/Flafl/DevOpsCore/internal/router"
 	"github.com/Flafl/DevOpsCore/internal/scheduler"
-	slackalarms "github.com/Flafl/DevOpsCore/internal/SlackRemindersAndAlarms"
 	"github.com/Flafl/DevOpsCore/internal/shell"
 	"github.com/Flafl/DevOpsCore/internal/syslog"
 	websocket "github.com/Flafl/DevOpsCore/internal/webSocket"
@@ -41,6 +42,8 @@ func main() {
 	inventoryRepo := repository.NewInventoryRepo(database)
 	workflowRepo := repository.NewWorkflowRepository(database)
 	nocPassRepo := repository.NewNocPassRepository(database)
+	slackTicketRepo := repository.NewSlackTicketReminderRepository(database)
+	ruijieMailRepo := repository.NewRuijieMailRepository(database)
 
 	jwtManager := auth.NewJWTManager(auth.JWTconfig{
 		SecretKey:            []byte(cfg.JWTSecret),
@@ -101,8 +104,9 @@ func main() {
 	var slackAPI *slack.Client
 	var slackBatcher *syslog.SlackSyslogBatcher
 	var slackReminder *syslog.SlackReminderWorker
-	var slackAlarmsWorker *slackalarms.Worker
-	var slackAlarmsH *slackalarms.Handler
+	var slackTicketWorker *slackreminders.Worker
+	var ruijieMailPoller *ruijie.MailPoller
+	var ruijieReminder *ruijie.ReminderWorker
 	var slackEventsH *handlers.SlackEventsHandler
 	if cfg.SlackSyslogConfigured() {
 		slackAPI = slack.New(cfg.SlackBotToken)
@@ -113,28 +117,33 @@ func main() {
 		log.Printf("[slack-syslog] enabled channel=%s batch=%s reminder=%s", cfg.SlackChannelID, cfg.SlackSyslogBatchWindow, cfg.SlackReminderInterval)
 	}
 	if cfg.SlackBotToken != "" && cfg.SlackSigningSecret != "" {
-		api := slackAPI
-		if api == nil {
-			api = slack.New(cfg.SlackBotToken)
+		if slackAPI == nil {
+			slackAPI = slack.New(cfg.SlackBotToken)
 		}
-		slackEventsH = handlers.NewSlackEventsHandler(cfg, esSyslogRepo, api)
+		slackEventsH = handlers.NewSlackEventsHandler(cfg, esSyslogRepo, slackTicketRepo, ruijieMailRepo, slackAPI)
 	}
-
-	if cfg.SlackAlarmsReminderConfigured() {
-		saStore := slackalarms.NewStore(database)
-		slackAlarmsH = slackalarms.NewHandler(saStore)
-		api := slackAPI
-		if api == nil {
-			api = slack.New(cfg.SlackBotToken)
+	if cfg.SlackTicketReminderConfigured() {
+		if slackAPI == nil {
+			slackAPI = slack.New(cfg.SlackBotToken)
 		}
-		slackAlarmsWorker = slackalarms.NewWorker(cfg, saStore, api)
-		slackAlarmsWorker.Start()
-		log.Printf("[slack-alarms] generic reminders enabled tick=%s", cfg.SlackAlarmsTickInterval)
+		slackTicketWorker = slackreminders.NewWorker(cfg, slackTicketRepo, slackAPI)
+		slackTicketWorker.Start()
+		log.Printf("[slack-ticket-reminders] enabled channel=%s every=%s", cfg.SlackTicketChannelID, cfg.SlackTicketReminderInterval)
+	}
+	if cfg.RuijieMailConfigured() {
+		if slackAPI == nil {
+			slackAPI = slack.New(cfg.SlackBotToken)
+		}
+		ruijieMailPoller = ruijie.NewMailPoller(cfg, ruijieMailRepo, slackAPI)
+		ruijieMailPoller.Start()
+		ruijieReminder = ruijie.NewReminderWorker(cfg, ruijieMailRepo, slackAPI)
+		ruijieReminder.Start()
+		log.Printf("[ruijie-mail] enabled channel=%s every=%s", cfg.RuijieSlackChannelID, cfg.RuijieSlackReminderInterval)
 	}
 
 	pageH := handlers.NewPageHandler(filepath.Join(projectRoot, "templates"), userRepo, jwtManager)
 
-	router.Setup(server, jwtManager, hub, powerH, descH, healthH, healthHistoryH, portH, portHistoryH, calendarH, backupH, userH, authH, pageH, inventoryH, scanH, workflowH, nocPassH, esSyslogH, slackEventsH, slackAlarmsH)
+	router.Setup(server, jwtManager, hub, powerH, descH, healthH, healthHistoryH, portH, portHistoryH, calendarH, backupH, userH, authH, pageH, inventoryH, scanH, workflowH, nocPassH, esSyslogH, slackEventsH)
 
 	esSyslogPoller := scheduler.NewEsSyslogPoller(cfg, esSyslogRepo, slackBatcher)
 	esSyslogPoller.Start()
@@ -159,7 +168,6 @@ func main() {
 
 			}
 
-
 		}
 	}()
 	quit := make(chan os.Signal, 1)
@@ -175,8 +183,14 @@ func main() {
 	if slackReminder != nil {
 		slackReminder.Stop()
 	}
-	if slackAlarmsWorker != nil {
-		slackAlarmsWorker.Stop()
+	if slackTicketWorker != nil {
+		slackTicketWorker.Stop()
+	}
+	if ruijieMailPoller != nil {
+		ruijieMailPoller.Stop()
+	}
+	if ruijieReminder != nil {
+		ruijieReminder.Stop()
 	}
 	sshPool.Close()
 

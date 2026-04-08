@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -10,31 +11,39 @@ import (
 	"time"
 
 	"github.com/Flafl/DevOpsCore/config"
+	ruijie "github.com/Flafl/DevOpsCore/internal/Ruijie"
+	slackreminders "github.com/Flafl/DevOpsCore/internal/SlackReminders"
+	"github.com/Flafl/DevOpsCore/internal/models"
 	"github.com/Flafl/DevOpsCore/internal/repository"
 	"github.com/Flafl/DevOpsCore/internal/syslog"
 	"github.com/gin-gonic/gin"
 	"github.com/slack-go/slack"
+	"gorm.io/gorm"
 )
 
 // SlackEventsHandler handles Slack Events API (URL verification + reaction to resolve).
 type SlackEventsHandler struct {
-	cfg       *config.Config
-	repo      *repository.EsSyslogRepository
-	api       *slack.Client
-	secret    string
-	botUserID string
+	cfg        *config.Config
+	repo       *repository.EsSyslogRepository
+	ticketRepo *repository.SlackTicketReminderRepository
+	ruijieRepo *repository.RuijieMailRepository
+	api        *slack.Client
+	secret     string
+	botUserID  string
 
 	seenMu sync.Mutex
 	seen   map[string]time.Time
 }
 
-func NewSlackEventsHandler(cfg *config.Config, repo *repository.EsSyslogRepository, api *slack.Client) *SlackEventsHandler {
+func NewSlackEventsHandler(cfg *config.Config, repo *repository.EsSyslogRepository, ticketRepo *repository.SlackTicketReminderRepository, ruijieRepo *repository.RuijieMailRepository, api *slack.Client) *SlackEventsHandler {
 	h := &SlackEventsHandler{
-		cfg:    cfg,
-		repo:   repo,
-		api:    api,
-		secret: strings.TrimSpace(cfg.SlackSigningSecret),
-		seen:   make(map[string]time.Time),
+		cfg:        cfg,
+		repo:       repo,
+		ticketRepo: ticketRepo,
+		ruijieRepo: ruijieRepo,
+		api:        api,
+		secret:     strings.TrimSpace(cfg.SlackSigningSecret),
+		seen:       make(map[string]time.Time),
 	}
 	if api != nil {
 		if a, err := api.AuthTest(); err == nil {
@@ -98,12 +107,86 @@ func (h *SlackEventsHandler) Handle(c *gin.Context) {
 	}
 
 	switch evType.Type {
+	case "message":
+		h.handleMessage(outer.Event)
 	case "reaction_added":
 		h.handleReactionAdded(outer.Event)
 	default:
 		// Other event types ignored
 	}
 	c.Status(http.StatusOK)
+}
+
+func (h *SlackEventsHandler) handleMessage(raw json.RawMessage) {
+	if h == nil || h.ticketRepo == nil || !h.cfg.SlackTicketReminderConfigured() {
+		return
+	}
+	var ev struct {
+		Type     string `json:"type"`
+		Subtype  string `json:"subtype"`
+		Channel  string `json:"channel"`
+		User     string `json:"user"`
+		BotID    string `json:"bot_id"`
+		Text     string `json:"text"`
+		TS       string `json:"ts"`
+		ThreadTS string `json:"thread_ts"`
+	}
+	if err := json.Unmarshal(raw, &ev); err != nil {
+		return
+	}
+	if ev.Type != "message" {
+		return
+	}
+	switch strings.TrimSpace(ev.Subtype) {
+	case "", "bot_message":
+	default:
+		return
+	}
+	channelID := strings.TrimSpace(ev.Channel)
+	if channelID != strings.TrimSpace(h.cfg.SlackTicketChannelID) {
+		return
+	}
+	messageTS := strings.TrimSpace(ev.TS)
+	threadTS := strings.TrimSpace(ev.ThreadTS)
+	if messageTS == "" {
+		return
+	}
+	threadRootTS := ""
+	if threadTS != "" && threadTS != messageTS {
+		threadRootTS = threadTS
+	}
+	if srcBot := strings.TrimSpace(h.cfg.SlackTicketSourceBotID); srcBot != "" && strings.TrimSpace(ev.BotID) != srcBot {
+		return
+	}
+	bodyText := strings.TrimSpace(ev.Text)
+	if bodyText == "" {
+		bodyText = slackreminders.ExtractMessageTextFromSlackEvent(raw)
+	}
+	if !slackreminders.LooksLikeTicketMessage(bodyText) {
+		return
+	}
+	ticket := slackreminders.BuildTicketRecord(h.cfg, channelID, messageTS, threadRootTS, bodyText, time.Now().UTC())
+	created, err := h.ticketRepo.CreateIfMissing(ticket)
+	if err != nil {
+		log.Printf("[slack-ticket-reminders] create ticket: %v", err)
+		return
+	}
+	if !created {
+		return
+	}
+	threadReplyTS := messageTS
+	if threadRootTS != "" {
+		threadReplyTS = threadRootTS
+	}
+	_, _, postErr := h.api.PostMessage(
+		channelID,
+		slack.MsgOptionTS(threadReplyTS),
+		slack.MsgOptionText(slackreminders.BuildTrackingStartedReminder(h.cfg, ticket), false),
+	)
+	if postErr != nil {
+		log.Printf("[slack-ticket-reminders] post tracking started: %v", postErr)
+	}
+	log.Printf("[slack-ticket-reminders] tracked message channel=%s ts=%s first_reminder_in=%s", channelID, messageTS, h.cfg.SlackTicketFirstReminderAfter)
 }
 
 func (h *SlackEventsHandler) handleReactionAdded(raw json.RawMessage) {
@@ -123,22 +206,34 @@ func (h *SlackEventsHandler) handleReactionAdded(raw json.RawMessage) {
 	if ev.Item.Type != "message" {
 		return
 	}
-	if !isResolveReaction(ev.Reaction) {
+	if !slackreminders.IsResolveReaction(ev.Reaction) {
 		return
 	}
 	if h.botUserID != "" && ev.User == h.botUserID {
 		return
 	}
 	ch := strings.TrimSpace(ev.Item.Channel)
-	if ch != strings.TrimSpace(h.cfg.SlackChannelID) {
+	if ch == "" {
 		return
 	}
 
 	parentTS := strings.TrimSpace(ev.Item.ThreadTS)
 	if parentTS == "" {
-		parentTS = h.resolveThreadParentTS(ch, strings.TrimSpace(ev.Item.TS))
+		parentTS = slackreminders.ResolveThreadParentTS(h.api, ch, strings.TrimSpace(ev.Item.TS))
+	}
+	if parentTS == "" {
+		return
 	}
 
+	h.resolveSyslogIncident(ch, parentTS, ev.User)
+	h.resolveRuijieIncident(ch, parentTS, ev.User)
+	h.resolveTicketReminder(ch, parentTS, strings.TrimSpace(ev.Item.TS), ev.User)
+}
+
+func (h *SlackEventsHandler) resolveSyslogIncident(ch, parentTS, userID string) {
+	if h.repo == nil || ch != strings.TrimSpace(h.cfg.SlackChannelID) {
+		return
+	}
 	inc, err := h.repo.GetSlackIncidentByMessage(ch, parentTS)
 	if err != nil || inc == nil {
 		return
@@ -147,8 +242,8 @@ func (h *SlackEventsHandler) handleReactionAdded(raw json.RawMessage) {
 		return
 	}
 
-	resolvedBy := ev.User
-	if u, err := h.api.GetUserInfo(ev.User); err == nil && u != nil {
+	resolvedBy := userID
+	if u, err := h.api.GetUserInfo(userID); err == nil && u != nil {
 		if u.RealName != "" {
 			resolvedBy = u.RealName
 		} else if u.Name != "" {
@@ -180,33 +275,116 @@ func (h *SlackEventsHandler) handleReactionAdded(raw json.RawMessage) {
 	)
 }
 
-// resolveThreadParentTS returns the root message ts for a reaction target (parent or fetched via history).
-func (h *SlackEventsHandler) resolveThreadParentTS(channelID, itemTS string) string {
-	if itemTS == "" {
-		return ""
+func (h *SlackEventsHandler) resolveRuijieIncident(ch, parentTS, userID string) {
+	if h.ruijieRepo == nil || ch != strings.TrimSpace(h.cfg.RuijieSlackChannelID) {
+		return
 	}
-	resp, err := h.api.GetConversationHistory(&slack.GetConversationHistoryParameters{
-		ChannelID: channelID,
-		Latest:    itemTS,
-		Limit:     1,
-		Inclusive: true,
-	})
-	if err != nil || resp == nil || len(resp.Messages) == 0 {
-		return itemTS
+	inc, err := h.ruijieRepo.GetSlackIncidentByMessage(ch, parentTS)
+	if err != nil || inc == nil {
+		return
 	}
-	m := resp.Messages[0]
-	if strings.TrimSpace(m.ThreadTimestamp) != "" {
-		return m.ThreadTimestamp
+	if inc.ResolvedAt != nil {
+		return
 	}
-	return m.Timestamp
+
+	resolvedBy := userID
+	if u, err := h.api.GetUserInfo(userID); err == nil && u != nil {
+		if u.RealName != "" {
+			resolvedBy = u.RealName
+		} else if u.Name != "" {
+			resolvedBy = u.Name
+		}
+	}
+
+	now := time.Now().UTC()
+	if err := h.ruijieRepo.MarkSlackIncidentResolved(inc.ID, resolvedBy, now); err != nil {
+		log.Printf("[ruijie-mail] mark resolved: %v", err)
+		return
+	}
+
+	alerts, err := h.ruijieRepo.AlertsForSlackIncident(inc.ID)
+	if err != nil {
+		log.Printf("[ruijie-mail] load alerts: %v", err)
+		return
+	}
+
+	att := ruijie.BuildRuijieSlackAttachment(alerts, true, &now, resolvedBy, h.cfg.RuijieSlackDisplayOffset)
+	_, _, _, err = h.api.UpdateMessage(inc.ChannelID, inc.MessageTS, slack.MsgOptionAttachments(att))
+	if err != nil {
+		log.Printf("[ruijie-mail] UpdateMessage: %v", err)
+	}
+
+	_, _, _ = h.api.PostMessage(ch,
+		slack.MsgOptionTS(parentTS),
+		slack.MsgOptionText(":white_check_mark: Ruijie alarm marked resolved. Reminders stopped.", false),
+	)
 }
 
-func isResolveReaction(name string) bool {
-	switch strings.TrimSpace(strings.ToLower(name)) {
-	case "white_check_mark", "heavy_check_mark", "ballot_box_with_check":
-		return true
-	default:
-		return false
+func (h *SlackEventsHandler) resolveTicketReminder(ch, parentTS, reactionMessageTS, userID string) {
+	if h.ticketRepo == nil || !h.cfg.SlackTicketReminderConfigured() || ch != strings.TrimSpace(h.cfg.SlackTicketChannelID) {
+		return
+	}
+	ticket, err := h.ticketRepo.GetByMessage(ch, parentTS)
+	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) && reactionMessageTS != "" && reactionMessageTS != parentTS {
+		ticket, err = h.ticketRepo.GetByMessage(ch, reactionMessageTS)
+	}
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("[slack-ticket-reminders] load ticket: %v", err)
+		}
+		return
+	}
+	if ticket == nil || ticket.ResolvedAt != nil {
+		return
+	}
+
+	resolvedBy := userID
+	if u, err := h.api.GetUserInfo(userID); err == nil && u != nil {
+		if u.RealName != "" {
+			resolvedBy = u.RealName
+		} else if u.Name != "" {
+			resolvedBy = u.Name
+		}
+	}
+
+	now := time.Now().UTC()
+	if err := h.ticketRepo.MarkResolved(ticket.ID, resolvedBy, now); err != nil {
+		log.Printf("[slack-ticket-reminders] mark resolved: %v", err)
+		return
+	}
+
+	h.updateTicketParentMessage(ticket, resolvedBy, now)
+	_, _, _ = h.api.PostMessage(ch,
+		slack.MsgOptionTS(parentTS),
+		slack.MsgOptionText(slackreminders.BuildResolvedStatus(h.cfg, now, resolvedBy), false),
+	)
+}
+
+func (h *SlackEventsHandler) updateTicketParentMessage(ticket *models.SlackTicketReminder, resolvedBy string, resolvedAt time.Time) {
+	if h == nil || h.api == nil || ticket == nil {
+		return
+	}
+	original := strings.TrimSpace(ticket.MessageText)
+	if original == "" {
+		resp, err := h.api.GetConversationHistory(&slack.GetConversationHistoryParameters{
+			ChannelID: ticket.ChannelID,
+			Latest:    ticket.MessageTS,
+			Limit:     1,
+			Inclusive: true,
+		})
+		if err == nil && resp != nil && len(resp.Messages) > 0 {
+			original = resp.Messages[0].Text
+		}
+	}
+	if original == "" {
+		return
+	}
+	updated := slackreminders.AppendResolutionLine(original, h.cfg, resolvedAt, resolvedBy)
+	if updated == original {
+		return
+	}
+	if _, _, _, err := h.api.UpdateMessage(ticket.ChannelID, ticket.MessageTS, slack.MsgOptionText(updated, false)); err != nil {
+		log.Printf("[slack-ticket-reminders] UpdateMessage failed: %v", err)
 	}
 }
 

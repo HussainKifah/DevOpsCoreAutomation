@@ -1,5 +1,12 @@
 .git
 .env
+.env.*
 backups/
 devopscore
 *.pdf
+.cursor
+.codex
+**/.cursor
+**/agent-transcripts
+*.md
+docker-compose*.yml

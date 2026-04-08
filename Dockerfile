@@ -1,3 +1,6 @@
+# syntax=docker/dockerfile:1
+# BuildKit cache mounts keep module + compile cache across rebuilds (enable: DOCKER_BUILDKIT=1).
+
 # ---- Build stage ----
 FROM golang:1.24-alpine AS builder
 
@@ -5,9 +8,14 @@ RUN apk add --no-cache git
 
 WORKDIR /src
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+	--mount=type=cache,target=/root/.cache/go-build \
+	go mod download
+
 COPY . .
-RUN CGO_ENABLED=0 go build -o /app/devopscore ./cmd/api
+RUN --mount=type=cache,target=/go/pkg/mod \
+	--mount=type=cache,target=/root/.cache/go-build \
+	CGO_ENABLED=0 go build -o /app/devopscore ./cmd/api
 
 # ---- Runtime stage ----
 FROM alpine:3.21

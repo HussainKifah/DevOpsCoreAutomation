@@ -18,10 +18,10 @@ type Config struct {
 	DBName     string
 	DBSSLMode  string
 
-	ServerPort string
-	JWTSecret  string
+	ServerPort  string
+	JWTSecret   string
 	TLSCertFile string
-	TLSKeyFile string
+	TLSKeyFile  string
 
 	OLTUser string // Nokia SSH credentials
 	OLTPass string
@@ -31,32 +31,48 @@ type Config struct {
 
 	// Elasticsearch (IP syslog alerts). Empty URL disables polling.
 	ElasticsearchURL           string
-	ElasticsearchUser        string
-	ElasticsearchPassword    string
+	ElasticsearchUser          string
+	ElasticsearchPassword      string
 	ElasticsearchSkipTLSVerify bool
-	ElasticsearchIndexPattern string // e.g. logstash-*
-	EsSyslogPollInterval      time.Duration
-	EsSyslogRetentionDays     int // hard-delete alerts older than this (default 30)
-	EsSyslogDedupWindow       time.Duration // suppress same host+device+normalized message within this window (default 1h)
+	ElasticsearchIndexPattern  string // e.g. logstash-*
+	EsSyslogPollInterval       time.Duration
+	EsSyslogRetentionDays      int           // hard-delete alerts older than this (default 30)
+	EsSyslogDedupWindow        time.Duration // suppress same host+device+normalized message within this window (default 1h)
 
 	// Slack syslog alerts (optional). Requires SLACK_BOT_TOKEN + SLACK_CHANNEL_ID and Events URL for "fixed"/"done".
-	SlackSyslogEnabled       bool
-	SlackBotToken            string
-	SlackChannelID           string
-	SlackSigningSecret       string
-	SlackReminderInterval    time.Duration // default 12h
-	SlackSyslogBatchWindow   time.Duration // coalesce alerts per device before post; default 45s
+	SlackSyslogEnabled     bool
+	SlackBotToken          string
+	SlackChannelID         string
+	SlackSigningSecret     string
+	SlackReminderInterval  time.Duration // default 12h
+	SlackSyslogBatchWindow time.Duration // coalesce alerts per device before post; default 45s
 	// SlackSyslogDisplayOffset shifts stored UTC timestamps shown in Slack (e.g. 3h for UTC+3).
 	SlackSyslogDisplayOffset time.Duration
 	// SlackSyslogTeamMention is raw mrkdwn for pings, e.g. <!subteam^S01234|ip-core> (from Slack user group).
 	SlackSyslogTeamMention string
 
-	// SlackAlarmsReminderEnabled runs generic thread reminders (SlackAlarmReminder table); uses SLACK_BOT_TOKEN.
-	SlackAlarmsReminderEnabled bool
-	// SlackAlarmsDefaultTeamMention is used when a reminder row has no TeamMention set.
-	SlackAlarmsDefaultTeamMention string
-	// SlackAlarmsTickInterval is how often the worker polls for due reminders (default 2m).
-	SlackAlarmsTickInterval time.Duration
+	SlackTicketReminderEnabled    bool
+	SlackTicketChannelID          string
+	SlackTicketReminderInterval   time.Duration
+	SlackTicketFirstReminderAfter time.Duration
+	SlackTicketTickInterval       time.Duration
+	SlackTicketIPTeamMention      string
+	SlackTicketDisplayOffset      time.Duration
+	SlackTicketSourceBotID        string
+
+	RuijieMailEnabled           bool
+	RuijieMailTenantID          string
+	RuijieMailClientID          string
+	RuijieMailClientSecret      string
+	RuijieMailUserID            string
+	RuijieMailFolderID          string
+	RuijieMailSubject           string
+	RuijieMailPollInterval      time.Duration
+	RuijieMailLookback          time.Duration
+	RuijieSlackChannelID        string
+	RuijieSlackTeamMention      string
+	RuijieSlackReminderInterval time.Duration
+	RuijieSlackDisplayOffset    time.Duration
 
 	PowerScanInterval  time.Duration
 	HealthScanInterval time.Duration
@@ -78,10 +94,10 @@ func Load() *Config {
 		DBName:     getEnv("DB_NAME", "devopscore"),
 		DBSSLMode:  getEnv("DB_SSLMODE", "disable"),
 
-		ServerPort: getEnv("PORT", "8080"),
-		JWTSecret:  getEnv("JWT_SECRET", ""),
+		ServerPort:  getEnv("PORT", "8080"),
+		JWTSecret:   getEnv("JWT_SECRET", ""),
 		TLSCertFile: getEnv("TLS_CERT", ""),
-		TLSKeyFile: getEnv("TLS_KEY", ""),
+		TLSKeyFile:  getEnv("TLS_KEY", ""),
 
 		OLTUser: getEnv("OLT_SSH_USER", ""),
 		OLTPass: getEnv("OLT_SSH_PASS", ""),
@@ -89,27 +105,46 @@ func Load() *Config {
 		HuaweiOLTUser: getEnv("HW_SSH_USER", getEnv("OLT_SSH_USER", "")),
 		HuaweiOLTPass: getEnv("HW_SSH_PASS", getEnv("OLT_SSH_PASS", "")),
 
-		ElasticsearchURL:            getEnv("ELASTICSEARCH_URL", ""),
-		ElasticsearchUser:         getEnv("ELASTICSEARCH_USER", ""),
-		ElasticsearchPassword:     getEnv("ELASTICSEARCH_PASSWORD", ""),
+		ElasticsearchURL:           getEnv("ELASTICSEARCH_URL", ""),
+		ElasticsearchUser:          getEnv("ELASTICSEARCH_USER", ""),
+		ElasticsearchPassword:      getEnv("ELASTICSEARCH_PASSWORD", ""),
 		ElasticsearchSkipTLSVerify: getEnv("ELASTICSEARCH_SKIP_TLS_VERIFY", "") == "true" || getEnv("ELASTICSEARCH_SKIP_TLS_VERIFY", "") == "1",
-		ElasticsearchIndexPattern: getEnv("ELASTICSEARCH_INDEX_PATTERN", "logstash-*"),
-		EsSyslogPollInterval:      parseDuration(getEnv("ES_SYSLOG_POLL_INTERVAL", "1m")),
-		EsSyslogRetentionDays:     parseRetentionDays("ES_SYSLOG_RETENTION_DAYS", 30),
-		EsSyslogDedupWindow:       parseDuration(getEnv("ES_SYSLOG_DEDUP_WINDOW", "1h")),
+		ElasticsearchIndexPattern:  getEnv("ELASTICSEARCH_INDEX_PATTERN", "logstash-*"),
+		EsSyslogPollInterval:       parseDuration(getEnv("ES_SYSLOG_POLL_INTERVAL", "1m")),
+		EsSyslogRetentionDays:      parseRetentionDays("ES_SYSLOG_RETENTION_DAYS", 30),
+		EsSyslogDedupWindow:        parseDuration(getEnv("ES_SYSLOG_DEDUP_WINDOW", "1h")),
 
-		SlackSyslogEnabled:     getEnv("SLACK_SYSLOG_ENABLED", "") == "1" || getEnv("SLACK_SYSLOG_ENABLED", "") == "true",
-		SlackBotToken:          getEnv("SLACK_BOT_TOKEN", ""),
-		SlackChannelID:         strings.TrimSpace(getEnv("SLACK_CHANNEL_ID", "")),
-		SlackSigningSecret:     getEnv("SLACK_SIGNING_SECRET", ""),
-		SlackReminderInterval:  parseDurationWithFallback(getEnv("SLACK_REMINDER_INTERVAL", "6h"), 6*time.Hour),
-		SlackSyslogBatchWindow: parseDurationWithFallback(getEnv("SLACK_SYSLOG_BATCH_WINDOW", "45s"), 45*time.Second),
+		SlackSyslogEnabled:       getEnv("SLACK_SYSLOG_ENABLED", "") == "1" || getEnv("SLACK_SYSLOG_ENABLED", "") == "true",
+		SlackBotToken:            getEnv("SLACK_BOT_TOKEN", ""),
+		SlackChannelID:           strings.TrimSpace(getEnv("SLACK_CHANNEL_ID", "")),
+		SlackSigningSecret:       getEnv("SLACK_SIGNING_SECRET", ""),
+		SlackReminderInterval:    parseDurationWithFallback(getEnv("SLACK_REMINDER_INTERVAL", "6h"), 6*time.Hour),
+		SlackSyslogBatchWindow:   parseDurationWithFallback(getEnv("SLACK_SYSLOG_BATCH_WINDOW", "45s"), 45*time.Second),
 		SlackSyslogDisplayOffset: parseDurationWithFallback(getEnv("SLACK_SYSLOG_DISPLAY_OFFSET", "3h"), 3*time.Hour),
 		SlackSyslogTeamMention:   strings.TrimSpace(getEnv("SLACK_SYSLOG_TEAM_MENTION", "")),
 
-		SlackAlarmsReminderEnabled:     getEnv("SLACK_ALARMS_REMINDER_ENABLED", "") == "1" || getEnv("SLACK_ALARMS_REMINDER_ENABLED", "") == "true",
-		SlackAlarmsDefaultTeamMention: strings.TrimSpace(getEnv("SLACK_ALARMS_DEFAULT_TEAM_MENTION", "")),
-		SlackAlarmsTickInterval:       parseDurationWithFallback(getEnv("SLACK_ALARMS_TICK_INTERVAL", "2m"), 2*time.Minute),
+		SlackTicketReminderEnabled:    getEnv("SLACK_TICKET_REMINDER_ENABLED", "") == "1" || getEnv("SLACK_TICKET_REMINDER_ENABLED", "") == "true",
+		SlackTicketChannelID:          strings.TrimSpace(getEnv("SLACK_TICKET_CHANNEL_ID", getEnv("SLACK_CHANNEL_ID", ""))),
+		SlackTicketReminderInterval:   parseDurationWithFallback(getEnv("SLACK_TICKET_REMINDER_INTERVAL", "6h"), 6*time.Hour),
+		SlackTicketFirstReminderAfter: parseDurationWithFallback(getEnv("SLACK_TICKET_FIRST_REMINDER_AFTER", "6h"), 6*time.Hour),
+		SlackTicketTickInterval:       parseDurationWithFallback(getEnv("SLACK_TICKET_TICK_INTERVAL", "2m"), 2*time.Minute),
+		SlackTicketIPTeamMention:      strings.TrimSpace(getEnv("SLACK_TICKET_IP_TEAM_MENTION", "")),
+		SlackTicketDisplayOffset:      parseDurationWithFallback(getEnv("SLACK_TICKET_DISPLAY_OFFSET", "3h"), 3*time.Hour),
+		SlackTicketSourceBotID:        strings.TrimSpace(getEnv("SLACK_TICKET_SOURCE_BOT_ID", "")),
+
+		RuijieMailEnabled:           getEnv("RUIJIE_MAIL_ENABLED", "") == "1" || getEnv("RUIJIE_MAIL_ENABLED", "") == "true",
+		RuijieMailTenantID:          strings.TrimSpace(getEnv("RUIJIE_MAIL_TENANT_ID", "")),
+		RuijieMailClientID:          strings.TrimSpace(getEnv("RUIJIE_MAIL_CLIENT_ID", "")),
+		RuijieMailClientSecret:      strings.TrimSpace(getEnv("RUIJIE_MAIL_CLIENT_SECRET", "")),
+		RuijieMailUserID:            strings.TrimSpace(getEnv("RUIJIE_MAIL_USER_ID", "")),
+		RuijieMailFolderID:          strings.TrimSpace(getEnv("RUIJIE_MAIL_FOLDER_ID", "junkemail")),
+		RuijieMailSubject:           strings.TrimSpace(getEnv("RUIJIE_MAIL_SUBJECT", "Ruijie Cloud Alarm Notification")),
+		RuijieMailPollInterval:      parseDurationWithFallback(getEnv("RUIJIE_MAIL_POLL_INTERVAL", "1m"), time.Minute),
+		RuijieMailLookback:          parseDurationWithFallback(getEnv("RUIJIE_MAIL_LOOKBACK", "10m"), 10*time.Minute),
+		RuijieSlackChannelID:        strings.TrimSpace(getEnv("RUIJIE_SLACK_CHANNEL_ID", "")),
+		RuijieSlackTeamMention:      strings.TrimSpace(getEnv("RUIJIE_SLACK_TEAM_MENTION", getEnv("SLACK_SYSLOG_TEAM_MENTION", ""))),
+		RuijieSlackReminderInterval: parseDurationWithFallback(getEnv("RUIJIE_SLACK_REMINDER_INTERVAL", getEnv("SLACK_REMINDER_INTERVAL", "6h")), 6*time.Hour),
+		RuijieSlackDisplayOffset:    parseDurationWithFallback(getEnv("RUIJIE_SLACK_DISPLAY_OFFSET", getEnv("SLACK_SYSLOG_DISPLAY_OFFSET", "3h")), 3*time.Hour),
 
 		PowerScanInterval:  parseDuration(getEnv("POWER_SCAN_INTERVAL", "6h")),
 		HealthScanInterval: parseDuration(getEnv("HEALTH_SCAN_INTERVAL", "0.5h")),
@@ -148,9 +183,23 @@ func (c *Config) SlackSyslogConfigured() bool {
 	return c != nil && c.SlackSyslogEnabled && c.SlackBotToken != "" && c.SlackChannelID != ""
 }
 
-// SlackAlarmsReminderConfigured is true when the generic Slack reminder worker should run.
-func (c *Config) SlackAlarmsReminderConfigured() bool {
-	return c != nil && c.SlackAlarmsReminderEnabled && c.SlackBotToken != ""
+func (c *Config) SlackTicketReminderConfigured() bool {
+	return c != nil &&
+		c.SlackTicketReminderEnabled &&
+		c.SlackBotToken != "" &&
+		c.SlackSigningSecret != "" &&
+		c.SlackTicketChannelID != ""
+}
+
+func (c *Config) RuijieMailConfigured() bool {
+	return c != nil &&
+		c.RuijieMailEnabled &&
+		c.RuijieMailTenantID != "" &&
+		c.RuijieMailClientID != "" &&
+		c.RuijieMailClientSecret != "" &&
+		c.RuijieMailUserID != "" &&
+		c.SlackBotToken != "" &&
+		c.RuijieSlackChannelID != ""
 }
 
 func parseDurationWithFallback(s string, fallback time.Duration) time.Duration {
