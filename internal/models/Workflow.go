@@ -8,6 +8,7 @@ import (
 
 type WorkflowDevice struct {
 	gorm.Model
+	Scope       string `gorm:"not null;default:ip;size:20;index" json:"scope"`
 	Name        string `gorm:"not null;size:100" json:"name"`
 	Host        string `gorm:"not null;size:64" json:"host"`
 	Vendor      string `gorm:"not null;size:20" json:"vendor"` // nokia | cisco | mikrotik
@@ -18,6 +19,7 @@ type WorkflowDevice struct {
 
 type WorkflowJob struct {
 	gorm.Model
+	Scope       string         `gorm:"not null;default:ip;size:20;index" json:"scope"`
 	DeviceID    uint           `gorm:"not null;index" json:"device_id"`
 	Device      WorkflowDevice `gorm:"foreignKey:DeviceID" json:"device,omitempty"`
 	JobType     string         `gorm:"not null;size:20" json:"job_type"` // backup | command
@@ -32,6 +34,7 @@ type WorkflowJob struct {
 
 type WorkflowRun struct {
 	ID         uint       `gorm:"primaryKey;autoIncrement" json:"id"`
+	Scope      string     `gorm:"not null;default:ip;size:20;index" json:"scope"`
 	JobID      uint       `gorm:"not null;index" json:"job_id"`
 	StartedAt  time.Time  `gorm:"not null;index" json:"started_at"`
 	FinishedAt *time.Time `json:"finished_at"`
@@ -42,6 +45,7 @@ type WorkflowRun struct {
 
 type WorkflowLog struct {
 	ID         uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	Scope      string    `gorm:"not null;default:ip;size:20;index" json:"scope"`
 	JobID      *uint     `gorm:"index" json:"job_id,omitempty"` // nil for system events
 	RunID      *uint     `gorm:"index" json:"run_id,omitempty"` // nil for non-run events
 	DeviceName string    `gorm:"size:100" json:"device_name"`

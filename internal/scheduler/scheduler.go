@@ -103,7 +103,7 @@ func (s *Scheduler) Start() {
 	go func() {
 		log.Println("[startup] running all jobs immediately")
 		// Nokia
-		s.runOntInterfaceScan()
+		// s.runOntInterfaceScan()
 		// s.runPowerScan()
 		// s.runDescScan()
 		// s.runHealthScan()

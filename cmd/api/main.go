@@ -41,6 +41,7 @@ func main() {
 	userRepo := repository.NewUserRepository(database)
 	inventoryRepo := repository.NewInventoryRepo(database)
 	workflowRepo := repository.NewWorkflowRepository(database)
+	nocWorkflowRepo := repository.NewWorkflowRepositoryForScope(database, "noc")
 	nocPassRepo := repository.NewNocPassRepository(database)
 	slackTicketRepo := repository.NewSlackTicketReminderRepository(database)
 	ruijieMailRepo := repository.NewRuijieMailRepository(database)
@@ -66,6 +67,11 @@ func main() {
 		log.Fatalf("failed to create workflow scheduler: %v", err)
 	}
 	wfSched.Start()
+	nocWfSched, err := scheduler.NewWorkflowSchedulerForScope(nocWorkflowRepo, cryptoKey, "noc")
+	if err != nil {
+		log.Fatalf("failed to create NOC workflow scheduler: %v", err)
+	}
+	nocWfSched.Start()
 
 	nocPassRotator := scheduler.NewNocPassRotator(nocPassRepo, cryptoKey)
 	nocPassRotator.Start()
@@ -97,6 +103,7 @@ func main() {
 	inventoryH := handlers.NewInventoryHandler(inventoryRepo)
 	scanH := handlers.NewScanHandler(sched)
 	workflowH := handlers.NewWorkflowHandler(workflowRepo, wfSched, cryptoKey)
+	nocWorkflowH := handlers.NewWorkflowHandler(nocWorkflowRepo, nocWfSched, cryptoKey)
 	nocPassH := handlers.NewNocPassHandler(nocPassRepo, cryptoKey)
 	esSyslogRepo := repository.NewEsSyslogRepository(database)
 	esSyslogH := handlers.NewEsSyslogHandler(esSyslogRepo)
@@ -143,7 +150,7 @@ func main() {
 
 	pageH := handlers.NewPageHandler(filepath.Join(projectRoot, "templates"), userRepo, jwtManager)
 
-	router.Setup(server, jwtManager, hub, powerH, descH, healthH, healthHistoryH, portH, portHistoryH, calendarH, backupH, userH, authH, pageH, inventoryH, scanH, workflowH, nocPassH, esSyslogH, slackEventsH)
+	router.Setup(server, jwtManager, hub, powerH, descH, healthH, healthHistoryH, portH, portHistoryH, calendarH, backupH, userH, authH, pageH, inventoryH, scanH, workflowH, nocWorkflowH, nocPassH, esSyslogH, slackEventsH)
 
 	esSyslogPoller := scheduler.NewEsSyslogPoller(cfg, esSyslogRepo, slackBatcher)
 	esSyslogPoller.Start()
@@ -178,6 +185,7 @@ func main() {
 
 	sched.FlushHealthBuffer()
 	wfSched.Stop()
+	nocWfSched.Stop()
 	nocPassRotator.Stop()
 	esSyslogPoller.Stop()
 	if slackReminder != nil {

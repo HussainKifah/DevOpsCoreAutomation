@@ -2,8 +2,8 @@
 <div x-data="workflowsPage()" x-init="init()">
   <div class="flex items-center justify-between mb-6">
     <div>
-      <h1 class="text-2xl font-bold text-[#f1f5f9]">Workflows</h1>
-      <p class="text-sm text-[#94a3b8] mt-0.5">Manage BNG devices and scheduled backup / command jobs</p>
+      <h1 class="text-2xl font-bold text-[#f1f5f9]">{{.WorkflowTitle}}</h1>
+      <p class="text-sm text-[#94a3b8] mt-0.5">{{.WorkflowDescription}}</p>
     </div>
     <div class="flex items-center gap-2">
       <button @click="openDeviceModal()" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9] hover:border-[#3b82f6]/50 transition-all btn-press">
@@ -218,6 +218,7 @@
   </div>
 </div>
 <script>
+const workflowApiBase = '{{.WorkflowAPIBase}}';
 function workflowsPage() {
   return {
     loading:true,devices:[],jobs:[],runs:[],runningJobs:{},
@@ -229,17 +230,17 @@ function workflowsPage() {
     showRunsModal:false,selectedJob:null,runsLoading:false,
     showDeleteModal:false,deleteTarget:null,
     async init(){await this.fetchAll();this.loading=false;},
-    async fetchAll(){const[d,j]=await Promise.all([fetch('/api/workflows/devices'),fetch('/api/workflows/jobs')]);this.devices=(await d.json())||[];this.jobs=(await j.json())||[];},
+    async fetchAll(){const[d,j]=await Promise.all([fetch(workflowApiBase+'/devices'),fetch(workflowApiBase+'/jobs')]);this.devices=(await d.json())||[];this.jobs=(await j.json())||[];},
     openDeviceModal(d){this.editingDevice=d||null;this.deviceForm=d?{name:d.name,host:d.host,vendor:d.vendor,username:'',password:''}:{name:'',host:'',vendor:'nokia',username:'',password:''};this.deviceFormError='';this.showDeviceModal=true;},
-    async submitDevice(){this.deviceSubmitting=true;this.deviceFormError='';try{const url=this.editingDevice?'/api/workflows/devices/'+this.editingDevice.ID:'/api/workflows/devices';const res=await fetch(url,{method:this.editingDevice?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.deviceForm)});const data=await res.json();if(!res.ok){this.deviceFormError=data.error||'Failed';}else{this.showDeviceModal=false;await this.fetchAll();}}catch(e){this.deviceFormError='Network error';}this.deviceSubmitting=false;},
+    async submitDevice(){this.deviceSubmitting=true;this.deviceFormError='';try{const url=this.editingDevice?workflowApiBase+'/devices/'+this.editingDevice.ID:workflowApiBase+'/devices';const res=await fetch(url,{method:this.editingDevice?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.deviceForm)});const data=await res.json();if(!res.ok){this.deviceFormError=data.error||'Failed';}else{this.showDeviceModal=false;await this.fetchAll();}}catch(e){this.deviceFormError='Network error';}this.deviceSubmitting=false;},
     openJobModal(){this.jobForm={device_id:'',job_type:'backup',command:'',schedule:'24h'};this.jobFormError='';this.showJobModal=true;},
-    async submitJob(){this.jobSubmitting=true;this.jobFormError='';try{const res=await fetch('/api/workflows/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...this.jobForm,device_id:parseInt(this.jobForm.device_id,10)})});const data=await res.json();if(!res.ok){this.jobFormError=data.error||'Failed';}else{this.showJobModal=false;await this.fetchAll();}}catch(e){this.jobFormError='Network error';}this.jobSubmitting=false;},
-    async toggleJob(j){await fetch('/api/workflows/jobs/'+j.ID,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!j.enabled})});await this.fetchAll();},
+    async submitJob(){this.jobSubmitting=true;this.jobFormError='';try{const res=await fetch(workflowApiBase+'/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...this.jobForm,device_id:parseInt(this.jobForm.device_id,10)})});const data=await res.json();if(!res.ok){this.jobFormError=data.error||'Failed';}else{this.showJobModal=false;await this.fetchAll();}}catch(e){this.jobFormError='Network error';}this.jobSubmitting=false;},
+    async toggleJob(j){await fetch(workflowApiBase+'/jobs/'+j.ID,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!j.enabled})});await this.fetchAll();},
     async runNow(j){
       this.runningJobs={...this.runningJobs,[j.ID]:true};
       var prevRunAt=j.last_run_at||'';
       try{
-        var res=await fetch('/api/workflows/jobs/'+j.ID+'/run',{method:'POST'});
+        var res=await fetch(workflowApiBase+'/jobs/'+j.ID+'/run',{method:'POST'});
         if(!res.ok){this.runningJobs={...this.runningJobs,[j.ID]:false};alert('Failed to start job');return;}
       }catch(e){this.runningJobs={...this.runningJobs,[j.ID]:false};alert('Network error');return;}
       var self=this;var polls=0;var maxPolls=60;
@@ -255,8 +256,8 @@ function workflowsPage() {
       },3000);
     },
     confirmDelete(t){this.deleteTarget=t;this.showDeleteModal=true;},
-    async executeDelete(){const url=this.deleteTarget.type==='device'?'/api/workflows/devices/'+this.deleteTarget.id:'/api/workflows/jobs/'+this.deleteTarget.id;await fetch(url,{method:'DELETE'});this.showDeleteModal=false;this.deleteTarget=null;await this.fetchAll();},
-    async viewRuns(j){this.selectedJob=j;this.runs=[];this.showRunsModal=true;this.runsLoading=true;const res=await fetch('/api/workflows/jobs/'+j.ID+'/runs');this.runs=(await res.json())||[];this.runsLoading=false;},
+    async executeDelete(){const url=this.deleteTarget.type==='device'?workflowApiBase+'/devices/'+this.deleteTarget.id:workflowApiBase+'/jobs/'+this.deleteTarget.id;await fetch(url,{method:'DELETE'});this.showDeleteModal=false;this.deleteTarget=null;await this.fetchAll();},
+    async viewRuns(j){this.selectedJob=j;this.runs=[];this.showRunsModal=true;this.runsLoading=true;const res=await fetch(workflowApiBase+'/jobs/'+j.ID+'/runs');this.runs=(await res.json())||[];this.runsLoading=false;},
   };
 }
 </script>

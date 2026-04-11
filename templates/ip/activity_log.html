@@ -4,8 +4,8 @@
   <!-- ── Header ── -->
   <div class="flex items-center justify-between mb-6">
     <div>
-      <h1 class="text-2xl font-bold text-[#f1f5f9]">Activity Log</h1>
-      <p class="text-sm text-[#94a3b8] mt-0.5">Every job execution — successes, failures, warnings, and system events</p>
+      <h1 class="text-2xl font-bold text-[#f1f5f9]">{{.ActivityLogTitle}}</h1>
+      <p class="text-sm text-[#94a3b8] mt-0.5">{{.ActivityLogDescription}}</p>
     </div>
     <div class="flex items-center gap-3">
       <!-- Live indicator -->
@@ -252,6 +252,7 @@
 </div>
 
 <script>
+const activityLogWorkflowApiBase = '{{.WorkflowAPIBase}}';
 function activityLogPage() {
   return {
     loading: true,
@@ -296,7 +297,7 @@ function activityLogPage() {
         if (this.filters.job_type) params.set('job_type', this.filters.job_type);
         if (this.filters.event)    params.set('event', this.filters.event);
 
-        const res = await fetch('/api/workflows/logs?' + params);
+        const res = await fetch(activityLogWorkflowApiBase + '/logs?' + params);
         const data = await res.json();
         this.logs = data.logs || [];
         this.total = data.total || 0;
@@ -316,7 +317,7 @@ function activityLogPage() {
       // Fetch counts for each level (no pagination)
       const levels = ['success', 'warning', 'error'];
       const totals = await Promise.all(levels.map(async (lvl) => {
-        const r = await fetch('/api/workflows/logs?level=' + lvl + '&per_page=1&page=1');
+        const r = await fetch(activityLogWorkflowApiBase + '/logs?level=' + lvl + '&per_page=1&page=1');
         const d = await r.json();
         return d.total || 0;
       }));
@@ -324,7 +325,7 @@ function activityLogPage() {
       this.stats.warning = totals[1];
       this.stats.error   = totals[2];
       // Total (no filter)
-      const r = await fetch('/api/workflows/logs?per_page=1&page=1');
+      const r = await fetch(activityLogWorkflowApiBase + '/logs?per_page=1&page=1');
       const d = await r.json();
       this.stats.total = d.total || 0;
     },

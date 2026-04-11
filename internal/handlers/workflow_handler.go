@@ -1,29 +1,29 @@
 package handlers
- 
+
 import (
 	"net/http"
 	"sort"
 	"strconv"
- 
+
 	auth "github.com/Flafl/DevOpsCore/internal/Auth"
 	"github.com/Flafl/DevOpsCore/internal/crypto"
 	"github.com/Flafl/DevOpsCore/internal/models"
 	"github.com/Flafl/DevOpsCore/internal/repository"
 	"github.com/gin-gonic/gin"
 )
- 
+
 // WorkflowSchedulerInterface is the subset of WorkflowScheduler the handler needs.
 type WorkflowSchedulerInterface interface {
 	ReloadAll()
 	RunJobNow(jobID uint)
 }
- 
+
 type WorkflowHandler struct {
 	repo      repository.WorkflowRepository
 	sched     WorkflowSchedulerInterface
 	cryptoKey []byte
 }
- 
+
 func NewWorkflowHandler(
 	repo repository.WorkflowRepository,
 	sched WorkflowSchedulerInterface,
@@ -31,9 +31,9 @@ func NewWorkflowHandler(
 ) *WorkflowHandler {
 	return &WorkflowHandler{repo: repo, sched: sched, cryptoKey: cryptoKey}
 }
- 
+
 // ──────────────────────── Devices ────────────────────────
- 
+
 func (h *WorkflowHandler) ListDevices(c *gin.Context) {
 	devices, err := h.repo.ListDevices()
 	if err != nil {
@@ -53,7 +53,7 @@ func (h *WorkflowHandler) ListDevices(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, out)
 }
- 
+
 func (h *WorkflowHandler) CreateDevice(c *gin.Context) {
 	var req struct {
 		Name     string `json:"name"     binding:"required"`
@@ -66,7 +66,7 @@ func (h *WorkflowHandler) CreateDevice(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
- 
+
 	encUser, err := crypto.Encrypt(h.cryptoKey, req.Username)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "encrypt username: " + err.Error()})
@@ -77,7 +77,7 @@ func (h *WorkflowHandler) CreateDevice(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "encrypt password: " + err.Error()})
 		return
 	}
- 
+
 	dev := &models.WorkflowDevice{
 		Name:        req.Name,
 		Host:        req.Host,
@@ -97,7 +97,7 @@ func (h *WorkflowHandler) CreateDevice(c *gin.Context) {
 		"vendor": dev.Vendor,
 	})
 }
- 
+
 func (h *WorkflowHandler) UpdateDevice(c *gin.Context) {
 	id, err := parseID(c)
 	if err != nil {
@@ -109,7 +109,7 @@ func (h *WorkflowHandler) UpdateDevice(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "device not found"})
 		return
 	}
- 
+
 	var req struct {
 		Name     string `json:"name"`
 		Host     string `json:"host"`
@@ -121,7 +121,7 @@ func (h *WorkflowHandler) UpdateDevice(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
- 
+
 	if req.Name != "" {
 		dev.Name = req.Name
 	}
@@ -153,14 +153,14 @@ func (h *WorkflowHandler) UpdateDevice(c *gin.Context) {
 		}
 		dev.EncPassword = enc
 	}
- 
+
 	if err := h.repo.UpdateDevice(dev); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "updated"})
 }
- 
+
 func (h *WorkflowHandler) DeleteDevice(c *gin.Context) {
 	id, err := parseID(c)
 	if err != nil {
@@ -173,9 +173,9 @@ func (h *WorkflowHandler) DeleteDevice(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }
- 
+
 // ──────────────────────── Jobs ────────────────────────
- 
+
 func (h *WorkflowHandler) ListJobs(c *gin.Context) {
 	jobs, err := h.repo.ListJobs()
 	if err != nil {
@@ -184,7 +184,7 @@ func (h *WorkflowHandler) ListJobs(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, jobs)
 }
- 
+
 func (h *WorkflowHandler) CreateJob(c *gin.Context) {
 	var req struct {
 		DeviceID uint   `json:"device_id" binding:"required"`
@@ -198,6 +198,10 @@ func (h *WorkflowHandler) CreateJob(c *gin.Context) {
 	}
 	if req.JobType == "command" && req.Command == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "command is required when job_type is command"})
+		return
+	}
+	if _, err := h.repo.GetDevice(req.DeviceID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "device not found"})
 		return
 	}
 
@@ -224,7 +228,7 @@ func (h *WorkflowHandler) CreateJob(c *gin.Context) {
 	}
 	c.JSON(http.StatusCreated, job)
 }
- 
+
 func (h *WorkflowHandler) UpdateJob(c *gin.Context) {
 	id, err := parseID(c)
 	if err != nil {
@@ -236,7 +240,7 @@ func (h *WorkflowHandler) UpdateJob(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "job not found"})
 		return
 	}
- 
+
 	var req struct {
 		Schedule *string `json:"schedule"`
 		Enabled  *bool   `json:"enabled"`
@@ -262,7 +266,7 @@ func (h *WorkflowHandler) UpdateJob(c *gin.Context) {
 	h.sched.ReloadAll()
 	c.JSON(http.StatusOK, gin.H{"message": "updated"})
 }
- 
+
 func (h *WorkflowHandler) DeleteJob(c *gin.Context) {
 	id, err := parseID(c)
 	if err != nil {
@@ -276,7 +280,7 @@ func (h *WorkflowHandler) DeleteJob(c *gin.Context) {
 	h.sched.ReloadAll()
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }
- 
+
 func (h *WorkflowHandler) RunJobNow(c *gin.Context) {
 	id, err := parseID(c)
 	if err != nil {
@@ -286,7 +290,7 @@ func (h *WorkflowHandler) RunJobNow(c *gin.Context) {
 	h.sched.RunJobNow(id)
 	c.JSON(http.StatusOK, gin.H{"status": "started"})
 }
- 
+
 func (h *WorkflowHandler) GetRuns(c *gin.Context) {
 	id, err := parseID(c)
 	if err != nil {
@@ -300,9 +304,9 @@ func (h *WorkflowHandler) GetRuns(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, runs)
 }
- 
+
 // ──────────────────── Runs (Backups + Command Output pages) ──────────────────────
- 
+
 // EnrichedRun adds device context to a run for the Backups and Command Output pages.
 type EnrichedRun struct {
 	ID         uint    `json:"id"`
@@ -318,21 +322,21 @@ type EnrichedRun struct {
 	ErrorMsg   string  `json:"error_msg"`
 	OutputSize int     `json:"output_size"`
 }
- 
+
 // GetRunsByType — GET /api/workflows/runs?type=backup|command
 // Returns all runs enriched with device info, newest first.
 func (h *WorkflowHandler) GetRunsByType(c *gin.Context) {
 	jobType := c.Query("type") // "backup", "command", or "" for all
- 
+
 	jobs, err := h.repo.ListJobs()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
- 
+
 	// Always return a JSON array, never null.
 	result := make([]EnrichedRun, 0)
- 
+
 	for i := range jobs {
 		j := jobs[i]
 		if jobType != "" && j.JobType != jobType {
@@ -364,7 +368,7 @@ func (h *WorkflowHandler) GetRunsByType(c *gin.Context) {
 			result = append(result, er)
 		}
 	}
- 
+
 	// Sort newest first.
 	sort.Slice(result, func(i, k int) bool {
 		if result[i].StartedAt == nil {
@@ -375,10 +379,10 @@ func (h *WorkflowHandler) GetRunsByType(c *gin.Context) {
 		}
 		return *result[i].StartedAt > *result[k].StartedAt
 	})
- 
+
 	c.JSON(http.StatusOK, result)
 }
- 
+
 // GetRunOutput — GET /api/workflows/runs/:id/output
 // Returns the full output text for one run (lazy-loaded by the UI to keep list fast).
 func (h *WorkflowHandler) GetRunOutput(c *gin.Context) {
@@ -394,9 +398,9 @@ func (h *WorkflowHandler) GetRunOutput(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"output": run.Output})
 }
- 
+
 // ──────────────────────── Activity Logs ────────────────────────
- 
+
 // GetLogs — GET /api/workflows/logs
 // Query params: level, job_type, event, search, page, per_page
 func (h *WorkflowHandler) GetLogs(c *gin.Context) {
@@ -408,7 +412,7 @@ func (h *WorkflowHandler) GetLogs(c *gin.Context) {
 	if perPage < 1 || perPage > 200 {
 		perPage = 50
 	}
- 
+
 	filter := repository.LogFilter{
 		Level:   c.Query("level"),
 		JobType: c.Query("job_type"),
@@ -417,24 +421,24 @@ func (h *WorkflowHandler) GetLogs(c *gin.Context) {
 		Page:    page,
 		PerPage: perPage,
 	}
- 
+
 	logs, total, err := h.repo.ListLogs(filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
- 
+
 	// Guard against division by zero.
 	totalPages := 1
 	if perPage > 0 && total > 0 {
 		totalPages = int((total + int64(perPage) - 1) / int64(perPage))
 	}
- 
+
 	// Always return an array, never null.
 	if logs == nil {
 		logs = []models.WorkflowLog{}
 	}
- 
+
 	c.JSON(http.StatusOK, gin.H{
 		"logs":        logs,
 		"total":       total,
@@ -443,15 +447,15 @@ func (h *WorkflowHandler) GetLogs(c *gin.Context) {
 		"total_pages": totalPages,
 	})
 }
- 
+
 // ──────────────────────── private helpers ────────────────────────
- 
+
 // parseID extracts the ":id" URL parameter and converts it to uint.
 func parseID(c *gin.Context) (uint, error) {
 	v, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	return uint(v), err
 }
- 
+
 // callerID returns the authenticated user's ID from the JWT claims, or 0.
 func callerID(c *gin.Context) uint {
 	if claims, ok := c.Get("user"); ok {
@@ -461,4 +465,3 @@ func callerID(c *gin.Context) uint {
 	}
 	return 0
 }
- 

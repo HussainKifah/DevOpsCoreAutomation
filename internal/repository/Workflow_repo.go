@@ -48,59 +48,78 @@ type LogFilter struct {
 }
 
 type workflowRepository struct {
-	db *gorm.DB
+	db    *gorm.DB
+	scope string
 }
 
 func NewWorkflowRepository(db *gorm.DB) WorkflowRepository {
-	return &workflowRepository{db: db}
+	return NewWorkflowRepositoryForScope(db, "ip")
+}
+
+func NewWorkflowRepositoryForScope(db *gorm.DB, scope string) WorkflowRepository {
+	if scope == "" {
+		scope = "ip"
+	}
+	return &workflowRepository{db: db, scope: scope}
+}
+
+func (r *workflowRepository) scoped(db *gorm.DB) *gorm.DB {
+	if r.scope == "ip" {
+		return db.Where("(scope = ? OR scope = '')", r.scope)
+	}
+	return db.Where("scope = ?", r.scope)
 }
 
 // ------------- Devices ---------------
 
 func (r *workflowRepository) CreateDevice(d *models.WorkflowDevice) error {
+	d.Scope = r.scope
 	return r.db.Create(d).Error
 }
 func (r *workflowRepository) UpdateDevice(d *models.WorkflowDevice) error {
+	d.Scope = r.scope
 	return r.db.Save(d).Error
 }
 func (r *workflowRepository) DeleteDevice(id uint) error {
-	return r.db.Delete(&models.WorkflowDevice{}, id).Error
+	return r.scoped(r.db).Delete(&models.WorkflowDevice{}, id).Error
 }
 func (r *workflowRepository) GetDevice(id uint) (*models.WorkflowDevice, error) {
 	var device models.WorkflowDevice
-	return &device, r.db.First(&device, id).Error
+	return &device, r.scoped(r.db).First(&device, id).Error
 }
 func (r *workflowRepository) ListDevices() ([]models.WorkflowDevice, error) {
 	var out []models.WorkflowDevice
-	return out, r.db.Order("name").Find(&out).Error
+	return out, r.scoped(r.db).Order("name").Find(&out).Error
 }
 
 // -------------- Jobs ----------------
 
 func (r *workflowRepository) CreateJob(j *models.WorkflowJob) error {
+	j.Scope = r.scope
 	return r.db.Create(j).Error
 }
 func (r *workflowRepository) UpdateJob(j *models.WorkflowJob) error {
+	j.Scope = r.scope
 	return r.db.Save(j).Error
 }
 func (r *workflowRepository) DeleteJob(id uint) error {
-	return r.db.Select(clause.Associations).Delete(&models.WorkflowJob{}, id).Error
+	return r.scoped(r.db).Select(clause.Associations).Delete(&models.WorkflowJob{}, id).Error
 }
 
 func (r *workflowRepository) GetJob(id uint) (*models.WorkflowJob, error) {
 	var j models.WorkflowJob
-	return &j, r.db.Preload("Device").First(&j, id).Error
+	return &j, r.scoped(r.db.Preload("Device")).First(&j, id).Error
 }
 func (r *workflowRepository) ListJobs() ([]models.WorkflowJob, error) {
 	var out []models.WorkflowJob
-	return out, r.db.Preload("Device").Order("created_at desc").Find(&out).Error
+	return out, r.scoped(r.db.Preload("Device")).Order("created_at desc").Find(&out).Error
 }
 func (r *workflowRepository) ListEnabledJobs() ([]models.WorkflowJob, error) {
 	var out []models.WorkflowJob
-	return out, r.db.Preload("Device").Where("enabled = true").Find(&out).Error
+	return out, r.scoped(r.db.Preload("Device")).Where("enabled = true").Find(&out).Error
 }
 func (r *workflowRepository) UpdateJobStatus(id uint, status, message string, t time.Time) error {
-	return r.db.Model(&models.WorkflowJob{}).Where("id = ?", id).Updates(map[string]interface{}{
+	return r.scoped(r.db.Model(&models.WorkflowJob{})).Where("id = ?", id).Updates(map[string]interface{}{
 		"last_status":  status,
 		"last_message": message,
 		"last_run_at":  t,
@@ -110,10 +129,11 @@ func (r *workflowRepository) UpdateJobStatus(id uint, status, message string, t 
 // --------------- Runs ------------------
 
 func (r *workflowRepository) CreateRun(run *models.WorkflowRun) error {
+	run.Scope = r.scope
 	return r.db.Create(run).Error
 }
 func (r *workflowRepository) FinishRun(id uint, status, output, errMsg string, t time.Time) error {
-	return r.db.Model(&models.WorkflowRun{}).Where("id = ?", id).Updates(map[string]interface{}{
+	return r.scoped(r.db.Model(&models.WorkflowRun{})).Where("id = ?", id).Updates(map[string]interface{}{
 		"status":      status,
 		"output":      output,
 		"error_msg":   errMsg,
@@ -122,11 +142,11 @@ func (r *workflowRepository) FinishRun(id uint, status, output, errMsg string, t
 }
 func (r *workflowRepository) GetRunByID(id uint) (*models.WorkflowRun, error) {
 	var run models.WorkflowRun
-	return &run, r.db.First(&run, id).Error
+	return &run, r.scoped(r.db).First(&run, id).Error
 }
 func (r *workflowRepository) ListRunsForJob(jobID uint, limit int) ([]models.WorkflowRun, error) {
 	var out []models.WorkflowRun
-	return out, r.db.Where("job_id = ?", jobID).Order("started_at desc").Limit(limit).Find(&out).Error
+	return out, r.scoped(r.db).Where("job_id = ?", jobID).Order("started_at desc").Limit(limit).Find(&out).Error
 }
 
 // ----------------- logs -----------------------
@@ -135,10 +155,11 @@ func (r *workflowRepository) WriteLog(entry *models.WorkflowLog) error {
 	if entry.CreatedAt.IsZero() {
 		entry.CreatedAt = time.Now()
 	}
+	entry.Scope = r.scope
 	return r.db.Create(entry).Error
 }
 func (r *workflowRepository) ListLogs(f LogFilter) ([]models.WorkflowLog, int64, error) {
-	q := r.db.Model(&models.WorkflowLog{})
+	q := r.scoped(r.db.Model(&models.WorkflowLog{}))
 
 	if f.Level != "" {
 		q = q.Where("level = ?", f.Level)
@@ -176,6 +197,6 @@ func (r *workflowRepository) ListLogs(f LogFilter) ([]models.WorkflowLog, int64,
 }
 
 func (r *workflowRepository) DeleteLogsOlderThan(cutoff time.Time) (int64, error) {
-	result := r.db.Where("created_at < ?", cutoff).Delete(&models.WorkflowLog{})
+	result := r.scoped(r.db).Where("created_at < ?", cutoff).Delete(&models.WorkflowLog{})
 	return result.RowsAffected, result.Error
 }

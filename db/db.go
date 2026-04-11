@@ -46,6 +46,7 @@ func Connect(cfg *config.Config) *gorm.DB {
 		&models.WorkflowRun{},
 		&models.WorkflowLog{},
 		&models.NocPassDevice{},
+		&models.NocPassKeepUser{},
 		&models.EsSyslogFilter{},
 		&models.EsSyslogAlert{},
 		&models.EsSyslogSlackIncident{},

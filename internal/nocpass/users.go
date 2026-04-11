@@ -4,6 +4,7 @@ package nocpass
 const (
 	UserFiberx   = "fiberx"
 	UserReadOnly = "readOnly"
+	UserDev      = "dev"
 )
 
 // AccountSummary describes the two accounts for API/UI.

@@ -15,11 +15,12 @@ import (
 	"github.com/go-co-op/gocron/v2"
 )
 
-// WorkflowScheduler manages IP-team workflow jobs and writes activity logs.
+// WorkflowScheduler manages team workflow jobs and writes activity logs.
 type WorkflowScheduler struct {
 	repo      repository.WorkflowRepository
 	jwtSecret []byte
 	sched     gocron.Scheduler
+	scope     string
 	// jobMap stores the gocron tag string for each registered WorkflowJob ID.
 	// We use the tag (not the gocron.Job value) because gocron.Job.ID() returns
 	// a uuid.UUID, not a uint, making it unsuitable as a map key for our purposes.
@@ -27,6 +28,13 @@ type WorkflowScheduler struct {
 }
 
 func NewWorkflowScheduler(repo repository.WorkflowRepository, jwtSecret []byte) (*WorkflowScheduler, error) {
+	return NewWorkflowSchedulerForScope(repo, jwtSecret, "ip")
+}
+
+func NewWorkflowSchedulerForScope(repo repository.WorkflowRepository, jwtSecret []byte, scope string) (*WorkflowScheduler, error) {
+	if scope == "" {
+		scope = "ip"
+	}
 	s, err := gocron.NewScheduler()
 	if err != nil {
 		return nil, err
@@ -35,6 +43,7 @@ func NewWorkflowScheduler(repo repository.WorkflowRepository, jwtSecret []byte) 
 		repo:      repo,
 		jwtSecret: jwtSecret,
 		sched:     s,
+		scope:     scope,
 		jobMap:    make(map[uint]string),
 	}, nil
 }
@@ -43,7 +52,7 @@ func (ws *WorkflowScheduler) Start() {
 	ws.sched.Start()
 	ws.writeSystemLog("system", "info", "scheduler_started", "Workflow scheduler started")
 	ws.ReloadAll()
-	log.Println("[workflow-scheduler] started")
+	log.Printf("[workflow-scheduler:%s] started", ws.scope)
 }
 
 // ReloadAll removes all previously registered gocron jobs and re-registers
@@ -57,7 +66,7 @@ func (ws *WorkflowScheduler) ReloadAll() {
 
 	jobs, err := ws.repo.ListEnabledJobs()
 	if err != nil {
-		log.Printf("[workflow-scheduler] reload error: %v", err)
+		log.Printf("[workflow-scheduler:%s] reload error: %v", ws.scope, err)
 		ws.writeSystemLog("system", "error", "scheduler_reload",
 			fmt.Sprintf("Failed to reload jobs: %v", err))
 		return
@@ -67,23 +76,23 @@ func (ws *WorkflowScheduler) ReloadAll() {
 	}
 	ws.writeSystemLog("system", "info", "scheduler_reload",
 		fmt.Sprintf("Scheduler reloaded — %d active jobs registered", len(jobs)))
-	log.Printf("[workflow-scheduler] registered %d jobs", len(jobs))
+	log.Printf("[workflow-scheduler:%s] registered %d jobs", ws.scope, len(jobs))
 }
 
 func (ws *WorkflowScheduler) register(j models.WorkflowJob) {
 	if strings.TrimSpace(j.Schedule) == "once" {
-		log.Printf("[workflow-scheduler] job %d is run-once — skipping scheduler registration", j.ID)
+		log.Printf("[workflow-scheduler:%s] job %d is run-once — skipping scheduler registration", ws.scope, j.ID)
 		return
 	}
 	def, valid := ws.jobDefinition(j.Schedule)
 	if !valid {
-		log.Printf("[workflow-scheduler] invalid schedule for job %d: %q", j.ID, j.Schedule)
+		log.Printf("[workflow-scheduler:%s] invalid schedule for job %d: %q", ws.scope, j.ID, j.Schedule)
 		ws.writeJobLog(&j, nil, "warning", "job_skipped",
 			fmt.Sprintf("Invalid schedule %q — job will not run until fixed", j.Schedule), 0)
 		return
 	}
 
-	tag := fmt.Sprintf("wf-%d", j.ID)
+	tag := fmt.Sprintf("wf-%s-%d", ws.scope, j.ID)
 	jobID := j.ID // capture for closure
 
 	_, err := ws.sched.NewJob(
@@ -94,7 +103,7 @@ func (ws *WorkflowScheduler) register(j models.WorkflowJob) {
 		gocron.WithSingletonMode(gocron.LimitModeReschedule),
 	)
 	if err != nil {
-		log.Printf("[workflow-scheduler] schedule job %d: %v", j.ID, err)
+		log.Printf("[workflow-scheduler:%s] schedule job %d: %v", ws.scope, j.ID, err)
 		ws.writeJobLog(&j, nil, "error", "job_skipped",
 			fmt.Sprintf("Failed to register with gocron: %v", err), 0)
 		return
@@ -126,32 +135,32 @@ func (ws *WorkflowScheduler) RunJobNow(jobID uint) {
 }
 
 func (ws *WorkflowScheduler) runJob(jobID uint) {
-	log.Printf("[workflow] ══════ RUN JOB %d ══════", jobID)
+	log.Printf("[workflow:%s] RUN JOB %d", ws.scope, jobID)
 
 	j, err := ws.repo.GetJob(jobID)
 	if err != nil {
-		log.Printf("[workflow] job %d: DB lookup FAILED: %v", jobID, err)
+		log.Printf("[workflow:%s] job %d: DB lookup FAILED: %v", ws.scope, jobID, err)
 		ws.writeSystemLog("system", "error", "job_failed",
 			fmt.Sprintf("Job %d not found in database: %v", jobID, err))
 		return
 	}
 	if j.Device.Host == "" {
 		msg := fmt.Sprintf("device for job %d has no host (may have been deleted)", jobID)
-		log.Printf("[workflow] job %d: ✘ %s", jobID, msg)
+		log.Printf("[workflow:%s] job %d: %s", ws.scope, jobID, msg)
 		_ = ws.repo.UpdateJobStatus(j.ID, "error", msg, time.Now())
 		return
 	}
-	log.Printf("[workflow] job %d: device=%s host=%s vendor=%s type=%s cmd=%q schedule=%s",
-		j.ID, j.Device.Name, j.Device.Host, j.Device.Vendor, j.JobType, j.Command, j.Schedule)
+	log.Printf("[workflow:%s] job %d: device=%s host=%s vendor=%s type=%s cmd=%q schedule=%s",
+		ws.scope, j.ID, j.Device.Name, j.Device.Host, j.Device.Vendor, j.JobType, j.Command, j.Schedule)
 
 	// ── Decrypt credentials ──────────────────────────────────────────────────
-	log.Printf("[workflow] job %d: decrypting credentials...", j.ID)
+	log.Printf("[workflow:%s] job %d: decrypting credentials...", ws.scope, j.ID)
 	user, err := crypto.Decrypt(ws.jwtSecret, j.Device.EncUsername)
 	if err != nil {
 		msg := "credential decrypt failed: " + err.Error()
 		ws.writeJobLog(j, nil, "error", "job_failed", msg, 0)
 		_ = ws.repo.UpdateJobStatus(j.ID, "error", msg, time.Now())
-		log.Printf("[workflow] job %d: ✘ %s", j.ID, msg)
+		log.Printf("[workflow:%s] job %d: %s", ws.scope, j.ID, msg)
 		return
 	}
 	pass, err := crypto.Decrypt(ws.jwtSecret, j.Device.EncPassword)
@@ -159,10 +168,10 @@ func (ws *WorkflowScheduler) runJob(jobID uint) {
 		msg := "credential decrypt failed: " + err.Error()
 		ws.writeJobLog(j, nil, "error", "job_failed", msg, 0)
 		_ = ws.repo.UpdateJobStatus(j.ID, "error", msg, time.Now())
-		log.Printf("[workflow] job %d: ✘ %s", j.ID, msg)
+		log.Printf("[workflow:%s] job %d: %s", ws.scope, j.ID, msg)
 		return
 	}
-	log.Printf("[workflow] job %d: credentials decrypted OK (user=%q)", j.ID, user)
+	log.Printf("[workflow:%s] job %d: credentials decrypted OK (user=%q)", ws.scope, j.ID, user)
 
 	// ── Create run record ────────────────────────────────────────────────────
 	startedAt := time.Now()
@@ -173,11 +182,11 @@ func (ws *WorkflowScheduler) runJob(jobID uint) {
 	}
 	if createErr := ws.repo.CreateRun(run); createErr != nil {
 		msg := "failed to create run record: " + createErr.Error()
-		log.Printf("[workflow] job %d: ✘ %s", j.ID, msg)
+		log.Printf("[workflow:%s] job %d: %s", ws.scope, j.ID, msg)
 		_ = ws.repo.UpdateJobStatus(j.ID, "error", msg, time.Now())
 		return
 	}
-	log.Printf("[workflow] job %d: run record created (run_id=%d)", j.ID, run.ID)
+	log.Printf("[workflow:%s] job %d: run record created (run_id=%d)", ws.scope, j.ID, run.ID)
 
 	ws.writeJobLog(j, &run.ID, "info", "job_started",
 		fmt.Sprintf("Started %s job on %s (%s)", j.JobType, j.Device.Name, j.Device.Host), 0)
@@ -191,15 +200,15 @@ func (ws *WorkflowScheduler) runJob(jobID uint) {
 			ws.writeJobLog(j, &run.ID, "error", "job_failed", msg, 0)
 			_ = ws.repo.FinishRun(run.ID, "error", "", msg, time.Now())
 			_ = ws.repo.UpdateJobStatus(j.ID, "error", msg, time.Now())
-			log.Printf("[workflow] job %d: ✘ %s", j.ID, msg)
+			log.Printf("[workflow:%s] job %d: %s", ws.scope, j.ID, msg)
 			return
 		}
 	} else {
 		cmd = j.Command
 	}
-	log.Printf("[workflow] job %d: SSH connecting to %s (vendor=%s, transport=%s)...",
-		j.ID, j.Device.Host, j.Device.Vendor, "auto")
-	log.Printf("[workflow] job %d: sending command: %q", j.ID, cmd)
+	log.Printf("[workflow:%s] job %d: SSH connecting to %s (vendor=%s, transport=%s)...",
+		ws.scope, j.ID, j.Device.Host, j.Device.Vendor, "auto")
+	log.Printf("[workflow:%s] job %d: sending command: %q", ws.scope, j.ID, cmd)
 
 	// ── Execute via SSH ──────────────────────────────────────────────────────
 	output, execErr := shell.IPSendCommand(j.Device.Host, user, pass, j.Device.Vendor, cmd)
@@ -213,13 +222,13 @@ func (ws *WorkflowScheduler) runJob(jobID uint) {
 		_ = ws.repo.UpdateJobStatus(j.ID, "error", errMsg, finishedAt)
 		ws.writeJobLog(j, &run.ID, "error", "job_failed",
 			fmt.Sprintf("FAILED after %dms: %s", durationMs, errMsg), durationMs)
-		log.Printf("[workflow] job %d: ✘ FAILED in %dms — %s", j.ID, durationMs, errMsg)
+		log.Printf("[workflow:%s] job %d: FAILED in %dms: %s", ws.scope, j.ID, durationMs, errMsg)
 		if len(output) > 0 {
 			preview := output
 			if len(preview) > 500 {
 				preview = preview[:500] + "...(truncated)"
 			}
-			log.Printf("[workflow] job %d: partial output:\n%s", j.ID, preview)
+			log.Printf("[workflow:%s] job %d: partial output:\n%s", ws.scope, j.ID, preview)
 		}
 		return
 	}
@@ -236,28 +245,28 @@ func (ws *WorkflowScheduler) runJob(jobID uint) {
 	}
 
 	ws.writeJobLog(j, &run.ID, "success", "job_success", successMsg, durationMs)
-	log.Printf("[workflow] job %d: ✔ OK in %dms (%d bytes)", j.ID, durationMs, len(output))
+	log.Printf("[workflow:%s] job %d: OK in %dms (%d bytes)", ws.scope, j.ID, durationMs, len(output))
 	if len(output) > 0 {
 		preview := output
 		if len(preview) > 300 {
 			preview = preview[:300] + "...(truncated)"
 		}
-		log.Printf("[workflow] job %d: output preview:\n%s", j.ID, preview)
+		log.Printf("[workflow:%s] job %d: output preview:\n%s", ws.scope, j.ID, preview)
 	}
-	log.Printf("[workflow] ══════ END JOB %d ══════", jobID)
+	log.Printf("[workflow:%s] END JOB %d", ws.scope, jobID)
 }
 
 func (ws *WorkflowScheduler) saveBackupFile(j *models.WorkflowJob, output string, t time.Time) string {
 	vendor := strings.ToLower(j.Device.Vendor)
-	folder := filepath.Join("backups", "ip-team", vendor, t.Format("2006-01-02"))
+	folder := filepath.Join("backups", ws.scope+"-team", vendor, t.Format("2006-01-02"))
 	if err := os.MkdirAll(folder, 0o755); err != nil {
-		log.Printf("[workflow] saveBackupFile mkdir %s: %v", folder, err)
+		log.Printf("[workflow:%s] saveBackupFile mkdir %s: %v", ws.scope, folder, err)
 	}
 	name := strings.ReplaceAll(j.Device.Name, "/", "-")
 	filename := fmt.Sprintf("%s_%s.txt", name, j.Device.Host)
 	path := filepath.Join(folder, filename)
 	if err := os.WriteFile(path, []byte(output), 0o644); err != nil {
-		log.Printf("[workflow] saveBackupFile write %s: %v", path, err)
+		log.Printf("[workflow:%s] saveBackupFile write %s: %v", ws.scope, path, err)
 	}
 	return path
 }
@@ -285,7 +294,7 @@ func (ws *WorkflowScheduler) writeJobLog(
 		DurationMs: durMs,
 	}
 	if err := ws.repo.WriteLog(entry); err != nil {
-		log.Printf("[workflow-log] write failed: %v", err)
+		log.Printf("[workflow-log:%s] write failed: %v", ws.scope, err)
 	}
 }
 
@@ -297,13 +306,13 @@ func (ws *WorkflowScheduler) writeSystemLog(jobType, level, event, msg string) {
 		Message: msg,
 	}
 	if err := ws.repo.WriteLog(entry); err != nil {
-		log.Printf("[workflow-log] write failed: %v", err)
+		log.Printf("[workflow-log:%s] write failed: %v", ws.scope, err)
 	}
 }
 
 func (ws *WorkflowScheduler) Stop() {
 	ws.writeSystemLog("system", "info", "scheduler_stopped", "Workflow scheduler stopped cleanly")
 	if err := ws.sched.Shutdown(); err != nil {
-		log.Printf("[workflow-scheduler] shutdown error: %v", err)
+		log.Printf("[workflow-scheduler:%s] shutdown error: %v", ws.scope, err)
 	}
 }

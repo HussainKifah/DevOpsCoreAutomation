@@ -3,50 +3,110 @@
   <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
     <div>
       <h1 class="text-2xl font-bold text-[#f1f5f9]">NOC Pass</h1>
+      <p class="text-sm text-[#94a3b8] mt-1" x-show="tab === 'keep-users'">Protected usernames in this tab are skipped by the rotator delete step on every managed device.</p>
     </div>
-    <button @click="showAdd = true"
-      class="px-4 py-2 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white text-sm font-semibold transition-colors btn-press">
-      Add device
-    </button>
-  </div>
-
-  <div class="mb-4">
-    <input type="search" x-model.debounce.300ms="q" @input="fetchList()"
-      placeholder="Search name or IP / host…"
-      class="w-full max-w-md rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] text-[#f1f5f9] placeholder-[#475569] px-3 py-2 text-sm focus:ring-2 focus:ring-[#f97316] focus:border-[#f97316]">
-  </div>
-
-  <template x-if="loading">
-    <div class="h-40 rounded-xl bg-[#1a2236] animate-pulse border border-[rgba(255,255,255,0.08)]"></div>
-  </template>
-
-  <template x-if="!loading && devices.length === 0">
-    <p class="text-[#94a3b8] text-sm py-8">No devices yet. Add one with admin SSH access.</p>
-  </template>
-
-  <div class="grid gap-3 sm:grid-cols-2" x-show="!loading && devices.length > 0">
-    <template x-for="d in devices" :key="d.id">
-      <button type="button" @click="openDetail(d)"
-        class="mission-card text-left rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] p-4 hover:border-[#f97316]/40 transition-colors">
-        <div class="flex items-start justify-between gap-2">
-          <div>
-            <p class="font-semibold text-[#f1f5f9]" x-text="d.display_name"></p>
-            <p class="text-xs font-mono text-[#94a3b8] mt-0.5" x-text="d.host"></p>
-            <p class="text-[11px] text-[#475569] mt-1">
-              <span x-text="d.vendor"></span>
-              <span> · </span>
-              <span class="font-mono" x-text="(d.accounts || []).map(a => a.username).join(' · ')"></span>
-            </p>
-          </div>
-          <span class="shrink-0 text-[10px] uppercase font-bold px-2 py-0.5 rounded"
-            :class="d.last_apply_ok ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'"
-            x-text="d.last_apply_ok ? 'OK' : 'Issue'"></span>
-        </div>
+    <template x-if="tab === 'devices'">
+      <button @click="showAdd = true"
+        class="px-4 py-2 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white text-sm font-semibold transition-colors btn-press">
+        Add device
       </button>
     </template>
   </div>
 
-  <!-- Add modal -->
+  <div class="flex flex-wrap gap-2 mb-4">
+    <button type="button" @click="tab = 'devices'"
+      class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+      :class="tab === 'devices' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">
+      Devices
+    </button>
+    <button type="button" @click="tab = 'keep-users'"
+      class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+      :class="tab === 'keep-users' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">
+      Keep Users
+    </button>
+  </div>
+
+  <div x-show="tab === 'devices'">
+    <div class="mb-4">
+      <input type="search" x-model.debounce.300ms="q" @input="fetchList()"
+        placeholder="Search name or IP / host…"
+        class="w-full max-w-md rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] text-[#f1f5f9] placeholder-[#475569] px-3 py-2 text-sm focus:ring-2 focus:ring-[#f97316] focus:border-[#f97316]">
+    </div>
+
+    <template x-if="loading">
+      <div class="h-40 rounded-xl bg-[#1a2236] animate-pulse border border-[rgba(255,255,255,0.08)]"></div>
+    </template>
+
+    <template x-if="!loading && devices.length === 0">
+      <p class="text-[#94a3b8] text-sm py-8">No devices yet. Add one with admin SSH access.</p>
+    </template>
+
+    <div class="grid gap-3 sm:grid-cols-2" x-show="!loading && devices.length > 0">
+      <template x-for="d in devices" :key="d.id">
+        <button type="button" @click="openDetail(d)"
+          class="mission-card text-left rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] p-4 hover:border-[#f97316]/40 transition-colors">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <p class="font-semibold text-[#f1f5f9]" x-text="d.display_name"></p>
+              <p class="text-xs font-mono text-[#94a3b8] mt-0.5" x-text="d.host"></p>
+              <p class="text-[11px] text-[#475569] mt-1">
+                <span x-text="d.vendor"></span>
+                <span> · </span>
+                <span class="font-mono" x-text="(d.accounts || []).map(a => a.username).join(' · ')"></span>
+              </p>
+            </div>
+            <span class="shrink-0 text-[10px] uppercase font-bold px-2 py-0.5 rounded"
+              :class="d.last_apply_ok ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'"
+              x-text="d.last_apply_ok ? 'OK' : 'Issue'"></span>
+          </div>
+        </button>
+      </template>
+    </div>
+  </div>
+
+  <div x-show="tab === 'keep-users'" class="space-y-4">
+    <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] p-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p class="text-sm font-semibold text-[#f1f5f9]">Protected usernames</p>
+          <p class="text-xs text-[#94a3b8] mt-1">Default protected users: <span class="font-mono">fiberx</span>, <span class="font-mono">readOnly</span>, <span class="font-mono">dev</span>. The rotator also protects its own admin login automatically.</p>
+        </div>
+      </div>
+      <form @submit.prevent="submitKeepUser()" class="mt-4 flex flex-col sm:flex-row gap-3">
+        <input x-model="keepUserForm.username" required placeholder="username"
+          class="flex-1 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9] font-mono">
+        <button type="submit" :disabled="keepUserSaving"
+          class="px-4 py-2 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white text-sm font-semibold disabled:opacity-50">
+          Add keep user
+        </button>
+      </form>
+      <p class="text-xs text-[#ef4444] mt-2" x-show="keepUserError" x-text="keepUserError"></p>
+    </div>
+
+    <template x-if="keepUsersLoading">
+      <div class="h-32 rounded-xl bg-[#1a2236] animate-pulse border border-[rgba(255,255,255,0.08)]"></div>
+    </template>
+
+    <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] overflow-hidden" x-show="!keepUsersLoading">
+      <template x-if="keepUsers.length === 0">
+        <p class="text-sm text-[#94a3b8] p-4">No custom keep users yet.</p>
+      </template>
+      <template x-if="keepUsers.length > 0">
+        <div class="divide-y divide-[rgba(255,255,255,0.06)]">
+          <template x-for="u in keepUsers" :key="u.id">
+            <div class="flex items-center justify-between gap-3 px-4 py-3">
+              <span class="font-mono text-sm text-[#f1f5f9]" x-text="u.username"></span>
+              <button type="button" @click="deleteKeepUser(u)"
+                class="px-3 py-1.5 text-xs rounded-lg text-[#ef4444] hover:bg-red-500/10">
+                Remove
+              </button>
+            </div>
+          </template>
+        </div>
+      </template>
+    </div>
+  </div>
+
   <div x-show="showAdd" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" @keydown.escape.window="showAdd = false">
     <div @click.away="showAdd = false" class="w-full max-w-lg rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-2xl">
       <h2 class="text-lg font-semibold text-[#f1f5f9] mb-4">Add NOC Pass device</h2>
@@ -84,7 +144,6 @@
     </div>
   </div>
 
-  <!-- Detail modal -->
   <div x-show="detail" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
     <div @click.away="detail = null" class="w-full max-w-lg rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-2xl">
       <template x-if="detail">
@@ -99,7 +158,7 @@
               <div class="space-y-3">
                 <div class="space-y-2">
                   <div class="flex items-center justify-between gap-2">
-                    <p class="text-xs text-[#94a3b8]">NOC logins <span class="text-[#475569]">(same 15-char password on both; rotates every 24h)</span></p>
+                    <p class="text-xs text-[#94a3b8]">Rotating NOC logins <span class="text-[#475569]">(same 15-char password on both; rotates every 24h)</span></p>
                     <button type="button" @click="showPass = !showPass" class="text-xs text-[#f97316] hover:underline shrink-0" x-text="showPass ? 'Hide passwords' : 'Show passwords'"></button>
                   </div>
                   <template x-for="a in (cred.accounts || [])" :key="a.username">
@@ -113,6 +172,7 @@
                     </div>
                   </template>
                 </div>
+                <p class="text-[11px] text-[#475569]">Protected from deletion: <span class="font-mono">fiberx</span>, <span class="font-mono">readOnly</span>, <span class="font-mono">dev</span>, the device admin login, and every username from the Keep Users tab.</p>
                 <p class="text-[11px] text-[#475569]" x-show="cred.next_rotation_at">
                   Next rotation (approx): <span x-text="fmtTime(cred.next_rotation_at)"></span>
                 </p>
@@ -134,9 +194,17 @@
 <script>
 function nocPassPage() {
   return {
+    tab: 'devices',
     q: '',
     devices: [],
     loading: true,
+    keepUsers: [],
+    keepUsersLoading: true,
+    keepUserSaving: false,
+    keepUserError: '',
+    keepUserForm: {
+      username: ''
+    },
     showAdd: false,
     saving: false,
     formError: '',
@@ -152,7 +220,7 @@ function nocPassPage() {
     showPass: false,
 
     async init() {
-      await this.fetchList();
+      await Promise.all([this.fetchList(), this.fetchKeepUsers()]);
     },
 
     async fetchList() {
@@ -167,6 +235,20 @@ function nocPassPage() {
         this.devices = [];
       }
       this.loading = false;
+    },
+
+    async fetchKeepUsers() {
+      this.keepUsersLoading = true;
+      try {
+        const res = await fetch('/api/noc-pass/keep-users');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load');
+        this.keepUsers = data.users || [];
+      } catch (e) {
+        console.error(e);
+        this.keepUsers = [];
+      }
+      this.keepUsersLoading = false;
     },
 
     async submitAdd() {
@@ -198,6 +280,40 @@ function nocPassPage() {
       } finally {
         this.saving = false;
       }
+    },
+
+    async submitKeepUser() {
+      this.keepUserError = '';
+      this.keepUserSaving = true;
+      try {
+        const res = await fetch('/api/noc-pass/keep-users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: this.keepUserForm.username })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          this.keepUserError = data.error || 'Save failed';
+          return;
+        }
+        this.keepUserForm.username = '';
+        await this.fetchKeepUsers();
+      } catch (e) {
+        this.keepUserError = 'Network error';
+      } finally {
+        this.keepUserSaving = false;
+      }
+    },
+
+    async deleteKeepUser(user) {
+      if (!user || !confirm('Remove this keep user?')) return;
+      const res = await fetch('/api/noc-pass/keep-users/' + user.id, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || 'Delete failed');
+        return;
+      }
+      await this.fetchKeepUsers();
     },
 
     async openDetail(d) {

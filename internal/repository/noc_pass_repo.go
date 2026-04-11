@@ -15,6 +15,9 @@ type NocPassRepository interface {
 	Create(d *models.NocPassDevice) error
 	Update(d *models.NocPassDevice) error
 	Delete(id uint) error
+	ListKeepUsers() ([]models.NocPassKeepUser, error)
+	CreateKeepUser(user *models.NocPassKeepUser) error
+	DeleteKeepUser(id uint) error
 	UpdateAfterApply(id uint, encNocPass []byte, rotatedAt *time.Time, ok bool, errMsg string) error
 }
 
@@ -62,6 +65,20 @@ func (r *nocPassRepo) Update(d *models.NocPassDevice) error {
 
 func (r *nocPassRepo) Delete(id uint) error {
 	return r.db.Delete(&models.NocPassDevice{}, id).Error
+}
+
+func (r *nocPassRepo) ListKeepUsers() ([]models.NocPassKeepUser, error) {
+	var list []models.NocPassKeepUser
+	err := r.db.Order("username ASC, id ASC").Find(&list).Error
+	return list, err
+}
+
+func (r *nocPassRepo) CreateKeepUser(user *models.NocPassKeepUser) error {
+	return r.db.Create(user).Error
+}
+
+func (r *nocPassRepo) DeleteKeepUser(id uint) error {
+	return r.db.Delete(&models.NocPassKeepUser{}, id).Error
 }
 
 func (r *nocPassRepo) UpdateAfterApply(id uint, encNocPass []byte, rotatedAt *time.Time, ok bool, errMsg string) error {

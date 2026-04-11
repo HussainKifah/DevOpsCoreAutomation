@@ -12,26 +12,30 @@ import (
 )
 
 type PageHandler struct {
-	templates    map[string]*template.Template
-	loginTmpl    *template.Template
-	userRepo     repository.UserRepository
-	jwtManager   *auth.JWTManager
+	templates  map[string]*template.Template
+	loginTmpl  *template.Template
+	userRepo   repository.UserRepository
+	jwtManager *auth.JWTManager
 }
 
 func NewPageHandler(templateDir string, userRepo repository.UserRepository, jwtManager *auth.JWTManager) *PageHandler {
 	base := filepath.Join(templateDir, "layout", "base.html")
 	pages := map[string]string{
-		"dashboard":   filepath.Join(templateDir, "excess", "dashboard.html"),
-		"devices":     filepath.Join(templateDir, "excess", "devices.html"),
-		"alerts":      filepath.Join(templateDir, "excess", "alerts.html"),
-		"backups":     filepath.Join(templateDir, "excess", "backups.html"),
-		"admin-users":     filepath.Join(templateDir, "admin", "users.html"),
-		"workflows":       filepath.Join(templateDir, "ip", "workflows.html"),
-		"ip-backups":      filepath.Join(templateDir, "ip", "backups.html"),
-		"ip-cmd-output":   filepath.Join(templateDir, "ip", "cmd_output.html"),
-		"ip-activity-log": filepath.Join(templateDir, "ip", "activity_log.html"),
+		"dashboard":        filepath.Join(templateDir, "excess", "dashboard.html"),
+		"devices":          filepath.Join(templateDir, "excess", "devices.html"),
+		"alerts":           filepath.Join(templateDir, "excess", "alerts.html"),
+		"backups":          filepath.Join(templateDir, "excess", "backups.html"),
+		"admin-users":      filepath.Join(templateDir, "admin", "users.html"),
+		"workflows":        filepath.Join(templateDir, "ip", "workflows.html"),
+		"ip-backups":       filepath.Join(templateDir, "ip", "backups.html"),
+		"ip-cmd-output":    filepath.Join(templateDir, "ip", "cmd_output.html"),
+		"ip-activity-log":  filepath.Join(templateDir, "ip", "activity_log.html"),
 		"ip-syslog-alerts": filepath.Join(templateDir, "ip", "syslog_alerts.html"),
-		"noc-pass":        filepath.Join(templateDir, "noc", "noc_pass.html"),
+		"noc-pass":         filepath.Join(templateDir, "noc", "noc_pass.html"),
+		"noc-workflows":    filepath.Join(templateDir, "ip", "workflows.html"),
+		"noc-backups":      filepath.Join(templateDir, "ip", "backups.html"),
+		"noc-cmd-output":   filepath.Join(templateDir, "ip", "cmd_output.html"),
+		"noc-activity-log": filepath.Join(templateDir, "ip", "activity_log.html"),
 	}
 
 	tmpl := make(map[string]*template.Template, len(pages))
@@ -101,14 +105,68 @@ func (h *PageHandler) Login(c *gin.Context) {
 	}
 }
 
-func (h *PageHandler) Dashboard(c *gin.Context) { h.render(c, "dashboard", nil) }
-func (h *PageHandler) Devices(c *gin.Context)   { h.render(c, "devices", nil) }
+func (h *PageHandler) Dashboard(c *gin.Context)  { h.render(c, "dashboard", nil) }
+func (h *PageHandler) Devices(c *gin.Context)    { h.render(c, "devices", nil) }
 func (h *PageHandler) Alerts(c *gin.Context)     { h.render(c, "alerts", nil) }
 func (h *PageHandler) Backups(c *gin.Context)    { h.render(c, "backups", nil) }
-func (h *PageHandler) AdminUsers(c *gin.Context)  { h.render(c, "admin-users", nil) }
-func (h *PageHandler) Workflows(c *gin.Context)   { h.render(c, "workflows", nil) }
-func (h *PageHandler) IPBackups(c *gin.Context)    { h.render(c, "ip-backups", nil) }
-func (h *PageHandler) IPCmdOutput(c *gin.Context)  { h.render(c, "ip-cmd-output", nil) }
-func (h *PageHandler) IPActivityLog(c *gin.Context) { h.render(c, "ip-activity-log", nil) }
+func (h *PageHandler) AdminUsers(c *gin.Context) { h.render(c, "admin-users", nil) }
+func (h *PageHandler) Workflows(c *gin.Context) {
+	h.render(c, "workflows", gin.H{
+		"WorkflowAPIBase":     "/api/workflows",
+		"WorkflowTitle":       "Workflows",
+		"WorkflowDescription": "Manage BNG devices and scheduled backup / command jobs",
+	})
+}
+func (h *PageHandler) IPBackups(c *gin.Context) {
+	h.render(c, "ip-backups", gin.H{
+		"WorkflowAPIBase":    "/api/workflows",
+		"BackupTitle":        "IP Team Backups",
+		"BackupDescription":  "Configuration backups collected from BNG devices",
+		"BackupEmptyMessage": "Run a backup job from the Workflows page to see files here.",
+	})
+}
+func (h *PageHandler) IPCmdOutput(c *gin.Context) {
+	h.render(c, "ip-cmd-output", gin.H{
+		"WorkflowAPIBase":      "/api/workflows",
+		"CmdOutputTitle":       "Command Output",
+		"CmdOutputDescription": "History of all custom commands executed on IP team devices",
+	})
+}
+func (h *PageHandler) IPActivityLog(c *gin.Context) {
+	h.render(c, "ip-activity-log", gin.H{
+		"WorkflowAPIBase":        "/api/workflows",
+		"ActivityLogTitle":       "Activity Log",
+		"ActivityLogDescription": "Every job execution — successes, failures, warnings, and system events",
+	})
+}
 func (h *PageHandler) IPSyslogAlerts(c *gin.Context) { h.render(c, "ip-syslog-alerts", nil) }
 func (h *PageHandler) NocPass(c *gin.Context)        { h.render(c, "noc-pass", nil) }
+func (h *PageHandler) NocWorkflows(c *gin.Context) {
+	h.render(c, "noc-workflows", gin.H{
+		"WorkflowAPIBase":     "/api/noc-workflows",
+		"WorkflowTitle":       "NOC Workflows",
+		"WorkflowDescription": "Manage NOC devices and scheduled backup / command jobs",
+	})
+}
+func (h *PageHandler) NocBackups(c *gin.Context) {
+	h.render(c, "noc-backups", gin.H{
+		"WorkflowAPIBase":    "/api/noc-workflows",
+		"BackupTitle":        "NOC Backups",
+		"BackupDescription":  "Configuration backups collected from NOC devices",
+		"BackupEmptyMessage": "Run a backup job from the NOC Workflows page to see files here.",
+	})
+}
+func (h *PageHandler) NocCmdOutput(c *gin.Context) {
+	h.render(c, "noc-cmd-output", gin.H{
+		"WorkflowAPIBase":      "/api/noc-workflows",
+		"CmdOutputTitle":       "NOC Command Output",
+		"CmdOutputDescription": "History of all custom commands executed on NOC devices",
+	})
+}
+func (h *PageHandler) NocActivityLog(c *gin.Context) {
+	h.render(c, "noc-activity-log", gin.H{
+		"WorkflowAPIBase":        "/api/noc-workflows",
+		"ActivityLogTitle":       "NOC Activity Log",
+		"ActivityLogDescription": "Every NOC job execution — successes, failures, warnings, and system events",
+	})
+}

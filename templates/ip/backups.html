@@ -3,8 +3,8 @@
 
   <div class="flex items-center justify-between mb-6">
     <div>
-      <h1 class="text-2xl font-bold text-[#f1f5f9]">IP Team Backups</h1>
-      <p class="text-sm text-[#94a3b8] mt-0.5">Configuration backups collected from BNG devices</p>
+      <h1 class="text-2xl font-bold text-[#f1f5f9]">{{.BackupTitle}}</h1>
+      <p class="text-sm text-[#94a3b8] mt-0.5">{{.BackupDescription}}</p>
     </div>
     <div class="flex items-center gap-2 text-sm text-[#94a3b8]">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4"/></svg>
@@ -31,7 +31,7 @@
         <div class="flex flex-col items-center justify-center py-20 text-center rounded-xl bg-[#1a2236] border border-[rgba(255,255,255,0.08)]">
           <svg class="w-14 h-14 text-[#475569] mb-4 opacity-40" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4"/></svg>
           <p class="text-[#f1f5f9] font-medium">No backups yet</p>
-          <p class="text-sm text-[#94a3b8] mt-1">Run a backup job from the Workflows page to see files here.</p>
+          <p class="text-sm text-[#94a3b8] mt-1">{{.BackupEmptyMessage}}</p>
         </div>
       </template>
 
@@ -79,7 +79,8 @@
                     :class="{
                       'bg-[#3b82f6]': v.vendor === 'nokia',
                       'bg-[#10b981]': v.vendor === 'cisco',
-                      'bg-[#f59e0b]': v.vendor === 'mikrotik'
+                      'bg-[#f59e0b]': v.vendor === 'mikrotik',
+                      'bg-[#ef4444]': v.vendor === 'huawei'
                     }"
                     x-text="v.count"></span>
                   <!-- vendor icon -->
@@ -87,7 +88,8 @@
                     :class="{
                       'bg-[#3b82f6]/15 text-[#3b82f6]': v.vendor === 'nokia',
                       'bg-[#10b981]/15 text-[#10b981]': v.vendor === 'cisco',
-                      'bg-[#f59e0b]/15 text-[#f59e0b]': v.vendor === 'mikrotik'
+                      'bg-[#f59e0b]/15 text-[#f59e0b]': v.vendor === 'mikrotik',
+                      'bg-[#ef4444]/15 text-[#ef4444]': v.vendor === 'huawei'
                     }">
                     <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3"/></svg>
                   </div>
@@ -204,6 +206,7 @@
 </div>
 
 <script>
+const backupWorkflowApiBase = '{{.WorkflowAPIBase}}';
 function ipBackupsPage() {
   return {
     loading: true,
@@ -223,7 +226,7 @@ function ipBackupsPage() {
 
     async fetchRuns() {
       // Fetch all backup job runs (job_type=backup, status=ok)
-      const res = await fetch('/api/workflows/runs?type=backup');
+      const res = await fetch(backupWorkflowApiBase + '/runs?type=backup');
       const data = await res.json();
       this.runs = data || [];
     },
@@ -290,7 +293,7 @@ function ipBackupsPage() {
       this.previewOutput = '';
       this.showPreview = true;
       // Fetch full output for this run
-      const res = await fetch('/api/workflows/runs/' + r.id + '/output');
+      const res = await fetch(backupWorkflowApiBase + '/runs/' + r.id + '/output');
       const data = await res.json();
       this.previewOutput = data.output || '(no output)';
     },
@@ -304,7 +307,7 @@ function ipBackupsPage() {
 
     async downloadRun(r) {
       try {
-        const res = await fetch('/api/workflows/runs/' + r.id + '/output');
+        const res = await fetch(backupWorkflowApiBase + '/runs/' + r.id + '/output');
         const data = await res.json();
         const blob = new Blob([data.output || ''], { type: 'text/plain' });
         const a = document.createElement('a');

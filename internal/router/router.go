@@ -26,6 +26,7 @@ func Setup(
 	inventoryH *handlers.InventoryHandler,
 	scanH *handlers.ScanHandler,
 	workflowH *handlers.WorkflowHandler,
+	nocWorkflowH *handlers.WorkflowHandler,
 	nocPassH *handlers.NocPassHandler,
 	esSyslogH *handlers.EsSyslogHandler,
 	slackEventsH *handlers.SlackEventsHandler,
@@ -171,6 +172,10 @@ func Setup(
 	nocPages.Use(middleware.PageAuthMiddleware(jwtManager), middleware.PageRoleGuard("noc", "admin"))
 	{
 		nocPages.GET("/noc-pass", pageH.NocPass)
+		nocPages.GET("/noc-workflows", pageH.NocWorkflows)
+		nocPages.GET("/noc-backups", pageH.NocBackups)
+		nocPages.GET("/noc-cmd-output", pageH.NocCmdOutput)
+		nocPages.GET("/noc-activity-log", pageH.NocActivityLog)
 	}
 
 	// NOC Pass API (role: noc, admin)
@@ -182,6 +187,31 @@ func Setup(
 		nocAPI.DELETE("/devices/:id", nocPassH.DeleteDevice)
 		nocAPI.GET("/devices/:id/credential", nocPassH.Credential)
 		nocAPI.POST("/devices/:id/rotate", nocPassH.RotateNow)
+		nocAPI.GET("/keep-users", nocPassH.ListKeepUsers)
+		nocAPI.POST("/keep-users", nocPassH.CreateKeepUser)
+		nocAPI.DELETE("/keep-users/:id", nocPassH.DeleteKeepUser)
+	}
+
+	// NOC Team workflow and backup API routes (role: noc, admin)
+	nocWfAPI := r.Group("/api/noc-workflows")
+	nocWfAPI.Use(middleware.AuthMiddleware(jwtManager), middleware.RoleGuard("noc", "admin"))
+	{
+		nocWfAPI.GET("/devices", nocWorkflowH.ListDevices)
+		nocWfAPI.POST("/devices", nocWorkflowH.CreateDevice)
+		nocWfAPI.PUT("/devices/:id", nocWorkflowH.UpdateDevice)
+		nocWfAPI.DELETE("/devices/:id", nocWorkflowH.DeleteDevice)
+
+		nocWfAPI.GET("/jobs", nocWorkflowH.ListJobs)
+		nocWfAPI.POST("/jobs", nocWorkflowH.CreateJob)
+		nocWfAPI.PUT("/jobs/:id", nocWorkflowH.UpdateJob)
+		nocWfAPI.DELETE("/jobs/:id", nocWorkflowH.DeleteJob)
+		nocWfAPI.POST("/jobs/:id/run", nocWorkflowH.RunJobNow)
+		nocWfAPI.GET("/jobs/:id/runs", nocWorkflowH.GetRuns)
+
+		nocWfAPI.GET("/runs", nocWorkflowH.GetRunsByType)
+		nocWfAPI.GET("/runs/:id/output", nocWorkflowH.GetRunOutput)
+
+		nocWfAPI.GET("/logs", nocWorkflowH.GetLogs)
 	}
 
 	// IP Team API routes (role: ip, admin)

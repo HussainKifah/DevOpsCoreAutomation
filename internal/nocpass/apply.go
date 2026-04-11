@@ -38,25 +38,37 @@ func RotateAndApply(repo repository.NocPassRepository, masterKey []byte, deviceI
 		return fmt.Errorf("admin SSH username or password is empty after decrypt")
 	}
 
+	keepUsers, err := listProtectedKeepUsers(repo, adminUser)
+	if err != nil {
+		_ = repo.UpdateAfterApply(deviceID, nil, nil, false, "list keep users: "+err.Error())
+		return fmt.Errorf("list keep users: %w", err)
+	}
+
 	newPass, err := RandomPassword(15)
 	if err != nil {
 		return fmt.Errorf("generate password: %w", err)
 	}
 
 	initialMikrotik := len(d.EncNocPassword) == 0
-	cmds, err := BuildCommandList(d, newPass, initialMikrotik)
-	if err != nil {
-		_ = repo.UpdateAfterApply(deviceID, nil, nil, false, err.Error())
-		return err
-	}
-
 	vendor, err := ShellVendor(d)
 	if err != nil {
 		_ = repo.UpdateAfterApply(deviceID, nil, nil, false, err.Error())
 		return err
 	}
 
-	log.Printf("[noc-pass] applying rotation host=%s vendor=%s accounts=%s+%s", d.Host, vendor, UserFiberx, UserReadOnly)
+	existingUsers, err := discoverExistingUsers(d, vendor, adminUser, adminPass)
+	if err != nil {
+		_ = repo.UpdateAfterApply(deviceID, nil, nil, false, err.Error())
+		return err
+	}
+
+	cmds, err := BuildCommandList(d, newPass, initialMikrotik, existingUsers, keepUsers)
+	if err != nil {
+		_ = repo.UpdateAfterApply(deviceID, nil, nil, false, err.Error())
+		return err
+	}
+
+	log.Printf("[noc-pass] applying rotation host=%s vendor=%s accounts=%s+%s keep=%d", d.Host, vendor, UserFiberx, UserReadOnly, len(keepUsers))
 	out, runErr := shell.NocPassSendCommand(d.Host, adminUser, adminPass, vendor, cmds...)
 	if runErr != nil {
 		msg := runErr.Error()
@@ -79,6 +91,47 @@ func RotateAndApply(repo repository.NocPassRepository, masterKey []byte, deviceI
 	}
 	log.Printf("[noc-pass] rotation OK host=%s", d.Host)
 	return nil
+}
+
+func listProtectedKeepUsers(repo repository.NocPassRepository, adminUser string) ([]string, error) {
+	list, err := repo.ListKeepUsers()
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(list)+1)
+	seen := map[string]struct{}{}
+	add := func(name string) {
+		raw := strings.TrimSpace(name)
+		if raw == "" {
+			return
+		}
+		key := NormalizeUsername(raw)
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		names = append(names, raw)
+	}
+	add(adminUser)
+	for _, item := range list {
+		add(item.Username)
+	}
+	return names, nil
+}
+
+func discoverExistingUsers(d *models.NocPassDevice, vendor, adminUser, adminPass string) ([]string, error) {
+	discoveryCmd, err := CiscoUserDiscoveryCommand(d)
+	if err != nil {
+		if strings.EqualFold(strings.TrimSpace(d.Vendor), "mikrotik") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	out, runErr := shell.NocPassSendCommand(d.Host, adminUser, adminPass, vendor, discoveryCmd)
+	if runErr != nil {
+		return nil, fmt.Errorf("discover users: %w", runErr)
+	}
+	return ExtractCiscoUsernames(out), nil
 }
 
 func min(a, b int) int {
