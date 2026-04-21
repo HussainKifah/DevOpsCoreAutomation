@@ -369,6 +369,8 @@ func (ws *WorkflowScheduler) nocTargetMatches(job *models.WorkflowJob, row *mode
 	targetType := strings.ToLower(strings.TrimSpace(job.TargetType))
 	targetValue := strings.TrimSpace(job.TargetValue)
 	switch targetType {
+	case "all_networks":
+		return true
 	case "network_type":
 		return nocWorkflowNetworkTypeFromSite(row.Site) == strings.ToLower(targetValue)
 	case "province":

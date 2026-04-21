@@ -6,6 +6,10 @@
       <p class="text-sm text-[#94a3b8] mt-0.5">{{.WorkflowDescription}}</p>
     </div>
     <div class="flex items-center gap-2">
+      <button x-show="workflowTreeMode === 'noc'" @click="openJobModal(treeTarget('all_networks', 'all', 'All Networks'))" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9] hover:border-[#3b82f6]/50 transition-all btn-press">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.5h16.5m-16.5 5.25h16.5m-16.5 5.25h16.5m-16.5 5.25h16.5"/></svg>
+        All Networks
+      </button>
       <button x-show="workflowTreeMode !== 'noc'" @click="openDeviceModal()" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9] hover:border-[#3b82f6]/50 transition-all btn-press">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3"/></svg>
         Add Device
@@ -237,6 +241,7 @@
               <label class="block text-sm font-medium text-[#94a3b8] mb-1">Target Type</label>
               <select x-model="jobForm.target_type" @change="syncTargetSelection()" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] px-3 py-2 text-sm focus:ring-2 focus:ring-[#3b82f6]">
                 <option value="device">Device</option>
+                <option value="all_networks">All Networks</option>
                 <option value="network_type">FTTH / WiFi</option>
                 <option value="province">Province</option>
                 <option value="vendor">Vendor</option>
@@ -361,6 +366,7 @@ function workflowsPage() {
     },
     syncTargetSelection(){
       if(this.workflowTreeMode!=='noc'){return;}
+      if(this.jobForm.target_type==='all_networks'){this.jobForm.target_value='all';this.jobForm.target_label='All Networks';return;}
       if(this.jobForm.target_type==='device'){this.jobForm.device_id=this.jobForm.target_value||this.jobForm.device_id;this.jobForm.target_value=this.jobForm.device_id||'';}
       const option=this.jobTargetOptions().find(o=>String(o.value)===String(this.jobForm.target_value));
       this.jobForm.target_label=option?option.label:'';
@@ -368,6 +374,7 @@ function workflowsPage() {
     jobTargetOptions(){
       if(this.workflowTreeMode!=='noc'){return [];}
       if(this.jobForm.target_type==='device'){return (this.devices||[]).map(d=>({key:'device-'+d.ID,value:String(d.ID),label:d.name+' ('+d.host+')'})).sort((a,b)=>a.label.localeCompare(b.label));}
+      if(this.jobForm.target_type==='all_networks'){return [{key:'all-networks',value:'all',label:'All Networks'}];}
       if(this.jobForm.target_type==='network_type'){return [{key:'ftth',value:'ftth',label:'FTTH'},{key:'wifi',value:'wifi',label:'WiFi'}];}
       if(this.jobForm.target_type==='province'){return [...new Map((this.devices||[]).map(d=>[(d.province||'Unknown').toLowerCase(),{key:'province-'+(d.province||'Unknown'),value:(d.province||'Unknown'),label:(d.province||'Unknown')}])).values()].sort((a,b)=>a.label.localeCompare(b.label));}
       if(this.jobForm.target_type==='vendor'){return [...new Map((this.devices||[]).map(d=>[this.workflowVendorValue(d),{key:'vendor-'+this.workflowVendorValue(d),value:this.workflowVendorValue(d),label:this.workflowVendorLabel(d)}])).values()].sort((a,b)=>a.label.localeCompare(b.label));}
@@ -419,7 +426,7 @@ function workflowsPage() {
     workflowVendorLabel(d){const v=this.workflowVendorValue(d);if(v==='cisco_nexus')return 'Cisco Nexus';if(v==='cisco_ios'||v==='cisco')return 'Cisco';if(v==='mikrotik')return 'Microtik';if(v==='huawei')return 'Huawei';if(v==='nokia')return 'Nokia';return v||'Unknown';},
     vendorBadgeClass(d){const v=(d.source_vendor||d.vendor||'').toLowerCase();return {'bg-[#3b82f6]/20 text-[#3b82f6]':v==='nokia','bg-[#10b981]/20 text-[#10b981]':v==='cisco'||v==='cisco_ios','bg-[#0ea5e9]/20 text-[#0ea5e9]':v==='cisco_nexus','bg-[#f59e0b]/20 text-[#f59e0b]':v==='mikrotik','bg-[#ef4444]/20 text-[#ef4444]':v==='huawei'};},
     vendorDotClass(d){const v=(d.source_vendor||d.vendor||'').toLowerCase();return {'bg-[#3b82f6]':v==='nokia','bg-[#10b981]':v==='cisco'||v==='cisco_ios','bg-[#0ea5e9]':v==='cisco_nexus','bg-[#f59e0b]':v==='mikrotik','bg-[#ef4444]':v==='huawei'};},
-    jobTargetTypeLabel(j){const t=(j.target_type||'device').toLowerCase();if(t==='network_type')return 'FTTH / WiFi';if(t==='province')return 'Province';if(t==='vendor')return 'Vendor';if(t==='model')return 'Model';return 'Device';},
+    jobTargetTypeLabel(j){const t=(j.target_type||'device').toLowerCase();if(t==='all_networks')return 'All Networks';if(t==='network_type')return 'FTTH / WiFi';if(t==='province')return 'Province';if(t==='vendor')return 'Vendor';if(t==='model')return 'Model';return 'Device';},
     jobHostLabel(j){if((j.target_type||'device').toLowerCase()==='device'){return j.device?.host||'—';}return j.target_value||'—';},
     isTreeNodeExpanded(key){return !!this.expandedTreeNodes[key];},
     toggleTreeNode(key){this.expandedTreeNodes={...this.expandedTreeNodes,[key]:!this.expandedTreeNodes[key]};},

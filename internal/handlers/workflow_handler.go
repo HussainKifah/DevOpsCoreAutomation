@@ -23,6 +23,7 @@ type WorkflowSchedulerInterface interface {
 
 const (
 	workflowTargetDevice      = "device"
+	workflowTargetAllNetworks = "all_networks"
 	workflowTargetNetworkType = "network_type"
 	workflowTargetProvince    = "province"
 	workflowTargetVendor      = "vendor"
@@ -394,6 +395,8 @@ func (h *WorkflowHandler) defaultTargetLabel(targetType, targetValue string, dev
 			}
 		}
 		return "Device"
+	case workflowTargetAllNetworks:
+		return "All Networks"
 	case workflowTargetNetworkType:
 		if strings.EqualFold(strings.TrimSpace(targetValue), "ftth") {
 			return "FTTH"
@@ -414,6 +417,8 @@ func normalizeNocWorkflowGroupTarget(targetType, targetValue string) (string, st
 	normalizedType := strings.ToLower(strings.TrimSpace(targetType))
 	normalizedValue := strings.TrimSpace(targetValue)
 	switch normalizedType {
+	case workflowTargetAllNetworks:
+		return normalizedType, "all", nil
 	case workflowTargetNetworkType:
 		value := strings.ToLower(normalizedValue)
 		if value != "ftth" && value != "wifi" {
@@ -509,7 +514,7 @@ func (h *WorkflowHandler) CreateJob(c *gin.Context) {
 			}
 			targetType = workflowTargetDevice
 			targetLabel = h.defaultTargetLabel(targetType, targetValue, device)
-		case workflowTargetNetworkType, workflowTargetProvince, workflowTargetVendor, workflowTargetModel:
+		case workflowTargetAllNetworks, workflowTargetNetworkType, workflowTargetProvince, workflowTargetVendor, workflowTargetModel:
 			var err error
 			targetType, targetValue, err = normalizeNocWorkflowGroupTarget(targetType, targetValue)
 			if err != nil {
