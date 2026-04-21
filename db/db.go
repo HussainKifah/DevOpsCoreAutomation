@@ -47,6 +47,9 @@ func Connect(cfg *config.Config) *gorm.DB {
 		&models.WorkflowLog{},
 		&models.NocPassDevice{},
 		&models.NocPassKeepUser{},
+		&models.NocDataDevice{},
+		&models.NocDataCredential{},
+		&models.NocDataExclusion{},
 		&models.EsSyslogFilter{},
 		&models.EsSyslogAlert{},
 		&models.EsSyslogSlackIncident{},
@@ -55,6 +58,10 @@ func Connect(cfg *config.Config) *gorm.DB {
 		&models.RuijieSlackIncident{},
 	); err != nil {
 		log.Fatalf("failed to migrate database: %v", err)
+	}
+
+	if err := db.Exec("ALTER TABLE workflow_jobs ALTER COLUMN device_id DROP NOT NULL").Error; err != nil {
+		log.Printf("workflow_jobs migration warning: %v", err)
 	}
 
 	go func() {

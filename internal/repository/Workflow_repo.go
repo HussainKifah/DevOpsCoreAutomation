@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"strings"
 	"time"
 
 	"github.com/Flafl/DevOpsCore/internal/models"
@@ -15,6 +16,7 @@ type WorkflowRepository interface {
 	UpdateDevice(d *models.WorkflowDevice) error
 	DeleteDevice(id uint) error
 	GetDevice(id uint) (*models.WorkflowDevice, error)
+	GetDeviceByHost(host string) (*models.WorkflowDevice, error)
 	ListDevices() ([]models.WorkflowDevice, error)
 
 	//Jobs
@@ -86,6 +88,10 @@ func (r *workflowRepository) DeleteDevice(id uint) error {
 func (r *workflowRepository) GetDevice(id uint) (*models.WorkflowDevice, error) {
 	var device models.WorkflowDevice
 	return &device, r.scoped(r.db).First(&device, id).Error
+}
+func (r *workflowRepository) GetDeviceByHost(host string) (*models.WorkflowDevice, error) {
+	var device models.WorkflowDevice
+	return &device, r.scoped(r.db).Where("LOWER(host) = ?", strings.ToLower(strings.TrimSpace(host))).First(&device).Error
 }
 func (r *workflowRepository) ListDevices() ([]models.WorkflowDevice, error) {
 	var out []models.WorkflowDevice

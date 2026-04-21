@@ -1,0 +1,1301 @@
+{{define "content"}}
+<div x-data="nocDataPage()" x-init="init()" class="max-w-[95rem] mx-auto">
+  <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-[#f1f5f9]">{{or .NocDataTitle "NOC Data"}}</h1>
+    </div>
+  </div>
+
+  <div class="flex flex-wrap gap-2 mb-4">
+    <button x-show="mode === 'data'" type="button" @click="switchTab('summary')"
+      class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+      :class="tab === 'summary' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">
+      Summary
+    </button>
+    <button x-show="mode === 'data'" type="button" @click="switchTab('table')"
+      class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+      :class="tab === 'table' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">
+      Data Table
+    </button>
+    <button x-show="mode === 'setup'" type="button" @click="tab = 'ranges'"
+      class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+      :class="tab === 'ranges' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">
+      IP Range Setup
+    </button>
+    <button x-show="mode === 'setup'" type="button" @click="tab = 'failed'"
+      class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+      :class="tab === 'failed' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">
+      Failed IPs
+    </button>
+    <button x-show="mode === 'setup'" type="button" @click="tab = 'exclusions'"
+      class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+      :class="tab === 'exclusions' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">
+      Excluded IPs
+    </button>
+    <button x-show="mode === 'setup'" type="button" @click="tab = 'users'"
+      class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+      :class="tab === 'users' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">
+      Users
+    </button>
+  </div>
+
+  <div x-show="mode === 'data' && tab === 'summary'" class="space-y-5">
+    <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-xl">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-semibold text-[#f1f5f9]">Network Summary</h2>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" @click="summaryScope = 'all'; renderSummaryCharts()"
+            class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+            :class="summaryScope === 'all' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8]'">
+            All Network
+          </button>
+          <button type="button" @click="summaryScope = 'site'; renderSummaryCharts()"
+            class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+            :class="summaryScope === 'site' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8]'">
+            Site View
+          </button>
+        </div>
+      </div>
+
+      <div x-show="summaryScope === 'site'" class="mt-4 max-w-sm">
+        <label class="block text-xs text-[#94a3b8] mb-1">Select Site</label>
+        <select x-model="selectedSummarySite" @change="renderSummaryCharts()"
+          class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+          <option value="">Choose a site</option>
+          <template x-for="site in summarySites()" :key="'summary-site-' + site">
+            <option :value="site" x-text="site"></option>
+          </template>
+        </select>
+      </div>
+
+      <div class="grid gap-4 md:grid-cols-3 mt-6">
+        <template x-for="item in summaryCards()" :key="item.label">
+          <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] p-4">
+            <p class="text-xs uppercase tracking-[0.18em] text-[#64748b]" x-text="item.label"></p>
+            <p class="text-3xl font-bold text-[#f8fafc] mt-2" x-text="item.value"></p>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <template x-if="summaryDataset().length === 0">
+      <div class="rounded-xl border border-dashed border-[rgba(255,255,255,0.12)] bg-[#111827] p-10 text-center">
+        <p class="text-sm text-[#94a3b8]">No NOC Data devices are available for this summary view yet.</p>
+      </div>
+    </template>
+
+    <div x-show="summaryDataset().length > 0" class="grid gap-5 xl:grid-cols-3">
+      <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-5 shadow-xl">
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 class="text-base font-semibold text-[#f1f5f9]">Status Overview</h3>
+            <p class="text-xs text-[#94a3b8]">How many devices are `ok` and `fail`.</p>
+          </div>
+        </div>
+        <div class="h-72">
+          <canvas x-ref="statusChart"></canvas>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-5 shadow-xl">
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 class="text-base font-semibold text-[#f1f5f9]">Vendor Mix</h3>
+            <p class="text-xs text-[#94a3b8]">Cisco versus MikroTik in the selected scope.</p>
+          </div>
+        </div>
+        <div class="h-72">
+          <canvas x-ref="vendorChart"></canvas>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-5 shadow-xl">
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 class="text-base font-semibold text-[#f1f5f9]">Layer Mode</h3>
+            <p class="text-xs text-[#94a3b8]">Layer 2 and Layer 3 device counts.</p>
+          </div>
+        </div>
+        <div class="h-72">
+          <canvas x-ref="layerChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="mode === 'setup' && tab === 'ranges'" class="grid gap-5 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
+    <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-xl">
+      <h2 class="text-lg font-semibold text-[#f1f5f9] mb-4">Add IP range</h2>
+      <form @submit.prevent="submitDevice()" class="space-y-3">
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label class="block text-xs text-[#94a3b8] mb-1">Site</label>
+            <input x-model="form.site" required class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+          </div>
+          <div>
+            <label class="block text-xs text-[#94a3b8] mb-1">Subnet</label>
+            <input x-model="form.subnet" required placeholder="10.130.100.0/24" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9] font-mono">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">Range</label>
+          <input x-model="form.range" required placeholder="10-25 or 10.130.100.10-10.130.100.25" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9] font-mono">
+        </div>
+        <div class="rounded-lg border border-[rgba(249,115,22,0.25)] bg-[#1b2437] px-3 py-3 text-xs text-[#cbd5e1]">
+          If some devices still fail after the normal range run, use the `Failed IPs` tab.
+          That runner clears cached vendor/login data and rechecks the failed hosts one by one with fresh SSH/telnet detection.
+        </div>
+        <p class="text-xs text-[#ef4444]" x-show="formError" x-text="formError"></p>
+        <p class="text-xs text-emerald-400" x-show="formNotice" x-text="formNotice"></p>
+        <button type="submit" :disabled="saving" class="w-full px-4 py-2 rounded-lg bg-[#f97316] text-white text-sm font-semibold disabled:opacity-50">Save range</button>
+        <button type="button" @click="tab = 'failed'" class="w-full px-4 py-2 rounded-lg bg-[#1a2236] text-[#f8fafc] text-sm font-semibold border border-[rgba(255,255,255,0.08)]">
+          Open Failed IPs
+        </button>
+      </form>
+    </div>
+
+    <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-xl">
+      <div class="flex items-center justify-between gap-3 mb-4">
+        <h2 class="text-lg font-semibold text-[#f1f5f9]">Saved Ranges</h2>
+        <span class="text-xs text-[#94a3b8]" x-text="ranges.length + ' total'"></span>
+      </div>
+      <template x-if="loading">
+        <div class="h-40 rounded-xl bg-[#1a2236] animate-pulse border border-[rgba(255,255,255,0.08)]"></div>
+      </template>
+      <template x-if="!loading && ranges.length === 0">
+        <p class="text-sm text-[#94a3b8]">No ranges added yet.</p>
+      </template>
+      <div class="space-y-3 max-h-[32rem] overflow-auto pr-1" x-show="!loading && ranges.length > 0">
+        <template x-for="group in ranges" :key="group.key">
+          <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] p-4">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="font-semibold text-[#f1f5f9]"><span x-text="group.site"></span></p>
+                <p class="text-xs text-[#94a3b8] mt-1"><span class="font-mono" x-text="group.subnet"></span> · <span x-text="group.range"></span></p>
+                <p class="text-[11px] text-[#475569] mt-1">
+                  reachable <span x-text="group.reachableCount"></span>
+                  · ok <span x-text="group.okCount"></span>
+                  · fail <span x-text="group.failCount"></span>
+                  · pending <span x-text="group.pendingCount"></span>
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" @click="toggleRange(group.key)" class="px-3 py-1.5 text-xs rounded-lg text-[#93c5fd] hover:bg-blue-500/10" x-text="group.open ? 'Hide IPs' : 'Show IPs'"></button>
+                <button type="button" @click="deleteRange(group)" class="px-3 py-1.5 text-xs rounded-lg text-[#ef4444] hover:bg-red-500/10">Remove</button>
+              </div>
+            </div>
+
+            <div x-show="group.open" class="mt-4 rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0f172a]">
+              <div class="max-h-[18rem] overflow-auto divide-y divide-[rgba(255,255,255,0.06)]">
+                <template x-for="device in group.devices" :key="device.id">
+                  <div class="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                    <div>
+                      <p class="font-mono text-[#e2e8f0]" x-text="device.ip"></p>
+                      <p class="text-[11px] text-[#64748b]">
+                        <span x-text="device.vendor || 'pending'"></span>
+                        ·
+                        <span x-text="device.hostname || 'waiting for collection'"></span>
+                      </p>
+                    </div>
+                    <span class="px-2 py-1 rounded text-[10px] font-bold uppercase"
+                      :class="device.status === 'ok' ? 'bg-emerald-500/20 text-emerald-400' : device.status === 'fail' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'"
+                      x-text="device.status || 'pending'"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="mode === 'setup' && tab === 'failed'" class="space-y-5">
+    <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-xl">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-semibold text-[#f1f5f9]">Failed IP Recovery</h2>
+          <p class="text-sm text-[#94a3b8] mt-1">
+            This runs only failed devices, one by one, after clearing cached vendor, method, and saved login choice for each IP.
+          </p>
+          <p class="text-xs text-[#64748b] mt-2">
+            The collector will probe SSH and telnet again using the existing NOC Data transport path, including the legacy-compatible SSH settings already in the app.
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-[#94a3b8]" x-text="failedDevices().length + ' failed IPs'"></span>
+          <button type="button" @click="runFailedOneByOne()" :disabled="runningFailedAll || failedDevices().length === 0"
+            class="px-4 py-2 rounded-lg bg-[#ef4444]/20 text-[#fca5a5] border border-[#ef4444]/30 text-sm font-semibold disabled:opacity-50"
+            x-text="runningFailedAll ? 'Running...' : 'Run Failed One By One'"></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-xl">
+      <div class="flex flex-wrap items-end gap-3">
+        <div class="min-w-[18rem] flex-1">
+          <label class="block text-xs text-[#94a3b8] mb-1">Pick Failed IP</label>
+          <select x-model="selectedFailedDeviceId"
+            class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+            <option value="">Select failed device</option>
+            <template x-for="device in failedDevices()" :key="'failed-picker-' + device.id">
+              <option :value="String(device.id)" x-text="(device.ip || '-') + ' · ' + (device.hostname || device.vendor || 'unknown')"></option>
+            </template>
+          </select>
+        </div>
+        <button type="button"
+          @click="runSelectedFailedDevice()"
+          :disabled="!selectedFailedDeviceId || runningFailedIds[selectedFailedDeviceId]"
+          class="px-4 py-2 rounded-lg bg-[#3b82f6]/20 text-[#93c5fd] border border-[#3b82f6]/30 text-sm font-semibold disabled:opacity-50"
+          x-text="selectedFailedDeviceId && runningFailedIds[selectedFailedDeviceId] ? 'Running...' : 'Run Selected IP'"></button>
+      </div>
+      <p class="text-xs text-[#64748b] mt-3">Use this control outside the table to run recovery for one failed IP.</p>
+    </div>
+
+    <div class="overflow-x-auto rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827]">
+      <table class="min-w-[980px] w-full text-xs">
+        <thead class="bg-[#1a2236] text-[#94a3b8] uppercase tracking-wide">
+          <tr>
+            <th class="px-3 py-3 text-left">Site</th>
+            <th class="px-3 py-3 text-left">Subnet</th>
+            <th class="px-3 py-3 text-left">Range</th>
+            <th class="px-3 py-3 text-left">IP</th>
+            <th class="px-3 py-3 text-left">Vendor</th>
+            <th class="px-3 py-3 text-left">Method</th>
+            <th class="px-3 py-3 text-left">Profile</th>
+            <th class="px-3 py-3 text-left">Fail Cause</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-[rgba(255,255,255,0.06)]">
+          <template x-if="!loading && failedDevices().length === 0">
+            <tr>
+              <td colspan="8" class="px-4 py-8 text-center text-sm text-[#94a3b8]">No failed IPs right now.</td>
+            </tr>
+          </template>
+          <template x-for="device in failedDevices()" :key="'failed-' + device.id">
+            <tr class="text-[#e2e8f0]">
+              <td class="px-3 py-3" x-text="device.site || '-'"></td>
+              <td class="px-3 py-3 font-mono" x-text="device.subnet || '-'"></td>
+              <td class="px-3 py-3" x-text="device.range || '-'"></td>
+              <td class="px-3 py-3 font-mono" x-text="device.ip || '-'"></td>
+              <td class="px-3 py-3" x-text="device.vendor || '-'"></td>
+              <td class="px-3 py-3" x-text="device.method || '-'"></td>
+              <td class="px-3 py-3" x-text="device.profile || '-'"></td>
+              <td class="px-3 py-3 max-w-[28rem] truncate" :title="device.error || ''" x-text="device.error || '-'"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div x-show="mode === 'setup' && tab === 'users'" class="space-y-4">
+    <div class="flex flex-wrap gap-2">
+      <button type="button" @click="userVendorTab = 'cisco'"
+        class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+        :class="userVendorTab === 'cisco' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8]'">
+        Cisco
+      </button>
+      <button type="button" @click="userVendorTab = 'huawei'"
+        class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+        :class="userVendorTab === 'huawei' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8]'">
+        Huawei
+      </button>
+      <button type="button" @click="userVendorTab = 'mikrotik'"
+        class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+        :class="userVendorTab === 'mikrotik' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8]'">
+        MikroTik
+      </button>
+    </div>
+
+    <div class="grid gap-5 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+      <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-xl">
+        <h2 class="text-lg font-semibold text-[#f1f5f9] mb-4">Add User</h2>
+        <form @submit.prevent="submitCredential()" class="space-y-3">
+          <div>
+            <label class="block text-xs text-[#94a3b8] mb-1">Username</label>
+            <input x-model="credentialForms[userVendorTab].username" required class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+          </div>
+          <div>
+            <label class="block text-xs text-[#94a3b8] mb-1">Password</label>
+            <input x-model="credentialForms[userVendorTab].password" type="password" required class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+          </div>
+          <p class="text-xs text-[#94a3b8]">Add multiple users per vendor. NOC Data will try them in order and fall back if one login fails.</p>
+          <p class="text-xs text-[#ef4444]" x-show="credentialError" x-text="credentialError"></p>
+          <button type="submit" :disabled="savingCredential" class="w-full px-4 py-2 rounded-lg bg-[#f97316] text-white text-sm font-semibold disabled:opacity-50">Save user</button>
+        </form>
+      </div>
+
+      <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-xl">
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <h2 class="text-lg font-semibold text-[#f1f5f9]">Saved Users</h2>
+          <span class="text-xs text-[#94a3b8]" x-text="credentials[userVendorTab].length + ' total'"></span>
+        </div>
+        <template x-if="credentials[userVendorTab].length === 0">
+          <p class="text-sm text-[#94a3b8]">No users added yet.</p>
+        </template>
+        <div class="space-y-3" x-show="credentials[userVendorTab].length > 0">
+          <template x-for="item in credentials[userVendorTab]" :key="item.id">
+            <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] p-4 flex items-center justify-between gap-3">
+              <div>
+                <p class="font-semibold text-[#f1f5f9]" x-text="item.username"></p>
+                <p class="text-xs text-[#94a3b8]" x-text="item.vendor_family"></p>
+              </div>
+              <button type="button" @click="deleteCredential(item)" class="px-3 py-1.5 text-xs rounded-lg text-[#ef4444] hover:bg-red-500/10">Remove</button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="mode === 'setup' && tab === 'exclusions'" class="grid gap-5 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+    <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-xl">
+      <h2 class="text-lg font-semibold text-[#f1f5f9] mb-4">Add Excluded IP Or Range</h2>
+      <form @submit.prevent="submitExclusion()" class="space-y-3">
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">Subnet</label>
+          <input x-model="exclusionForm.subnet" required placeholder="10.130.0.0/16" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9] font-mono">
+        </div>
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">IP Or Range</label>
+          <input x-model="exclusionForm.target" required placeholder="10.130.10.5 or 10.130.10.5-10.130.10.50 or 0-255" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9] font-mono">
+        </div>
+        <p class="text-xs text-[#94a3b8]">Excluded IPs are skipped during discovery and later data collection.</p>
+        <p class="text-xs text-[#ef4444]" x-show="exclusionError" x-text="exclusionError"></p>
+        <button type="submit" :disabled="savingExclusion" class="w-full px-4 py-2 rounded-lg bg-[#f97316] text-white text-sm font-semibold disabled:opacity-50">Save exclusion</button>
+      </form>
+    </div>
+
+    <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-xl">
+      <div class="flex items-center justify-between gap-3 mb-4">
+        <h2 class="text-lg font-semibold text-[#f1f5f9]">Excluded IPs</h2>
+        <span class="text-xs text-[#94a3b8]" x-text="exclusions.length + ' total'"></span>
+      </div>
+      <template x-if="exclusions.length === 0">
+        <p class="text-sm text-[#94a3b8]">No exclusions added yet.</p>
+      </template>
+      <div class="space-y-3" x-show="exclusions.length > 0">
+        <template x-for="item in exclusions" :key="item.id">
+          <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] p-4 flex items-center justify-between gap-3">
+            <div>
+              <p class="font-mono text-[#f1f5f9]" x-text="item.target"></p>
+              <p class="text-xs text-[#94a3b8]" x-text="item.subnet"></p>
+            </div>
+            <button type="button" @click="deleteExclusion(item)" class="px-3 py-1.5 text-xs rounded-lg text-[#ef4444] hover:bg-red-500/10">Remove</button>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="mode === 'data' && tab === 'table'" class="space-y-4">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex-1 min-w-[14rem]">
+        <input type="search" x-model.debounce.300ms="q" placeholder="Search site, subnet, range, or IP..."
+          class="w-full max-w-md rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] text-[#f1f5f9] placeholder-[#475569] px-3 py-2 text-sm focus:ring-2 focus:ring-[#f97316] focus:border-[#f97316]">
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button type="button" @click="runAll()" :disabled="runningAll" class="px-4 py-2 rounded-lg bg-[#3b82f6]/20 text-[#60a5fa] border border-[#3b82f6]/30 text-sm font-semibold disabled:opacity-50" x-text="runningAll ? 'Running...' : 'Run All Now'"></button>
+        <button type="button" @click="clearColumnFilters()" class="px-4 py-2 rounded-lg bg-[#1a2236] text-[#cbd5e1] text-sm font-semibold border border-[rgba(255,255,255,0.08)]">Clear Filters</button>
+        <button type="button" @click="exportExcel()" class="px-4 py-2 rounded-lg bg-[#f97316] text-white text-sm font-semibold">Export Excel</button>
+      </div>
+    </div>
+
+    <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-4 shadow-xl">
+      <div class="flex flex-wrap items-end gap-3">
+        <div class="min-w-[18rem] flex-1">
+          <label class="block text-xs text-[#94a3b8] mb-1">Pick Row To Delete</label>
+          <select x-model="selectedTableDeviceId"
+            class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+            <option value="">Select device row</option>
+            <template x-for="device in displayedDevices()" :key="'table-picker-' + device.id">
+              <option :value="String(device.id)" x-text="(device.ip || '-') + ' · ' + (device.hostname || device.vendor || 'unknown')"></option>
+            </template>
+          </select>
+        </div>
+        <button type="button"
+          @click="deleteSelectedTableDevice()"
+          :disabled="!selectedTableDeviceId || deletingDeviceIds[selectedTableDeviceId]"
+          class="px-4 py-2 rounded-lg bg-[#ef4444]/20 text-[#fca5a5] border border-[#ef4444]/30 text-sm font-semibold disabled:opacity-50"
+          x-text="selectedTableDeviceId && deletingDeviceIds[selectedTableDeviceId] ? 'Deleting...' : 'Delete Selected Row'"></button>
+      </div>
+      <p class="text-xs text-[#64748b] mt-3">Use this control outside the table to hard delete one NOC Data row.</p>
+    </div>
+
+    <div class="flex flex-wrap items-center justify-between gap-3 text-xs text-[#94a3b8]">
+      <p x-text="displayedDevices().length + ' rows shown from ' + devices.length + ' loaded devices'"></p>
+      <p x-text="sortSummary()"></p>
+    </div>
+
+    <div class="overflow-x-auto rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827]">
+      <table class="min-w-[1600px] w-full text-xs">
+        <thead class="bg-[#1a2236] text-[#94a3b8] uppercase tracking-wide">
+          <tr>
+            <template x-for="column in tableColumns" :key="'head-' + column.key">
+              <th class="px-3 py-3 text-left">
+                <button type="button" @click="toggleSort(column.key)" class="flex items-center gap-2 text-left hover:text-[#f1f5f9] transition-colors">
+                  <span x-text="column.label"></span>
+                  <span class="text-[10px]" x-text="sortIndicator(column.key)"></span>
+                </button>
+              </th>
+            </template>
+          </tr>
+          <tr class="bg-[#111827] normal-case tracking-normal">
+            <template x-for="column in tableColumns" :key="'filter-' + column.key">
+              <th class="px-3 py-2 align-top">
+                <template x-if="column.filterType === 'select'">
+                  <select x-model="columnFilters[column.key]" class="w-full rounded-md border border-[rgba(255,255,255,0.08)] bg-[#0f172a] px-2 py-1.5 text-[11px] text-[#e2e8f0]">
+                    <option value="">All</option>
+                    <template x-for="option in filterOptions(column.key)" :key="column.key + '-' + option">
+                      <option :value="option" x-text="option"></option>
+                    </template>
+                  </select>
+                </template>
+                <template x-if="column.filterType !== 'select'">
+                  <input type="text" x-model.debounce.200ms="columnFilters[column.key]" :placeholder="'Filter ' + column.label"
+                    class="w-full rounded-md border border-[rgba(255,255,255,0.08)] bg-[#0f172a] px-2 py-1.5 text-[11px] text-[#e2e8f0] placeholder-[#475569]">
+                </template>
+              </th>
+            </template>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-[rgba(255,255,255,0.06)]">
+          <template x-if="!loading && displayedDevices().length === 0">
+            <tr><td colspan="26" class="px-4 py-8 text-center text-sm text-[#94a3b8]">No devices found.</td></tr>
+          </template>
+          <template x-for="d in displayedDevices()" :key="d.id">
+            <tr class="text-[#e2e8f0]">
+              <template x-for="column in tableColumns" :key="'cell-' + d.id + '-' + column.key">
+                <td class="px-3 py-3" :class="cellClass(column, d)">
+                  <template x-if="column.key === 'status'">
+                    <span class="px-2 py-1 rounded text-[10px] font-bold uppercase"
+                      :class="d.status === 'ok' ? 'bg-emerald-500/20 text-emerald-400' : d.status === 'fail' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'"
+                      x-text="formatCell(column, d)"></span>
+                  </template>
+                  <template x-if="column.key !== 'status'">
+                    <span :title="cellTitle(column, d)" x-text="formatCell(column, d)"></span>
+                  </template>
+                </td>
+              </template>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const nocDataMode = '{{or .NocDataMode "data"}}';
+const nocDataInitialTab = '{{or .NocDataInitialTab "summary"}}';
+function nocDataPage() {
+  return {
+    mode: nocDataMode,
+    tab: nocDataInitialTab,
+    userVendorTab: 'cisco',
+    summaryScope: 'all',
+    selectedSummarySite: '',
+    q: '',
+    devices: [],
+    ranges: [],
+    tableColumns: [
+      { key: 'site', label: 'Site', filterType: 'text' },
+      { key: 'subnet', label: 'Subnet', filterType: 'text', mono: true },
+      { key: 'range', label: 'Range', filterType: 'text' },
+      { key: 'ip', label: 'IP', filterType: 'text', mono: true },
+      { key: 'vendor', label: 'Vendor', filterType: 'select' },
+      { key: 'method', label: 'Method', filterType: 'select' },
+      { key: 'profile', label: 'Profile', filterType: 'select' },
+      { key: 'status', label: 'Status', filterType: 'select' },
+      { key: 'hostname', label: 'Hostname', filterType: 'text' },
+      { key: 'model', label: 'Model', filterType: 'text' },
+      { key: 'version', label: 'Version', filterType: 'text' },
+      { key: 'serial', label: 'Serial', filterType: 'text' },
+      { key: 'uptime', label: 'Uptime', filterType: 'text' },
+      { key: 'if_up', label: 'IF_UP', filterType: 'text' },
+      { key: 'if_down', label: 'IF_DOWN', filterType: 'text' },
+      { key: 'default_router', label: 'Default Router', filterType: 'select' },
+      { key: 'layer_mode', label: 'Layer Mode', filterType: 'text' },
+      { key: 'user_count', label: 'Users Count', filterType: 'text' },
+      { key: 'users', label: 'Users', filterType: 'text', truncate: 'max-w-[18rem] truncate' },
+      { key: 'ssh', label: 'SSH', filterType: 'select' },
+      { key: 'telnet', label: 'Telnet', filterType: 'select' },
+      { key: 'snmp', label: 'SNMP', filterType: 'select' },
+      { key: 'ntp', label: 'NTP', filterType: 'select' },
+      { key: 'aaa', label: 'AAA', filterType: 'select' },
+      { key: 'syslog', label: 'Syslog', filterType: 'select' },
+      { key: 'error', label: 'Fail Cause', filterType: 'text', truncate: 'max-w-[22rem] truncate' }
+    ],
+    columnFilters: {},
+    sortBy: 'site',
+    sortDirection: 'asc',
+    credentials: { cisco: [], huawei: [], mikrotik: [] },
+    exclusions: [],
+    loading: true,
+    saving: false,
+    savingCredential: false,
+    savingExclusion: false,
+    runningAll: false,
+    runningFailedAll: false,
+    runningFailedIds: {},
+    deletingDeviceIds: {},
+    selectedFailedDeviceId: '',
+    selectedTableDeviceId: '',
+    formError: '',
+    formNotice: '',
+    credentialError: '',
+    exclusionError: '',
+    refreshTimer: null,
+    charts: {
+      status: null,
+      vendor: null,
+      layer: null
+    },
+    form: {
+      site: '',
+      range: '',
+      subnet: ''
+    },
+    credentialForms: {
+      cisco: { username: '', password: '' },
+      huawei: { username: '', password: '' },
+      mikrotik: { username: '', password: '' }
+    },
+    exclusionForm: {
+      subnet: '',
+      target: ''
+    },
+
+    async init() {
+      window.__nocDataPage = this;
+      this.initColumnFilters();
+      await this.fetchDevices();
+      await this.fetchCredentials();
+      await this.fetchExclusions();
+      this.$nextTick(() => this.renderSummaryCharts());
+    },
+
+    initColumnFilters() {
+      const next = {};
+      for (const column of this.tableColumns) {
+        next[column.key] = '';
+      }
+      this.columnFilters = next;
+    },
+
+    async fetchDevices() {
+      this.loading = true;
+      try {
+        const res = await fetch('/api/noc-data/devices');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load');
+        this.devices = data.devices || [];
+        this.ranges = this.groupRanges(this.devices);
+        if (this.summaryScope === 'site' && this.selectedSummarySite && !this.summarySites().includes(this.selectedSummarySite)) {
+          this.selectedSummarySite = '';
+        }
+        this.$nextTick(() => this.renderSummaryCharts());
+      } catch (e) {
+        console.error(e);
+        this.devices = [];
+        this.ranges = [];
+        this.$nextTick(() => this.renderSummaryCharts());
+      }
+      this.loading = false;
+    },
+
+    async fetchCredentials() {
+      try {
+        const res = await fetch('/api/noc-data/credentials');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load users');
+        const all = data.credentials || [];
+        this.credentials = {
+          cisco: all.filter(item => item.vendor_family === 'cisco'),
+          huawei: all.filter(item => item.vendor_family === 'huawei'),
+          mikrotik: all.filter(item => item.vendor_family === 'mikrotik')
+        };
+      } catch (e) {
+        console.error(e);
+        this.credentials = { cisco: [], huawei: [], mikrotik: [] };
+      }
+    },
+
+    async fetchExclusions() {
+      try {
+        const res = await fetch('/api/noc-data/exclusions');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load exclusions');
+        this.exclusions = data.exclusions || [];
+      } catch (e) {
+        console.error(e);
+        this.exclusions = [];
+      }
+    },
+
+    async submitDevice() {
+      this.formError = '';
+      this.formNotice = '';
+      this.saving = true;
+      try {
+        const res = await fetch('/api/noc-data/devices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.form)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          this.formError = data.error || 'Save failed';
+          return;
+        }
+        this.form = { site: '', range: '', subnet: '' };
+        this.formNotice = data.message || 'Scan started';
+        await this.fetchDevices();
+        this.startAutoRefresh('ranges');
+      } catch (e) {
+        this.formError = 'Network error';
+      } finally {
+        this.saving = false;
+      }
+    },
+
+    async runAll() {
+      this.runningAll = true;
+      try {
+        const res = await fetch('/api/noc-data/run', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Run failed');
+        setTimeout(() => this.fetchDevices(), 3000);
+      } catch (e) {
+        alert(e.message || 'Run failed');
+      } finally {
+        this.runningAll = false;
+      }
+    },
+
+    startAutoRefresh(activeTab = this.tab) {
+      this.tab = activeTab;
+      if (this.refreshTimer) clearInterval(this.refreshTimer);
+      let attempts = 0;
+      this.refreshTimer = setInterval(async () => {
+        attempts += 1;
+        await this.fetchDevices();
+        if (attempts >= 20) {
+          clearInterval(this.refreshTimer);
+          this.refreshTimer = null;
+        }
+      }, 3000);
+    },
+
+    async submitCredential() {
+      this.credentialError = '';
+      this.savingCredential = true;
+      try {
+        const vendor_family = this.userVendorTab;
+        const form = this.credentialForms[vendor_family];
+        const res = await fetch('/api/noc-data/credentials', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vendor_family, username: form.username, password: form.password })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          this.credentialError = data.error || 'Save failed';
+          return;
+        }
+        this.credentialForms[vendor_family] = { username: '', password: '' };
+        await this.fetchCredentials();
+      } catch (e) {
+        this.credentialError = 'Network error';
+      } finally {
+        this.savingCredential = false;
+      }
+    },
+
+    async deleteCredential(item) {
+      if (!item || !confirm('Remove this NOC Data user?')) return;
+      const res = await fetch('/api/noc-data/credentials/' + item.id, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || 'Delete failed');
+        return;
+      }
+      await this.fetchCredentials();
+    },
+
+    async submitExclusion() {
+      this.exclusionError = '';
+      this.savingExclusion = true;
+      try {
+        const res = await fetch('/api/noc-data/exclusions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.exclusionForm)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          this.exclusionError = data.error || 'Save failed';
+          return;
+        }
+        this.exclusionForm = { subnet: '', target: '' };
+        await this.fetchExclusions();
+      } catch (e) {
+        this.exclusionError = 'Network error';
+      } finally {
+        this.savingExclusion = false;
+      }
+    },
+
+    async deleteExclusion(item) {
+      if (!item || !confirm('Remove this exclusion?')) return;
+      const res = await fetch('/api/noc-data/exclusions/' + item.id, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || 'Delete failed');
+        return;
+      }
+      await this.fetchExclusions();
+    },
+
+    async deleteDeviceRow(device) {
+      if (!device || !device.id) return;
+      const label = device.ip || device.hostname || ('row #' + device.id);
+      if (!confirm('Hard delete this NOC Data row for ' + label + '?')) return;
+
+      this.deletingDeviceIds = { ...this.deletingDeviceIds, [device.id]: true };
+      try {
+        this.devices = (this.devices || []).filter(item => item.id !== device.id);
+        this.ranges = this.groupRanges(this.devices);
+        this.$nextTick(() => this.renderSummaryCharts());
+
+        const res = await fetch('/api/noc-data/devices/' + device.id, { method: 'DELETE' });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || 'Delete failed');
+        }
+      } catch (e) {
+        await this.fetchDevices();
+        alert(e.message || 'Delete failed');
+      } finally {
+        const next = { ...this.deletingDeviceIds };
+        delete next[device.id];
+        this.deletingDeviceIds = next;
+      }
+    },
+
+    async deleteSelectedTableDevice() {
+      const device = this.deviceById(this.selectedTableDeviceId);
+      if (!device) return;
+      await this.deleteDeviceRow(device);
+      this.selectedTableDeviceId = '';
+    },
+
+    deviceById(id) {
+      const numericID = Number(id || 0);
+      if (!numericID) return null;
+      return (this.devices || []).find(item => Number(item.id) === numericID) || null;
+    },
+
+    groupRanges(devices) {
+      const groups = new Map();
+      for (const device of devices || []) {
+        const key = [device.site || '', device.subnet || '', device.range || ''].join('||');
+        if (!groups.has(key)) {
+          groups.set(key, {
+            key,
+            open: false,
+            site: device.site || '',
+            subnet: device.subnet || '',
+            range: device.range || '',
+            devices: [],
+            reachableCount: 0,
+            okCount: 0,
+            failCount: 0,
+            pendingCount: 0
+          });
+        }
+        const group = groups.get(key);
+        group.devices.push(device);
+        group.reachableCount += 1;
+        if (device.status === 'ok') group.okCount += 1;
+        else if (device.status === 'fail') group.failCount += 1;
+        else group.pendingCount += 1;
+      }
+
+      return Array.from(groups.values())
+        .sort((a, b) => {
+          if (a.site !== b.site) return a.site.localeCompare(b.site);
+          if (a.subnet !== b.subnet) return a.subnet.localeCompare(b.subnet);
+          return a.range.localeCompare(b.range);
+        })
+        .map(group => ({
+          ...group,
+          devices: group.devices.sort((a, b) => (a.ip || '').localeCompare(b.ip || ''))
+        }));
+    },
+
+    failedDevices() {
+      const rows = Array.isArray(this.devices) ? this.devices : [];
+      return rows
+        .filter(device => String(device.status || '').toLowerCase() === 'fail')
+        .sort((a, b) => {
+          if ((a.site || '') !== (b.site || '')) return (a.site || '').localeCompare(b.site || '');
+          if ((a.subnet || '') !== (b.subnet || '')) return (a.subnet || '').localeCompare(b.subnet || '');
+          return (a.ip || '').localeCompare(b.ip || '');
+        });
+    },
+
+    async runFailedOneByOne(device = null) {
+      const targetId = device?.id || 0;
+      if (!targetId && this.failedDevices().length === 0) return;
+
+      if (targetId) {
+        this.runningFailedIds = { ...this.runningFailedIds, [targetId]: true };
+        this.devices = (this.devices || []).map(item => item.id === targetId ? { ...item, status: 'pending' } : item);
+        this.ranges = this.groupRanges(this.devices);
+      } else {
+        this.runningFailedAll = true;
+      }
+
+      try {
+        const url = targetId ? ('/api/noc-data/failed/run/' + targetId) : '/api/noc-data/failed/run';
+        const fetchOptions = {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        };
+        if (!targetId) {
+          fetchOptions.body = JSON.stringify({});
+        }
+
+        const res = await fetch(url, fetchOptions);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed recovery run failed');
+        await this.fetchDevices();
+        this.startAutoRefresh('failed');
+      } catch (e) {
+        await this.fetchDevices();
+        alert(e.message || 'Failed recovery run failed');
+      } finally {
+        if (targetId) {
+          const next = { ...this.runningFailedIds };
+          delete next[targetId];
+          this.runningFailedIds = next;
+        } else {
+          this.runningFailedAll = false;
+        }
+      }
+    },
+
+    async runSelectedFailedDevice() {
+      const device = this.deviceById(this.selectedFailedDeviceId);
+      if (!device) return;
+      await this.runFailedOneByOne(device);
+      this.selectedFailedDeviceId = '';
+    },
+
+    displayedDevices() {
+      let rows = Array.isArray(this.devices) ? [...this.devices] : [];
+      const search = this.q.trim().toLowerCase();
+      if (search) {
+        rows = rows.filter(device => this.deviceMatchesSearch(device, search));
+      }
+      rows = rows.filter(device => this.matchesColumnFilters(device));
+
+      const column = this.tableColumns.find(item => item.key === this.sortBy);
+      if (!column) return rows;
+
+      rows.sort((a, b) => {
+        const left = this.sortValue(column, a);
+        const right = this.sortValue(column, b);
+        if (left < right) return this.sortDirection === 'asc' ? -1 : 1;
+        if (left > right) return this.sortDirection === 'asc' ? 1 : -1;
+        return (a.id || 0) - (b.id || 0);
+      });
+
+      return rows;
+    },
+
+    deviceMatchesSearch(device, search) {
+      const fields = [
+        device.site,
+        device.subnet,
+        device.range,
+        device.ip,
+        device.vendor,
+        device.method,
+        device.status,
+        device.hostname,
+        device.model,
+        device.version,
+        device.serial,
+        device.uptime,
+        device.layer_mode,
+        device.users,
+        device.error
+      ];
+      return fields.some(value => String(value || '').toLowerCase().includes(search));
+    },
+
+    matchesColumnFilters(device) {
+      for (const column of this.tableColumns) {
+        const rawFilter = (this.columnFilters[column.key] || '').trim().toLowerCase();
+        if (!rawFilter) continue;
+        const value = this.filterValue(column, device).toLowerCase();
+        if (!value.includes(rawFilter)) return false;
+      }
+      return true;
+    },
+
+    filterValue(column, device) {
+      return this.formatCell(column, device);
+    },
+
+    sortValue(column, device) {
+      const value = device?.[column.key];
+      if (typeof value === 'number') return value;
+      if (typeof value === 'boolean') return value ? 1 : 0;
+      return this.formatCell(column, device).toLowerCase();
+    },
+
+    formatCell(column, device) {
+      const value = device?.[column.key];
+      if (column.key === 'status') return value || 'pending';
+      if (typeof value === 'boolean') return value ? 'yes' : 'no';
+      if (value === null || value === undefined || value === '') return '-';
+      return String(value);
+    },
+
+    cellClass(column) {
+      return [
+        column.mono ? 'font-mono' : '',
+        column.truncate || ''
+      ].filter(Boolean).join(' ');
+    },
+
+    cellTitle(column, device) {
+      const value = this.formatCell(column, device);
+      return value === '-' ? '' : value;
+    },
+
+    filterOptions(columnKey) {
+      const column = this.tableColumns.find(item => item.key === columnKey);
+      if (!column) return [];
+      const values = new Set();
+      for (const device of this.devices || []) {
+        const value = this.formatCell(column, device);
+        if (value && value !== '-') values.add(value);
+      }
+      return Array.from(values).sort((a, b) => a.localeCompare(b));
+    },
+
+    toggleSort(columnKey) {
+      if (this.sortBy === columnKey) {
+        this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+        return;
+      }
+      this.sortBy = columnKey;
+      this.sortDirection = 'asc';
+    },
+
+    sortIndicator(columnKey) {
+      if (this.sortBy !== columnKey) return '↕';
+      return this.sortDirection === 'asc' ? '↑' : '↓';
+    },
+
+    sortSummary() {
+      const column = this.tableColumns.find(item => item.key === this.sortBy);
+      if (!column) return 'No sorting';
+      return 'Sorted by ' + column.label + ' (' + this.sortDirection + ')';
+    },
+
+    clearColumnFilters() {
+      this.initColumnFilters();
+    },
+
+    switchTab(nextTab) {
+      this.tab = nextTab;
+      if (nextTab === 'summary') {
+        this.$nextTick(() => this.renderSummaryCharts());
+      }
+    },
+
+    summarySites() {
+      return Array.from(new Set((this.devices || []).map(device => String(device.site || '').trim()).filter(Boolean)))
+        .sort((a, b) => a.localeCompare(b));
+    },
+
+    summaryDataset() {
+      const rows = Array.isArray(this.devices) ? this.devices : [];
+      if (this.summaryScope !== 'site') return rows;
+      if (!this.selectedSummarySite) return [];
+      return rows.filter(device => String(device.site || '').trim() === this.selectedSummarySite);
+    },
+
+    summaryCards() {
+      const data = this.summaryDataset();
+      const ok = data.filter(device => (device.status || '').toLowerCase() === 'ok').length;
+      const fail = data.filter(device => (device.status || '').toLowerCase() === 'fail').length;
+      return [
+        { label: 'Devices In Scope', value: data.length },
+        { label: 'OK Devices', value: ok },
+        { label: 'Failed Devices', value: fail }
+      ];
+    },
+
+    summaryCounts() {
+      const data = this.summaryDataset();
+      const counts = {
+        status: { ok: 0, fail: 0 },
+        vendor: {},
+        layer: { 'Layer 2': 0, 'Layer 3': 0, Unknown: 0 }
+      };
+
+      for (const device of data) {
+        const status = String(device.status || '').toLowerCase();
+        if (status === 'ok') counts.status.ok += 1;
+        if (status === 'fail') counts.status.fail += 1;
+
+        const vendor = this.normalizeSummaryVendor(device.vendor);
+        counts.vendor[vendor] = (counts.vendor[vendor] || 0) + 1;
+
+        const layer = String(device.layer_mode || '').trim().toLowerCase();
+        if (layer === '2' || layer === 'layer 2' || layer === 'layer2' || layer === 'l2') counts.layer['Layer 2'] += 1;
+        else if (layer === '3' || layer === 'layer 3' || layer === 'layer3' || layer === 'l3') counts.layer['Layer 3'] += 1;
+        else counts.layer.Unknown += 1;
+      }
+
+      return counts;
+    },
+
+    normalizeSummaryVendor(vendor) {
+      const value = String(vendor || '').trim().toLowerCase();
+      return value || 'unknown';
+    },
+
+    summaryVendorEntries(vendorCounts) {
+      return Object.entries(vendorCounts || {})
+        .sort((a, b) => {
+          if (b[1] !== a[1]) return b[1] - a[1];
+          return a[0].localeCompare(b[0]);
+        })
+        .map(([key, count]) => ({
+          key,
+          label: this.summaryVendorLabel(key),
+          count,
+          color: this.summaryVendorColor(key)
+        }));
+    },
+
+    summaryVendorLabel(vendorKey) {
+      switch (vendorKey) {
+        case 'cisco_ios':
+          return 'Cisco IOS';
+        case 'cisco_nexus':
+          return 'Cisco Nexus';
+        case 'mikrotik':
+          return 'MikroTik';
+        case 'huawei':
+          return 'Huawei';
+        case 'unknown':
+          return 'Unknown';
+        default:
+          return vendorKey
+            .split(/[_\s-]+/)
+            .filter(Boolean)
+            .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+            .join(' ');
+      }
+    },
+
+    summaryVendorColor(vendorKey) {
+      const palette = {
+        cisco_ios: '#3b82f6',
+        cisco_nexus: '#1d4ed8',
+        mikrotik: '#f97316',
+        huawei: '#10b981',
+        unknown: '#64748b'
+      };
+      if (palette[vendorKey]) return palette[vendorKey];
+
+      const fallback = ['#38bdf8', '#eab308', '#8b5cf6', '#ef4444', '#14b8a6', '#f59e0b', '#6366f1', '#84cc16'];
+      let hash = 0;
+      for (const ch of vendorKey) hash = ((hash << 5) - hash) + ch.charCodeAt(0);
+      return fallback[Math.abs(hash) % fallback.length];
+    },
+
+    renderSummaryCharts() {
+      if (typeof Chart === 'undefined') return;
+      const data = this.summaryDataset();
+      if (!this.$refs.statusChart || !this.$refs.vendorChart || !this.$refs.layerChart) return;
+      if (this.summaryScope === 'site' && !this.selectedSummarySite) {
+        this.destroySummaryCharts();
+        return;
+      }
+
+      const counts = this.summaryCounts();
+      const vendorEntries = this.summaryVendorEntries(counts.vendor);
+      this.renderChart('status', this.$refs.statusChart, {
+        type: 'doughnut',
+        data: {
+          labels: ['OK', 'Fail'],
+          datasets: [{
+            data: [counts.status.ok, counts.status.fail],
+            backgroundColor: ['#10b981', '#ef4444'],
+            borderColor: ['#10b981', '#ef4444'],
+            borderWidth: 1
+          }]
+        },
+        options: this.summaryChartOptions('Device Status', data.length)
+      });
+
+      this.renderChart('vendor', this.$refs.vendorChart, {
+        type: 'bar',
+        data: {
+          labels: vendorEntries.map(item => item.label),
+          datasets: [{
+            label: 'Devices',
+            data: vendorEntries.map(item => item.count),
+            backgroundColor: vendorEntries.map(item => item.color),
+            borderRadius: 10
+          }]
+        },
+        options: this.summaryBarOptions()
+      });
+
+      this.renderChart('layer', this.$refs.layerChart, {
+        type: 'pie',
+        data: {
+          labels: ['Layer 2', 'Layer 3', 'Unknown'],
+          datasets: [{
+            data: [counts.layer['Layer 2'], counts.layer['Layer 3'], counts.layer.Unknown],
+            backgroundColor: ['#38bdf8', '#8b5cf6', '#475569'],
+            borderWidth: 1
+          }]
+        },
+        options: this.summaryChartOptions('Layer Mode', data.length)
+      });
+    },
+
+    renderChart(key, canvas, config) {
+      if (!canvas) return;
+      if (this.charts[key]) {
+        this.charts[key].destroy();
+      }
+      this.charts[key] = new Chart(canvas, config);
+    },
+
+    destroySummaryCharts() {
+      for (const key of Object.keys(this.charts)) {
+        if (this.charts[key]) {
+          this.charts[key].destroy();
+          this.charts[key] = null;
+        }
+      }
+    },
+
+    summaryChartOptions(title, total) {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            labels: { color: '#cbd5e1' }
+          },
+          title: {
+            display: true,
+            text: total ? 'Total devices: ' + total : 'No data',
+            color: '#94a3b8',
+            font: { size: 12, weight: '600' }
+          }
+        }
+      };
+    },
+
+    summaryBarOptions() {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          title: {
+            display: true,
+            text: 'Vendor distribution',
+            color: '#94a3b8',
+            font: { size: 12, weight: '600' }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: '#cbd5e1' },
+            grid: { color: 'rgba(255,255,255,0.08)' }
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { color: '#cbd5e1', precision: 0 },
+            grid: { color: 'rgba(255,255,255,0.08)' }
+          }
+        }
+      };
+    },
+
+    exportExcel() {
+      const rows = this.displayedDevices().map(device => ({
+        Site: device.site || '',
+        Subnet: device.subnet || '',
+        Range: device.range || '',
+        IP: device.ip || '',
+        Vendor: device.vendor || '',
+        Method: device.method || '',
+        Profile: device.profile || '',
+        Status: device.status || 'pending',
+        Hostname: device.hostname || '',
+        Model: device.model || '',
+        Version: device.version || '',
+        Serial: device.serial || '',
+        Uptime: device.uptime || '',
+        IF_UP: device.if_up ?? '',
+        IF_DOWN: device.if_down ?? '',
+        Default_Router: device.default_router ? 'yes' : 'no',
+        Layer_Mode: device.layer_mode || '',
+        Users_Count: device.user_count ?? '',
+        Users: device.users || '',
+        SSH: device.ssh ? 'yes' : 'no',
+        Telnet: device.telnet ? 'yes' : 'no',
+        SNMP: device.snmp ? 'yes' : 'no',
+        NTP: device.ntp ? 'yes' : 'no',
+        AAA: device.aaa ? 'yes' : 'no',
+        Syslog: device.syslog ? 'yes' : 'no',
+        Fail_Cause: device.error || ''
+      }));
+
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(rows.length ? rows : [{}]);
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'NOC Data');
+
+      const today = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(workbook, 'noc-data-' + today + '.xlsx');
+    },
+
+    toggleRange(rangeKey) {
+      this.ranges = this.ranges.map(group => group.key === rangeKey ? { ...group, open: !group.open } : group);
+    },
+
+    async deleteRange(group) {
+      if (!group || !group.devices?.length || !confirm('Remove this whole NOC range and all discovered reachable IPs?')) return;
+      for (const device of group.devices) {
+        const res = await fetch('/api/noc-data/devices/' + device.id, { method: 'DELETE' });
+        if (!res.ok) {
+          const data = await res.json();
+          alert(data.error || 'Delete failed');
+          return;
+        }
+      }
+      await this.fetchDevices();
+    }
+  };
+}
+</script>
+{{end}}

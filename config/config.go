@@ -11,12 +11,13 @@ import (
 )
 
 type Config struct {
-	DBHost     string
-	DBPort     string
-	DBUser     string
-	DBPassword string
-	DBName     string
-	DBSSLMode  string
+	DBHost       string
+	DBPort       string
+	DBUser       string
+	DBPassword   string
+	DBName       string
+	DBSSLMode    string
+	GormLogLevel string
 
 	ServerPort  string
 	JWTSecret   string
@@ -28,6 +29,14 @@ type Config struct {
 
 	HuaweiOLTUser string // Huawei SSH credentials (falls back to OLTUser if empty)
 	HuaweiOLTPass string
+
+	NocDataCiscoUser    string
+	NocDataCiscoPass    string
+	NocDataMikrotikUser string
+	NocDataMikrotikPass string
+	NocDataWorkers      int
+	NocDataCommandGap   time.Duration
+	NocDataHeavyCmdGap  time.Duration
 
 	// Elasticsearch (IP syslog alerts). Empty URL disables polling.
 	ElasticsearchURL           string
@@ -87,12 +96,13 @@ func Load() *Config {
 	}
 
 	return &Config{
-		DBHost:     getEnv("DB_HOST", "localhost"),
-		DBPort:     getEnv("DB_PORT", "5432"),
-		DBUser:     getEnv("DB_USER", "hussain"),
-		DBPassword: getEnv("DB_PASSWORD", ""),
-		DBName:     getEnv("DB_NAME", "devopscore"),
-		DBSSLMode:  getEnv("DB_SSLMODE", "disable"),
+		DBHost:       getEnv("DB_HOST", "localhost"),
+		DBPort:       getEnv("DB_PORT", "5432"),
+		DBUser:       getEnv("DB_USER", "hussain"),
+		DBPassword:   getEnv("DB_PASSWORD", ""),
+		DBName:       getEnv("DB_NAME", "devopscore"),
+		DBSSLMode:    getEnv("DB_SSLMODE", "disable"),
+		GormLogLevel: strings.TrimSpace(getEnv("GORM_LOG_LEVEL", "warn")),
 
 		ServerPort:  getEnv("PORT", "8080"),
 		JWTSecret:   getEnv("JWT_SECRET", ""),
@@ -104,6 +114,14 @@ func Load() *Config {
 
 		HuaweiOLTUser: getEnv("HW_SSH_USER", getEnv("OLT_SSH_USER", "")),
 		HuaweiOLTPass: getEnv("HW_SSH_PASS", getEnv("OLT_SSH_PASS", "")),
+
+		NocDataCiscoUser:    strings.TrimSpace(getEnv("NOC_DATA_CISCO_USER", "")),
+		NocDataCiscoPass:    getEnv("NOC_DATA_CISCO_PASS", ""),
+		NocDataMikrotikUser: strings.TrimSpace(getEnv("NOC_DATA_MIKROTIK_USER", "")),
+		NocDataMikrotikPass: getEnv("NOC_DATA_MIKROTIK_PASS", ""),
+		NocDataWorkers:      parseBoundedInt("NOC_DATA_WORKERS", 2, 1, 32),
+		NocDataCommandGap:   parseDurationBounded(getEnv("NOC_DATA_CMD_GAP", "250ms"), 250*time.Millisecond, 0, 30*time.Second),
+		NocDataHeavyCmdGap:  parseDurationBounded(getEnv("NOC_DATA_HEAVY_CMD_GAP", "750ms"), 750*time.Millisecond, 0, 30*time.Second),
 
 		ElasticsearchURL:           getEnv("ELASTICSEARCH_URL", ""),
 		ElasticsearchUser:          getEnv("ELASTICSEARCH_USER", ""),
@@ -220,4 +238,24 @@ func parseRetentionDays(key string, fallback int) int {
 		return fallback
 	}
 	return n
+}
+
+func parseBoundedInt(key string, fallback, min, max int) int {
+	v := strings.TrimSpace(getEnv(key, ""))
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < min || n > max {
+		return fallback
+	}
+	return n
+}
+
+func parseDurationBounded(s string, fallback, min, max time.Duration) time.Duration {
+	d, err := time.ParseDuration(strings.TrimSpace(s))
+	if err != nil || d < min || d > max {
+		return fallback
+	}
+	return d
 }

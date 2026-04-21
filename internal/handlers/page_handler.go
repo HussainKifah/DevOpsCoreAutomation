@@ -31,7 +31,9 @@ func NewPageHandler(templateDir string, userRepo repository.UserRepository, jwtM
 		"ip-cmd-output":    filepath.Join(templateDir, "ip", "cmd_output.html"),
 		"ip-activity-log":  filepath.Join(templateDir, "ip", "activity_log.html"),
 		"ip-syslog-alerts": filepath.Join(templateDir, "ip", "syslog_alerts.html"),
+		"noc-setup":        filepath.Join(templateDir, "noc", "noc_data.html"),
 		"noc-pass":         filepath.Join(templateDir, "noc", "noc_pass.html"),
+		"noc-data":         filepath.Join(templateDir, "noc", "noc_data.html"),
 		"noc-workflows":    filepath.Join(templateDir, "ip", "workflows.html"),
 		"noc-backups":      filepath.Join(templateDir, "ip", "backups.html"),
 		"noc-cmd-output":   filepath.Join(templateDir, "ip", "cmd_output.html"),
@@ -90,7 +92,7 @@ func (h *PageHandler) Login(c *gin.Context) {
 	if cookie, err := c.Cookie("access_token"); err == nil && cookie != "" {
 		if claims, err := h.jwtManager.ValidateToken(cookie); err == nil && claims.TokenType == "access" {
 			if claims.Role == "noc" {
-				c.Redirect(http.StatusFound, "/noc-pass")
+				c.Redirect(http.StatusFound, "/noc-setup")
 			} else {
 				c.Redirect(http.StatusFound, "/dashboard")
 			}
@@ -110,11 +112,19 @@ func (h *PageHandler) Devices(c *gin.Context)    { h.render(c, "devices", nil) }
 func (h *PageHandler) Alerts(c *gin.Context)     { h.render(c, "alerts", nil) }
 func (h *PageHandler) Backups(c *gin.Context)    { h.render(c, "backups", nil) }
 func (h *PageHandler) AdminUsers(c *gin.Context) { h.render(c, "admin-users", nil) }
+func (h *PageHandler) NocSetup(c *gin.Context) {
+	h.render(c, "noc-setup", gin.H{
+		"NocDataMode":       "setup",
+		"NocDataTitle":      "NOC Setup",
+		"NocDataInitialTab": "ranges",
+	})
+}
 func (h *PageHandler) Workflows(c *gin.Context) {
 	h.render(c, "workflows", gin.H{
 		"WorkflowAPIBase":     "/api/workflows",
 		"WorkflowTitle":       "Workflows",
 		"WorkflowDescription": "Manage BNG devices and scheduled backup / command jobs",
+		"WorkflowTreeMode":    "standard",
 	})
 }
 func (h *PageHandler) IPBackups(c *gin.Context) {
@@ -141,11 +151,19 @@ func (h *PageHandler) IPActivityLog(c *gin.Context) {
 }
 func (h *PageHandler) IPSyslogAlerts(c *gin.Context) { h.render(c, "ip-syslog-alerts", nil) }
 func (h *PageHandler) NocPass(c *gin.Context)        { h.render(c, "noc-pass", nil) }
+func (h *PageHandler) NocData(c *gin.Context) {
+	h.render(c, "noc-data", gin.H{
+		"NocDataMode":       "data",
+		"NocDataTitle":      "NOC Data",
+		"NocDataInitialTab": "summary",
+	})
+}
 func (h *PageHandler) NocWorkflows(c *gin.Context) {
 	h.render(c, "noc-workflows", gin.H{
 		"WorkflowAPIBase":     "/api/noc-workflows",
 		"WorkflowTitle":       "NOC Workflows",
-		"WorkflowDescription": "Manage NOC devices and scheduled backup / command jobs",
+		"WorkflowDescription": "Run scheduled backup and command jobs on devices synced from NOC Setup and categorized from NOC Data",
+		"WorkflowTreeMode":    "noc",
 	})
 }
 func (h *PageHandler) NocBackups(c *gin.Context) {

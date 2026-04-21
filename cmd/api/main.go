@@ -43,6 +43,7 @@ func main() {
 	workflowRepo := repository.NewWorkflowRepository(database)
 	nocWorkflowRepo := repository.NewWorkflowRepositoryForScope(database, "noc")
 	nocPassRepo := repository.NewNocPassRepository(database)
+	nocDataRepo := repository.NewNocDataRepository(database)
 	slackTicketRepo := repository.NewSlackTicketReminderRepository(database)
 	ruijieMailRepo := repository.NewRuijieMailRepository(database)
 
@@ -67,7 +68,7 @@ func main() {
 		log.Fatalf("failed to create workflow scheduler: %v", err)
 	}
 	wfSched.Start()
-	nocWfSched, err := scheduler.NewWorkflowSchedulerForScope(nocWorkflowRepo, cryptoKey, "noc")
+	nocWfSched, err := scheduler.NewWorkflowSchedulerForScope(nocWorkflowRepo, cryptoKey, "noc", nocDataRepo)
 	if err != nil {
 		log.Fatalf("failed to create NOC workflow scheduler: %v", err)
 	}
@@ -75,6 +76,8 @@ func main() {
 
 	nocPassRotator := scheduler.NewNocPassRotator(nocPassRepo, cryptoKey)
 	nocPassRotator.Start()
+	nocDataCollector := scheduler.NewNocDataCollector(nocDataRepo, cryptoKey, cfg)
+	nocDataCollector.Start()
 
 	server := gin.Default()
 
@@ -103,8 +106,9 @@ func main() {
 	inventoryH := handlers.NewInventoryHandler(inventoryRepo)
 	scanH := handlers.NewScanHandler(sched)
 	workflowH := handlers.NewWorkflowHandler(workflowRepo, wfSched, cryptoKey)
-	nocWorkflowH := handlers.NewWorkflowHandler(nocWorkflowRepo, nocWfSched, cryptoKey)
+	nocWorkflowH := handlers.NewNocWorkflowHandler(nocWorkflowRepo, nocWfSched, cryptoKey, nocDataRepo)
 	nocPassH := handlers.NewNocPassHandler(nocPassRepo, cryptoKey)
+	nocDataH := handlers.NewNocDataHandler(nocDataRepo, cryptoKey, nocDataCollector, cfg)
 	esSyslogRepo := repository.NewEsSyslogRepository(database)
 	esSyslogH := handlers.NewEsSyslogHandler(esSyslogRepo)
 
@@ -150,7 +154,7 @@ func main() {
 
 	pageH := handlers.NewPageHandler(filepath.Join(projectRoot, "templates"), userRepo, jwtManager)
 
-	router.Setup(server, jwtManager, hub, powerH, descH, healthH, healthHistoryH, portH, portHistoryH, calendarH, backupH, userH, authH, pageH, inventoryH, scanH, workflowH, nocWorkflowH, nocPassH, esSyslogH, slackEventsH)
+	router.Setup(server, jwtManager, hub, powerH, descH, healthH, healthHistoryH, portH, portHistoryH, calendarH, backupH, userH, authH, pageH, inventoryH, scanH, workflowH, nocWorkflowH, nocPassH, nocDataH, esSyslogH, slackEventsH)
 
 	esSyslogPoller := scheduler.NewEsSyslogPoller(cfg, esSyslogRepo, slackBatcher)
 	esSyslogPoller.Start()
@@ -187,6 +191,7 @@ func main() {
 	wfSched.Stop()
 	nocWfSched.Stop()
 	nocPassRotator.Stop()
+	nocDataCollector.Stop()
 	esSyslogPoller.Stop()
 	if slackReminder != nil {
 		slackReminder.Stop()

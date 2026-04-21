@@ -54,10 +54,17 @@ func dedupeStrs(in []string) []string {
 
 // scrapligoWideKEX / scrapligoWideCiphers are full algorithm lists for scrapligo's standard
 // transport "extra" options (see package comment on wideSSHConfig).
-var scrapligoWideKEX, scrapligoWideCiphers []string
+var scrapligoWideKEX, scrapligoWideCiphers, wideSSHHostKeys []string
+
+func wideSSHHostKeyAlgorithms() []string {
+	return slices.Clone(wideSSHHostKeys)
+}
 
 func init() {
 	c := wideSSHConfig()
 	scrapligoWideKEX = c.KeyExchanges
 	scrapligoWideCiphers = c.Ciphers
+	s := ssh.SupportedAlgorithms()
+	i := ssh.InsecureAlgorithms()
+	wideSSHHostKeys = dedupeStrs(append(slices.Clone(s.HostKeys), i.HostKeys...))
 }

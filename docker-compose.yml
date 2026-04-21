@@ -38,7 +38,7 @@ services:
       TLS_KEY: ${TLS_KEY:-}
       GIN_MODE: release
     volumes:
-      - backups:/app/backups
+      - ./backups:/app/backups
       - ./certs:/app/certs:ro
 
 volumes:

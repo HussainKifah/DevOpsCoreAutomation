@@ -89,8 +89,8 @@ func (s *Scheduler) Start() {
 	mustAdd(sched, s.cfg.PowerScanInterval, s.runHuaweiPowerScan, "huawei-power-scan")
 	mustAdd(sched, s.cfg.PortScanInterval, s.runHuaweiPortScan, "huawei-port-scan")
 
-	mustAddCron(sched, "0 21 * * *", s.runBackup, "backup")       // 9:00 PM daily
-	mustAddCron(sched, "0 21 * * *", s.runHuaweiBackup, "backup") // 9:00 PM daily
+	// mustAddCron(sched, "0 21 * * *", s.runBackup, "backup")       // 9:00 PM daily
+	// mustAddCron(sched, "0 21 * * *", s.runHuaweiBackup, "backup") // 9:00 PM daily
 	mustAddCron(sched, "0 1 * * *", s.runHistoryCleanup, "history-cleanup")
 	mustAddCron(sched, "0 2 1 * *", s.runInventoryScan, "inventory-scan") // Runs at 02:00 on the 1st of every month
 	mustAddCron(sched, "0 3 1 * *", s.runOntInterfaceScan, "ont-interface-scan")

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"regexp"
@@ -12,9 +11,11 @@ import (
 	"strings"
 	"time"
 
+	log "github.com/Flafl/DevOpsCore/utils"
 	"github.com/scrapli/scrapligo/driver/generic"
 	"github.com/scrapli/scrapligo/driver/options"
 	"github.com/scrapli/scrapligo/transport"
+	"github.com/scrapli/scrapligo/util"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -62,6 +63,10 @@ var vendorProfiles = map[string]VendorProfile{
 		UseRawSSH:  true,
 	},
 }
+
+var legacySystemSSHPasswordPrompt = regexp.MustCompile(`(?im)(?:.*@.*)?password(?: for [^:\r\n]+)?\s*:?\s?$`)
+var huaweiWorkflowMoreRe = regexp.MustCompile(`(?i)(----\s*more\s*----|--more--|<---\s*more\s*--->)`)
+var huaweiWorkflowContinueRe = regexp.MustCompile(`(?im)(continue\?\s*\[y/n\]\s*:?\s*[a-z]*\s*$|please choose 'yes' or 'no' first before pressing 'enter'.*\[y/n\]\s*:?\s*[a-z]*\s*$)`)
 
 func mikrotikSSH(host, user, pass string, timeout time.Duration, cmds ...string) (string, error) {
 	sshUser := user + "+cet511w4098h"
@@ -165,9 +170,16 @@ func mikrotikSSH(host, user, pass string, timeout time.Duration, cmds ...string)
 // MikrotikNocPassSSH connects with the admin username as entered (no +cet511w4098h IP-workflow suffix).
 // Uses a longer TCP dial timeout than IP backups (helps slow links; override with NOCPASS_SSH_DIAL_TIMEOUT_SEC).
 func MikrotikNocPassSSH(host, user, pass string, cmds ...string) (string, error) {
+	return MikrotikNocPassSSHContext(context.Background(), host, user, pass, cmds...)
+}
+
+func MikrotikNocPassSSHContext(ctx context.Context, host, user, pass string, cmds ...string) (string, error) {
 	profile, ok := vendorProfiles["mikrotik"]
 	if !ok {
 		return "", fmt.Errorf("mikrotik profile missing")
+	}
+	if ctx == nil {
+		ctx = context.Background()
 	}
 	host = strings.TrimSpace(host)
 	user = strings.TrimSpace(user)
@@ -204,27 +216,64 @@ func MikrotikNocPassSSH(host, user, pass string, cmds ...string) (string, error)
 	}
 
 	log.Printf("[noc-pass-mikrotik] %s: TCP connect...", host)
-	conn, err := net.DialTimeout("tcp", addr, dialTimeout)
+	dialer := &net.Dialer{Timeout: dialTimeout}
+	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		log.Printf("[noc-pass-mikrotik] %s: ✘ TCP dial failed: %v", host, err)
 		return "", fmt.Errorf("tcp dial: %w", err)
 	}
 	log.Printf("[noc-pass-mikrotik] %s: ✔ TCP connected to %s — SSH handshake...", host, addr)
 
-	sshConn, chans, reqs, err := ssh.NewClientConn(conn, addr, cfg)
-	if err != nil {
-		conn.Close()
-		log.Printf("[noc-pass-mikrotik] %s: ✘ SSH handshake failed: %v", host, err)
-		return "", fmt.Errorf("ssh handshake: %w", err)
+	type handshakeResult struct {
+		conn  ssh.Conn
+		chans <-chan ssh.NewChannel
+		reqs  <-chan *ssh.Request
+		err   error
 	}
+	handshakeCh := make(chan handshakeResult, 1)
+	go func() {
+		sshConn, chans, reqs, err := ssh.NewClientConn(conn, addr, cfg)
+		handshakeCh <- handshakeResult{conn: sshConn, chans: chans, reqs: reqs, err: err}
+	}()
+
+	var sshConn ssh.Conn
+	var chans <-chan ssh.NewChannel
+	var reqs <-chan *ssh.Request
+	select {
+	case res := <-handshakeCh:
+		if res.err != nil {
+			conn.Close()
+			log.Printf("[noc-pass-mikrotik] %s: ✘ SSH handshake failed: %v", host, res.err)
+			return "", fmt.Errorf("ssh handshake: %w", res.err)
+		}
+		sshConn = res.conn
+		chans = res.chans
+		reqs = res.reqs
+	case <-ctx.Done():
+		conn.Close()
+		return "", ctx.Err()
+	}
+
 	client := ssh.NewClient(sshConn, chans, reqs)
 	defer client.Close()
 	log.Printf("[noc-pass-mikrotik] %s: ✔ SSH connected", host)
 
 	fullCmd := strings.Join(cmds, "; ")
+	if len(cmds) > 1 {
+		parts := make([]string, 0, len(cmds)*2)
+		for _, cmd := range cmds {
+			trimmed := strings.TrimSpace(cmd)
+			if trimmed == "" {
+				continue
+			}
+			parts = append(parts, fmt.Sprintf(":put %q", trimmed))
+			parts = append(parts, trimmed)
+		}
+		fullCmd = strings.Join(parts, "; ")
+	}
 	execTimeout := profile.TimeoutOps
 
-	ctx, cancel := context.WithTimeout(context.Background(), execTimeout)
+	runCtx, cancel := context.WithTimeout(ctx, execTimeout)
 	defer cancel()
 
 	type result struct {
@@ -265,8 +314,11 @@ func MikrotikNocPassSSH(host, user, pass string, cmds ...string) (string, error)
 			return "", res.err
 		}
 		return res.output, nil
-	case <-ctx.Done():
+	case <-runCtx.Done():
 		client.Close()
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
 		return "", fmt.Errorf("timeout after %s: command never returned", execTimeout)
 	}
 }
@@ -364,14 +416,14 @@ func huaweiWorkflowSSH(host, user, pass string, cmds ...string) (string, error) 
 
 	// Huawei BNG prompt is <HOSTNAME> — never match standalone # (config separator)
 	initialPromptRe := regexp.MustCompile(`<[A-Za-z0-9._-]+>\s*$`)
-	moreRe := regexp.MustCompile(`(?i)(---- More|--More--|<--- More --->)`)
-
 	waitForBNGPrompt := func(label string, promptRe *regexp.Regexp, timeout time.Duration) error {
 		deadline := time.After(timeout)
 		tick := time.NewTicker(200 * time.Millisecond)
 		defer tick.Stop()
 		lastLen := 0
 		stableCount := 0
+		lastHandledRawLen := 0
+		continueAnswered := false
 		for {
 			select {
 			case <-deadline:
@@ -388,10 +440,44 @@ func huaweiWorkflowSSH(host, user, pass string, cmds ...string) (string, error) 
 					continue
 				}
 
-				// Handle pager
-				if moreRe.Match(raw) {
+				if curLen > lastHandledRawLen {
+					windowStart := lastHandledRawLen
+					if windowStart > 128 {
+						windowStart -= 128
+					} else {
+						windowStart = 0
+					}
+					fresh := raw[windowStart:]
+					cleanFresh := ansiRe.ReplaceAll(fresh, nil)
+
+					if huaweiWorkflowMoreRe.Match(cleanFresh) {
+						log.Printf("[hw-bng] %s: flushing pager (%s)", host, label)
+						stdinPipe.Write([]byte(" "))
+						lastHandledRawLen = curLen
+						lastLen = 0
+						stableCount = 0
+						time.Sleep(300 * time.Millisecond)
+						continue
+					}
+
+					if !continueAnswered && huaweiWorkflowContinueRe.Match(cleanFresh) {
+						log.Printf("[hw-bng] %s: answering continue prompt with y (%s)", host, label)
+						stdinPipe.Write([]byte("y\r\n"))
+						continueAnswered = true
+						lastHandledRawLen = curLen
+						lastLen = 0
+						stableCount = 0
+						time.Sleep(500 * time.Millisecond)
+						continue
+					}
+				}
+
+				// Handle pager seen in the full buffer too, in case ANSI/control bytes split the match.
+				clean := ansiRe.ReplaceAll(raw, nil)
+				if huaweiWorkflowMoreRe.Match(clean) {
 					log.Printf("[hw-bng] %s: flushing pager (%s)", host, label)
 					stdinPipe.Write([]byte(" "))
+					lastHandledRawLen = curLen
 					lastLen = 0
 					stableCount = 0
 					time.Sleep(300 * time.Millisecond)
@@ -411,7 +497,6 @@ func huaweiWorkflowSSH(host, user, pass string, cmds ...string) (string, error) 
 					continue
 				}
 
-				clean := ansiRe.ReplaceAll(raw, nil)
 				if promptRe.Match(clean) {
 					log.Printf("[hw-bng] %s: ✔ prompt detected (%s) after %d bytes stable", host, label, curLen)
 					return nil
@@ -502,50 +587,83 @@ func IPSendCommand(host, user, pass, vendor string, cmds ...string) (string, err
 		tp = transport.StandardTransport
 	}
 
-	log.Printf("[ip-ssh] %s (%s): creating driver — user=%q transport=%s timeout=%s prompt=%s",
-		host, vendor, sshUser, tp, profile.TimeoutOps, profile.PromptPattern)
+	rawLegacyFallbackAllowed := strings.EqualFold(vendor, "cisco") || strings.EqualFold(vendor, "nexus")
 
-	d, err := generic.NewDriver(
-		host,
-		options.WithAuthNoStrictKey(),
-		options.WithAuthUsername(sshUser),
-		options.WithAuthPassword(pass),
-		options.WithPromptPattern(profile.PromptPattern),
-		options.WithTransportType(tp),
-		options.WithTimeoutSocket(60*time.Second),
-		options.WithStandardTransportExtraKexs(scrapligoWideKEX),
-		options.WithStandardTransportExtraCiphers(scrapligoWideCiphers),
-		options.WithTimeoutOps(profile.TimeoutOps),
-		options.WithTermWidth(511),
-	)
-	if err != nil {
-		log.Printf("[ip-ssh] %s (%s): ✘ driver init failed: %v", host, vendor, err)
-		return "", fmt.Errorf("driver init: %w", err)
-	}
+	buildDriver := func(transportType string) (*generic.Driver, error) {
+		log.Printf("[ip-ssh] %s (%s): creating driver — user=%q transport=%s timeout=%s prompt=%s",
+			host, vendor, sshUser, transportType, profile.TimeoutOps, profile.PromptPattern)
 
-	log.Printf("[ip-ssh] %s (%s): opening SSH connection...", host, vendor)
-	if err := d.Open(); err != nil {
-		log.Printf("[ip-ssh] %s (%s): ✘ SSH open failed: %v", host, vendor, err)
-		return "", fmt.Errorf("ssh open: %w", err)
-	}
-	defer d.Close()
-	log.Printf("[ip-ssh] %s (%s): ✔ SSH connected", host, vendor)
-
-	for _, setup := range profile.SetupCmds {
-		log.Printf("[ip-ssh] %s (%s): running setup cmd: %q", host, vendor, setup)
-		_, setupErr := d.SendCommand(setup)
-		if setupErr != nil {
-			log.Printf("[ip-ssh] %s (%s): setup cmd %q error: %v", host, vendor, setup, setupErr)
-		} else {
-			log.Printf("[ip-ssh] %s (%s): setup cmd %q OK", host, vendor, setup)
+		opts := []util.Option{
+			options.WithAuthNoStrictKey(),
+			options.WithAuthUsername(sshUser),
+			options.WithAuthPassword(pass),
+			options.WithPasswordPattern(legacySystemSSHPasswordPrompt),
+			options.WithPromptPattern(profile.PromptPattern),
+			options.WithTransportType(transportType),
+			options.WithTimeoutSocket(60 * time.Second),
+			options.WithStandardTransportExtraKexs(scrapligoWideKEX),
+			options.WithStandardTransportExtraCiphers(scrapligoWideCiphers),
+			options.WithTimeoutOps(profile.TimeoutOps),
+			options.WithTermWidth(511),
 		}
+		return generic.NewDriver(host, opts...)
 	}
 
+	runSession := func(transportType string) (string, error) {
+		d, err := buildDriver(transportType)
+		if err != nil {
+			log.Printf("[ip-ssh] %s (%s): ✘ driver init failed: %v", host, vendor, err)
+			return "", fmt.Errorf("driver init: %w", err)
+		}
+		defer d.Close()
+
+		log.Printf("[ip-ssh] %s (%s): opening SSH connection...", host, vendor)
+		if err := d.Open(); err != nil {
+			log.Printf("[ip-ssh] %s (%s): ✘ SSH open failed: %v", host, vendor, err)
+			return "", fmt.Errorf("ssh open: %w", err)
+		}
+		log.Printf("[ip-ssh] %s (%s): ✔ SSH connected", host, vendor)
+
+		for _, setup := range profile.SetupCmds {
+			log.Printf("[ip-ssh] %s (%s): running setup cmd: %q", host, vendor, setup)
+			_, setupErr := d.SendCommand(setup)
+			if setupErr != nil {
+				log.Printf("[ip-ssh] %s (%s): setup cmd %q error: %v", host, vendor, setup, setupErr)
+			} else {
+				log.Printf("[ip-ssh] %s (%s): setup cmd %q OK", host, vendor, setup)
+			}
+		}
+
+		out, err := sendIPCommandsWithTimeout(d, host, vendor, profile.TimeoutOps+30*time.Second, cmds...)
+		if err != nil {
+			return "", err
+		}
+		logIPOutputPreview(host, vendor, out)
+		return out, nil
+	}
+
+	out, err := runSession(tp)
+	if err == nil || !rawLegacyFallbackAllowed || tp == transport.SystemTransport {
+		return out, err
+	}
+	if !shouldRetryCiscoWithLegacyFallback(err) {
+		return "", err
+	}
+
+	log.Printf("[ip-ssh] %s (%s): retrying through raw SSH legacy fallback after standard transport error: %v", host, vendor, err)
+	fallbackOut, fallbackErr := ciscoLegacyRawSSH(host, sshUser, pass, vendor, profile, cmds...)
+	if fallbackErr != nil {
+		return "", fmt.Errorf("standard transport failed: %v; raw SSH legacy fallback failed: %w", err, fallbackErr)
+	}
+	return fallbackOut, nil
+}
+
+func sendIPCommandsWithTimeout(d *generic.Driver, host, vendor string, timeout time.Duration, cmds ...string) (string, error) {
 	type result struct {
 		output string
 		err    error
 	}
-	timeout := profile.TimeoutOps + 30*time.Second
+
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -561,26 +679,27 @@ func IPSendCommand(host, user, pass, vendor string, cmds ...string) (string, err
 			}
 			log.Printf("[ip-ssh] %s (%s): ✔ command done — %d bytes", host, vendor, len(r.Result))
 			ch <- result{r.Result, nil}
-		} else {
-			// One SendCommand per line: batched SendCommands can hit "channel timeout sending input"
-			// on IOS when write memory or config mode is slow — each call waits for prompt before the next.
-			log.Printf("[ip-ssh] %s (%s): sending %d commands sequentially: %v", host, vendor, len(cmds), cmds)
-			var out strings.Builder
-			for i, cmd := range cmds {
-				log.Printf("[ip-ssh] %s (%s): cmd %d/%d: %q", host, vendor, i+1, len(cmds), cmd)
-				r, cmdErr := d.SendCommand(cmd)
-				if cmdErr != nil {
-					log.Printf("[ip-ssh] %s (%s): ✘ cmd %d/%d failed: %v", host, vendor, i+1, len(cmds), cmdErr)
-					ch <- result{out.String(), cmdErr}
-					return
-				}
-				log.Printf("[ip-ssh] %s (%s): ✔ cmd %d/%d OK — %d bytes", host, vendor, i+1, len(cmds), len(r.Result))
-				out.WriteString(r.Result)
-			}
-			joined := out.String()
-			log.Printf("[ip-ssh] %s (%s): ✔ all commands done — %d bytes", host, vendor, len(joined))
-			ch <- result{joined, nil}
+			return
 		}
+
+		// One SendCommand per line: batched SendCommands can hit "channel timeout sending input"
+		// on IOS when write memory or config mode is slow — each call waits for prompt before the next.
+		log.Printf("[ip-ssh] %s (%s): sending %d commands sequentially: %v", host, vendor, len(cmds), cmds)
+		var out strings.Builder
+		for i, cmd := range cmds {
+			log.Printf("[ip-ssh] %s (%s): cmd %d/%d: %q", host, vendor, i+1, len(cmds), cmd)
+			r, cmdErr := d.SendCommand(cmd)
+			if cmdErr != nil {
+				log.Printf("[ip-ssh] %s (%s): ✘ cmd %d/%d failed: %v", host, vendor, i+1, len(cmds), cmdErr)
+				ch <- result{out.String(), cmdErr}
+				return
+			}
+			log.Printf("[ip-ssh] %s (%s): ✔ cmd %d/%d OK — %d bytes", host, vendor, i+1, len(cmds), len(r.Result))
+			out.WriteString(r.Result)
+		}
+		joined := out.String()
+		log.Printf("[ip-ssh] %s (%s): ✔ all commands done — %d bytes", host, vendor, len(joined))
+		ch <- result{joined, nil}
 	}()
 
 	select {
@@ -588,18 +707,54 @@ func IPSendCommand(host, user, pass, vendor string, cmds ...string) (string, err
 		if res.err != nil {
 			return "", res.err
 		}
-		if len(res.output) > 200 {
-			log.Printf("[ip-ssh] %s (%s): output preview: %s...", host, vendor, res.output[:200])
-		} else if len(res.output) > 0 {
-			log.Printf("[ip-ssh] %s (%s): full output: %s", host, vendor, res.output)
-		} else {
-			log.Printf("[ip-ssh] %s (%s): ⚠ empty output!", host, vendor)
-		}
 		return res.output, nil
 	case <-ctx.Done():
 		log.Printf("[ip-ssh] %s (%s): ✘ TIMEOUT after %s — command hung, closing connection", host, vendor, timeout)
 		return "", fmt.Errorf("timeout after %s: command never returned", timeout)
 	}
+}
+
+func logIPOutputPreview(host, vendor, output string) {
+	log.FileOnlyf(
+		"[ip-ssh] %s (%s): full_output_begin\n%s\n[ip-ssh] %s (%s): full_output_end",
+		host,
+		vendor,
+		output,
+		host,
+		vendor,
+	)
+	if len(output) > 200 {
+		log.Printf("[ip-ssh] %s (%s): output preview: %s...", host, vendor, output[:200])
+		return
+	}
+	if len(output) > 0 {
+		log.Printf("[ip-ssh] %s (%s): full output: %s", host, vendor, output)
+		return
+	}
+	log.Printf("[ip-ssh] %s (%s): ⚠ empty output!", host, vendor)
+}
+
+func shouldRetryCiscoWithLegacyFallback(err error) bool {
+	if err == nil {
+		return false
+	}
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "ssh open") ||
+		strings.Contains(lower, "handshake") ||
+		strings.Contains(lower, "unable to authenticate") ||
+		strings.Contains(lower, "no supported methods remain") ||
+		strings.Contains(lower, "authentication failed") ||
+		strings.Contains(lower, "password prompt seen multiple times") ||
+		strings.Contains(lower, "channel timeout") ||
+		strings.Contains(lower, "timeout") ||
+		strings.Contains(lower, "errconnectionerror") ||
+		strings.Contains(lower, "connection reset") ||
+		strings.Contains(lower, "connection refused") ||
+		strings.Contains(lower, "connection closed") ||
+		strings.Contains(lower, "eof") ||
+		strings.Contains(lower, "kex") ||
+		strings.Contains(lower, "cipher") ||
+		strings.Contains(lower, "host key")
 }
 
 func IPBackupCommand(vendor string) (string, error) {

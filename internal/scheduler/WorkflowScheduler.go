@@ -17,10 +17,11 @@ import (
 
 // WorkflowScheduler manages team workflow jobs and writes activity logs.
 type WorkflowScheduler struct {
-	repo      repository.WorkflowRepository
-	jwtSecret []byte
-	sched     gocron.Scheduler
-	scope     string
+	repo        repository.WorkflowRepository
+	nocDataRepo repository.NocDataRepository
+	jwtSecret   []byte
+	sched       gocron.Scheduler
+	scope       string
 	// jobMap stores the gocron tag string for each registered WorkflowJob ID.
 	// We use the tag (not the gocron.Job value) because gocron.Job.ID() returns
 	// a uuid.UUID, not a uint, making it unsuitable as a map key for our purposes.
@@ -31,7 +32,7 @@ func NewWorkflowScheduler(repo repository.WorkflowRepository, jwtSecret []byte) 
 	return NewWorkflowSchedulerForScope(repo, jwtSecret, "ip")
 }
 
-func NewWorkflowSchedulerForScope(repo repository.WorkflowRepository, jwtSecret []byte, scope string) (*WorkflowScheduler, error) {
+func NewWorkflowSchedulerForScope(repo repository.WorkflowRepository, jwtSecret []byte, scope string, nocDataRepo ...repository.NocDataRepository) (*WorkflowScheduler, error) {
 	if scope == "" {
 		scope = "ip"
 	}
@@ -39,12 +40,17 @@ func NewWorkflowSchedulerForScope(repo repository.WorkflowRepository, jwtSecret 
 	if err != nil {
 		return nil, err
 	}
+	var ndRepo repository.NocDataRepository
+	if len(nocDataRepo) > 0 {
+		ndRepo = nocDataRepo[0]
+	}
 	return &WorkflowScheduler{
-		repo:      repo,
-		jwtSecret: jwtSecret,
-		sched:     s,
-		scope:     scope,
-		jobMap:    make(map[uint]string),
+		repo:        repo,
+		nocDataRepo: ndRepo,
+		jwtSecret:   jwtSecret,
+		sched:       s,
+		scope:       scope,
+		jobMap:      make(map[uint]string),
 	}, nil
 }
 
@@ -144,74 +150,116 @@ func (ws *WorkflowScheduler) runJob(jobID uint) {
 			fmt.Sprintf("Job %d not found in database: %v", jobID, err))
 		return
 	}
-	if j.Device.Host == "" {
-		msg := fmt.Sprintf("device for job %d has no host (may have been deleted)", jobID)
-		log.Printf("[workflow:%s] job %d: %s", ws.scope, jobID, msg)
+	targetDevices, targetLabel, err := ws.resolveTargetDevices(j)
+	if err != nil {
+		log.Printf("[workflow:%s] job %d: target resolution failed: %v", ws.scope, j.ID, err)
+		_ = ws.repo.UpdateJobStatus(j.ID, "error", err.Error(), time.Now())
+		ws.writeSystemLog("system", "error", "job_failed", fmt.Sprintf("Job %d target resolution failed: %v", j.ID, err))
+		return
+	}
+	if len(targetDevices) == 0 {
+		msg := fmt.Sprintf("no matching devices found for target %q", targetLabel)
+		log.Printf("[workflow:%s] job %d: %s", ws.scope, j.ID, msg)
 		_ = ws.repo.UpdateJobStatus(j.ID, "error", msg, time.Now())
 		return
 	}
+
+	successCount := 0
+	var failures []string
+	lastRunAt := time.Now()
+
+	for i := range targetDevices {
+		device := targetDevices[i]
+		runErr := ws.runJobForDevice(j, &device)
+		lastRunAt = time.Now()
+		if runErr != nil {
+			failures = append(failures, fmt.Sprintf("%s (%s): %v", device.Name, device.Host, runErr))
+			continue
+		}
+		successCount++
+	}
+
+	switch {
+	case len(failures) == 0:
+		msg := fmt.Sprintf("completed for %d device(s) on target %s", successCount, targetLabel)
+		_ = ws.repo.UpdateJobStatus(j.ID, "ok", msg, lastRunAt)
+	case successCount == 0:
+		msg := strings.Join(failures, "; ")
+		_ = ws.repo.UpdateJobStatus(j.ID, "error", msg, lastRunAt)
+	default:
+		msg := fmt.Sprintf("completed for %d device(s), %d failed on target %s", successCount, len(failures), targetLabel)
+		if len(failures) > 0 {
+			msg += ": " + strings.Join(failures, "; ")
+		}
+		_ = ws.repo.UpdateJobStatus(j.ID, "error", msg, lastRunAt)
+	}
+	log.Printf("[workflow:%s] END JOB %d", ws.scope, jobID)
+}
+
+func (ws *WorkflowScheduler) runJobForDevice(job *models.WorkflowJob, device *models.WorkflowDevice) error {
+	if strings.TrimSpace(device.Host) == "" {
+		return fmt.Errorf("device has no host")
+	}
+
+	jobView := *job
+	jobView.Device = *device
+
 	log.Printf("[workflow:%s] job %d: device=%s host=%s vendor=%s type=%s cmd=%q schedule=%s",
-		ws.scope, j.ID, j.Device.Name, j.Device.Host, j.Device.Vendor, j.JobType, j.Command, j.Schedule)
+		ws.scope, job.ID, device.Name, device.Host, device.Vendor, job.JobType, job.Command, job.Schedule)
+	log.Printf("[workflow:%s] job %d: decrypting credentials...", ws.scope, job.ID)
 
-	// ── Decrypt credentials ──────────────────────────────────────────────────
-	log.Printf("[workflow:%s] job %d: decrypting credentials...", ws.scope, j.ID)
-	user, err := crypto.Decrypt(ws.jwtSecret, j.Device.EncUsername)
+	user, err := crypto.Decrypt(ws.jwtSecret, device.EncUsername)
 	if err != nil {
 		msg := "credential decrypt failed: " + err.Error()
-		ws.writeJobLog(j, nil, "error", "job_failed", msg, 0)
-		_ = ws.repo.UpdateJobStatus(j.ID, "error", msg, time.Now())
-		log.Printf("[workflow:%s] job %d: %s", ws.scope, j.ID, msg)
-		return
+		ws.writeJobLog(&jobView, nil, "error", "job_failed", msg, 0)
+		log.Printf("[workflow:%s] job %d: %s", ws.scope, job.ID, msg)
+		return err
 	}
-	pass, err := crypto.Decrypt(ws.jwtSecret, j.Device.EncPassword)
+	pass, err := crypto.Decrypt(ws.jwtSecret, device.EncPassword)
 	if err != nil {
 		msg := "credential decrypt failed: " + err.Error()
-		ws.writeJobLog(j, nil, "error", "job_failed", msg, 0)
-		_ = ws.repo.UpdateJobStatus(j.ID, "error", msg, time.Now())
-		log.Printf("[workflow:%s] job %d: %s", ws.scope, j.ID, msg)
-		return
+		ws.writeJobLog(&jobView, nil, "error", "job_failed", msg, 0)
+		log.Printf("[workflow:%s] job %d: %s", ws.scope, job.ID, msg)
+		return err
 	}
-	log.Printf("[workflow:%s] job %d: credentials decrypted OK (user=%q)", ws.scope, j.ID, user)
+	log.Printf("[workflow:%s] job %d: credentials decrypted OK (user=%q)", ws.scope, job.ID, user)
 
-	// ── Create run record ────────────────────────────────────────────────────
 	startedAt := time.Now()
 	run := &models.WorkflowRun{
-		JobID:     j.ID,
-		StartedAt: startedAt,
-		Status:    "pending",
+		JobID:      job.ID,
+		DeviceName: device.Name,
+		Host:       device.Host,
+		Vendor:     device.Vendor,
+		StartedAt:  startedAt,
+		Status:     "pending",
 	}
 	if createErr := ws.repo.CreateRun(run); createErr != nil {
 		msg := "failed to create run record: " + createErr.Error()
-		log.Printf("[workflow:%s] job %d: %s", ws.scope, j.ID, msg)
-		_ = ws.repo.UpdateJobStatus(j.ID, "error", msg, time.Now())
-		return
+		log.Printf("[workflow:%s] job %d: %s", ws.scope, job.ID, msg)
+		return createErr
 	}
-	log.Printf("[workflow:%s] job %d: run record created (run_id=%d)", ws.scope, j.ID, run.ID)
 
-	ws.writeJobLog(j, &run.ID, "info", "job_started",
-		fmt.Sprintf("Started %s job on %s (%s)", j.JobType, j.Device.Name, j.Device.Host), 0)
+	ws.writeJobLog(&jobView, &run.ID, "info", "job_started",
+		fmt.Sprintf("Started %s job on %s (%s)", job.JobType, device.Name, device.Host), 0)
 
-	// ── Resolve command ──────────────────────────────────────────────────────
 	var cmd string
-	if j.JobType == "backup" {
-		cmd, err = shell.IPBackupCommand(j.Device.Vendor)
+	if job.JobType == "backup" {
+		cmd, err = shell.IPBackupCommand(device.Vendor)
 		if err != nil {
 			msg := "cannot resolve backup command for vendor: " + err.Error()
-			ws.writeJobLog(j, &run.ID, "error", "job_failed", msg, 0)
+			ws.writeJobLog(&jobView, &run.ID, "error", "job_failed", msg, 0)
 			_ = ws.repo.FinishRun(run.ID, "error", "", msg, time.Now())
-			_ = ws.repo.UpdateJobStatus(j.ID, "error", msg, time.Now())
-			log.Printf("[workflow:%s] job %d: %s", ws.scope, j.ID, msg)
-			return
+			return err
 		}
 	} else {
-		cmd = j.Command
+		cmd = job.Command
 	}
-	log.Printf("[workflow:%s] job %d: SSH connecting to %s (vendor=%s, transport=%s)...",
-		ws.scope, j.ID, j.Device.Host, j.Device.Vendor, "auto")
-	log.Printf("[workflow:%s] job %d: sending command: %q", ws.scope, j.ID, cmd)
 
-	// ── Execute via SSH ──────────────────────────────────────────────────────
-	output, execErr := shell.IPSendCommand(j.Device.Host, user, pass, j.Device.Vendor, cmd)
+	log.Printf("[workflow:%s] job %d: SSH connecting to %s (vendor=%s, transport=%s)...",
+		ws.scope, job.ID, device.Host, device.Vendor, "auto")
+	log.Printf("[workflow:%s] job %d: sending command: %q", ws.scope, job.ID, cmd)
+
+	output, execErr := shell.IPSendCommand(device.Host, user, pass, device.Vendor, cmd)
 
 	finishedAt := time.Now()
 	durationMs := finishedAt.Sub(startedAt).Milliseconds()
@@ -219,51 +267,159 @@ func (ws *WorkflowScheduler) runJob(jobID uint) {
 	if execErr != nil {
 		errMsg := execErr.Error()
 		_ = ws.repo.FinishRun(run.ID, "error", output, errMsg, finishedAt)
-		_ = ws.repo.UpdateJobStatus(j.ID, "error", errMsg, finishedAt)
-		ws.writeJobLog(j, &run.ID, "error", "job_failed",
+		ws.writeJobLog(&jobView, &run.ID, "error", "job_failed",
 			fmt.Sprintf("FAILED after %dms: %s", durationMs, errMsg), durationMs)
-		log.Printf("[workflow:%s] job %d: FAILED in %dms: %s", ws.scope, j.ID, durationMs, errMsg)
+		log.Printf("[workflow:%s] job %d: FAILED in %dms: %s", ws.scope, job.ID, durationMs, errMsg)
 		if len(output) > 0 {
 			preview := output
 			if len(preview) > 500 {
 				preview = preview[:500] + "...(truncated)"
 			}
-			log.Printf("[workflow:%s] job %d: partial output:\n%s", ws.scope, j.ID, preview)
+			log.Printf("[workflow:%s] job %d: partial output:\n%s", ws.scope, job.ID, preview)
 		}
-		return
+		return execErr
 	}
 
-	// ── Success ──────────────────────────────────────────────────────────────
 	_ = ws.repo.FinishRun(run.ID, "ok", output, "", finishedAt)
-	_ = ws.repo.UpdateJobStatus(j.ID, "ok", "", finishedAt)
 
 	successMsg := fmt.Sprintf("Completed in %dms — %d bytes collected", durationMs, len(output))
-	if j.JobType == "backup" {
-		savedPath := ws.saveBackupFile(j, output, startedAt)
+	if job.JobType == "backup" {
+		savedPath := ws.saveBackupFile(device, output, startedAt)
 		successMsg = fmt.Sprintf("Backup completed in %dms — %d bytes — saved to %s",
 			durationMs, len(output), savedPath)
 	}
 
-	ws.writeJobLog(j, &run.ID, "success", "job_success", successMsg, durationMs)
-	log.Printf("[workflow:%s] job %d: OK in %dms (%d bytes)", ws.scope, j.ID, durationMs, len(output))
+	ws.writeJobLog(&jobView, &run.ID, "success", "job_success", successMsg, durationMs)
+	log.Printf("[workflow:%s] job %d: OK in %dms (%d bytes)", ws.scope, job.ID, durationMs, len(output))
 	if len(output) > 0 {
 		preview := output
 		if len(preview) > 300 {
 			preview = preview[:300] + "...(truncated)"
 		}
-		log.Printf("[workflow:%s] job %d: output preview:\n%s", ws.scope, j.ID, preview)
+		log.Printf("[workflow:%s] job %d: output preview:\n%s", ws.scope, job.ID, preview)
 	}
-	log.Printf("[workflow:%s] END JOB %d", ws.scope, jobID)
+	return nil
 }
 
-func (ws *WorkflowScheduler) saveBackupFile(j *models.WorkflowJob, output string, t time.Time) string {
-	vendor := strings.ToLower(j.Device.Vendor)
+func (ws *WorkflowScheduler) resolveTargetDevices(job *models.WorkflowJob) ([]models.WorkflowDevice, string, error) {
+	targetType := strings.ToLower(strings.TrimSpace(job.TargetType))
+	if targetType == "" {
+		targetType = "device"
+	}
+	targetLabel := strings.TrimSpace(job.TargetLabel)
+	if targetLabel == "" {
+		targetLabel = strings.TrimSpace(job.TargetValue)
+	}
+
+	if targetType == "device" {
+		if strings.TrimSpace(job.Device.Host) != "" {
+			if targetLabel == "" {
+				targetLabel = job.Device.Name
+			}
+			return []models.WorkflowDevice{job.Device}, targetLabel, nil
+		}
+		if job.DeviceID == nil {
+			return nil, targetLabel, fmt.Errorf("device target has no device_id")
+		}
+		device, err := ws.repo.GetDevice(*job.DeviceID)
+		if err != nil {
+			return nil, targetLabel, fmt.Errorf("device not found")
+		}
+		if targetLabel == "" {
+			targetLabel = device.Name
+		}
+		return []models.WorkflowDevice{*device}, targetLabel, nil
+	}
+
+	if ws.nocDataRepo == nil {
+		return nil, targetLabel, fmt.Errorf("group targets are not available for this workflow scope")
+	}
+
+	rows, err := ws.nocDataRepo.ListAll()
+	if err != nil {
+		return nil, targetLabel, err
+	}
+
+	seenHosts := make(map[string]struct{})
+	devices := make([]models.WorkflowDevice, 0)
+	for i := range rows {
+		row := rows[i]
+		if !ws.nocTargetMatches(job, &row) {
+			continue
+		}
+		host := strings.ToLower(strings.TrimSpace(row.Host))
+		if host == "" {
+			continue
+		}
+		if _, ok := seenHosts[host]; ok {
+			continue
+		}
+		device, err := ws.repo.GetDeviceByHost(row.Host)
+		if err != nil {
+			continue
+		}
+		seenHosts[host] = struct{}{}
+		devices = append(devices, *device)
+	}
+
+	return devices, targetLabel, nil
+}
+
+func (ws *WorkflowScheduler) nocTargetMatches(job *models.WorkflowJob, row *models.NocDataDevice) bool {
+	targetType := strings.ToLower(strings.TrimSpace(job.TargetType))
+	targetValue := strings.TrimSpace(job.TargetValue)
+	switch targetType {
+	case "network_type":
+		return nocWorkflowNetworkTypeFromSite(row.Site) == strings.ToLower(targetValue)
+	case "province":
+		return strings.EqualFold(nocWorkflowProvinceFromSite(row.Site), targetValue)
+	case "vendor":
+		return strings.EqualFold(normalizeNocWorkflowSchedulerVendor(row.Vendor, row.DeviceModel), targetValue)
+	case "model":
+		return strings.EqualFold(strings.TrimSpace(row.DeviceModel), targetValue)
+	default:
+		return false
+	}
+}
+
+func normalizeNocWorkflowSchedulerVendor(vendor, model string) string {
+	normalizedVendor := strings.ToLower(strings.TrimSpace(vendor))
+	normalizedModel := strings.ToLower(strings.TrimSpace(model))
+	if (normalizedVendor == "cisco_ios" || normalizedVendor == "cisco_nexus" || normalizedVendor == "cisco") &&
+		(strings.Contains(normalizedModel, "nexus") || strings.Contains(normalizedModel, "n9k") || strings.Contains(normalizedModel, "nexus9000")) {
+		return "cisco_nexus"
+	}
+	return normalizedVendor
+}
+
+func nocWorkflowProvinceFromSite(site string) string {
+	trimmed := strings.TrimSpace(site)
+	if trimmed == "" {
+		return "Unknown"
+	}
+	parts := strings.Fields(trimmed)
+	if len(parts) == 0 {
+		return "Unknown"
+	}
+	first := strings.ToLower(parts[0])
+	return strings.ToUpper(first[:1]) + first[1:]
+}
+
+func nocWorkflowNetworkTypeFromSite(site string) string {
+	if strings.Contains(strings.ToLower(strings.TrimSpace(site)), "ftth") {
+		return "ftth"
+	}
+	return "wifi"
+}
+
+func (ws *WorkflowScheduler) saveBackupFile(device *models.WorkflowDevice, output string, t time.Time) string {
+	vendor := strings.ToLower(device.Vendor)
 	folder := filepath.Join("backups", ws.scope+"-team", vendor, t.Format("2006-01-02"))
 	if err := os.MkdirAll(folder, 0o755); err != nil {
 		log.Printf("[workflow:%s] saveBackupFile mkdir %s: %v", ws.scope, folder, err)
 	}
-	name := strings.ReplaceAll(j.Device.Name, "/", "-")
-	filename := fmt.Sprintf("%s_%s.txt", name, j.Device.Host)
+	name := strings.ReplaceAll(device.Name, "/", "-")
+	filename := fmt.Sprintf("%s_%s.txt", name, device.Host)
 	path := filepath.Join(folder, filename)
 	if err := os.WriteFile(path, []byte(output), 0o644); err != nil {
 		log.Printf("[workflow:%s] saveBackupFile write %s: %v", ws.scope, path, err)

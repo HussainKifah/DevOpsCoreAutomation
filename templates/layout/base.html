@@ -156,9 +156,17 @@
           <span class="text-xs font-semibold uppercase tracking-[0.2em] text-[#f97316]">NOC TEAM</span>
         </div>
       </div>
+      <a href="/noc-setup" class="sidebar-link flex items-center justify-center lg:justify-start gap-2 lg:gap-3 px-2 lg:px-3 py-2.5 rounded-r-lg text-sm font-medium text-[#94a3b8] lg:pl-4 {{if eq .Page "noc-setup"}}active{{end}}" title="NOC Setup">
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 6.75h15m-15 5.25h15m-15 5.25h9m5.25 0h.008v.008h-.008v-.008Z"/></svg>
+        <span class="hidden lg:inline">NOC Setup</span>
+      </a>
       <a href="/noc-pass" class="sidebar-link flex items-center justify-center lg:justify-start gap-2 lg:gap-3 px-2 lg:px-3 py-2.5 rounded-r-lg text-sm font-medium text-[#94a3b8] lg:pl-4 {{if eq .Page "noc-pass"}}active{{end}}" title="NOC Pass">
         <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z"/></svg>
         <span class="hidden lg:inline">NOC Pass</span>
+      </a>
+      <a href="/noc-data" class="sidebar-link flex items-center justify-center lg:justify-start gap-2 lg:gap-3 px-2 lg:px-3 py-2.5 rounded-r-lg text-sm font-medium text-[#94a3b8] lg:pl-4 {{if eq .Page "noc-data"}}active{{end}}" title="NOC Data">
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.5h16.5m-16.5 5.25h16.5m-16.5 5.25h16.5m-16.5 5.25h16.5"/></svg>
+        <span class="hidden lg:inline">NOC Data</span>
       </a>
       <a href="/noc-workflows" class="sidebar-link flex items-center justify-center lg:justify-start gap-2 lg:gap-3 px-2 lg:px-3 py-2.5 rounded-r-lg text-sm font-medium text-[#94a3b8] lg:pl-4 {{if eq .Page "noc-workflows"}}active{{end}}" title="NOC Workflows">
         <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z"/></svg>
@@ -229,9 +237,17 @@
   <!-- Mobile bottom nav -->
   <nav class="fixed bottom-0 left-0 right-0 sm:hidden h-16 bg-[#111827] border-t border-[rgba(255,255,255,0.08)] flex items-center justify-around z-30">
     {{if eq .UserRole "noc"}}
+    <a href="/noc-setup" class="flex flex-col items-center gap-1 py-2 px-4 {{if eq .Page "noc-setup"}}text-[#f97316]{{else}}text-[#94a3b8]{{end}}">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 6.75h15m-15 5.25h15m-15 5.25h9m5.25 0h.008v.008h-.008v-.008Z"/></svg>
+      <span class="text-[10px]">Setup</span>
+    </a>
     <a href="/noc-pass" class="flex flex-col items-center gap-1 py-2 px-4 {{if eq .Page "noc-pass"}}text-[#f97316]{{else}}text-[#94a3b8]{{end}}">
       <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z"/></svg>
       <span class="text-[10px]">NOC Pass</span>
+    </a>
+    <a href="/noc-data" class="flex flex-col items-center gap-1 py-2 px-4 {{if eq .Page "noc-data"}}text-[#f97316]{{else}}text-[#94a3b8]{{end}}">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.5h16.5m-16.5 5.25h16.5m-16.5 5.25h16.5m-16.5 5.25h16.5"/></svg>
+      <span class="text-[10px]">Data</span>
     </a>
     <a href="/noc-workflows" class="flex flex-col items-center gap-1 py-2 px-4 {{if eq .Page "noc-workflows"}}text-[#f97316]{{else}}text-[#94a3b8]{{end}}">
       <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z"/></svg>

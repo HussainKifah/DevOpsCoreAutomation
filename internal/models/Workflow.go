@@ -20,8 +20,11 @@ type WorkflowDevice struct {
 type WorkflowJob struct {
 	gorm.Model
 	Scope       string         `gorm:"not null;default:ip;size:20;index" json:"scope"`
-	DeviceID    uint           `gorm:"not null;index" json:"device_id"`
+	DeviceID    *uint          `gorm:"index" json:"device_id"`
 	Device      WorkflowDevice `gorm:"foreignKey:DeviceID" json:"device,omitempty"`
+	TargetType  string         `gorm:"size:32;index" json:"target_type"`
+	TargetValue string         `gorm:"size:255;index" json:"target_value"`
+	TargetLabel string         `gorm:"size:255" json:"target_label"`
 	JobType     string         `gorm:"not null;size:20" json:"job_type"` // backup | command
 	Command     string         `gorm:"type:text" json:"command"`
 	Schedule    string         `gorm:"not null;size:50" json:"schedule"` // "24h" or "0 21 * * *"
@@ -36,6 +39,9 @@ type WorkflowRun struct {
 	ID         uint       `gorm:"primaryKey;autoIncrement" json:"id"`
 	Scope      string     `gorm:"not null;default:ip;size:20;index" json:"scope"`
 	JobID      uint       `gorm:"not null;index" json:"job_id"`
+	DeviceName string     `gorm:"size:100" json:"device_name"`
+	Host       string     `gorm:"size:64;index" json:"host"`
+	Vendor     string     `gorm:"size:20" json:"vendor"`
 	StartedAt  time.Time  `gorm:"not null;index" json:"started_at"`
 	FinishedAt *time.Time `json:"finished_at"`
 	Status     string     `gorm:"not null;size:20" json:"status"` // ok | error | pending

@@ -28,6 +28,7 @@ func Setup(
 	workflowH *handlers.WorkflowHandler,
 	nocWorkflowH *handlers.WorkflowHandler,
 	nocPassH *handlers.NocPassHandler,
+	nocDataH *handlers.NocDataHandler,
 	esSyslogH *handlers.EsSyslogHandler,
 	slackEventsH *handlers.SlackEventsHandler,
 ) {
@@ -171,7 +172,9 @@ func Setup(
 	nocPages := r.Group("/")
 	nocPages.Use(middleware.PageAuthMiddleware(jwtManager), middleware.PageRoleGuard("noc", "admin"))
 	{
+		nocPages.GET("/noc-setup", pageH.NocSetup)
 		nocPages.GET("/noc-pass", pageH.NocPass)
+		nocPages.GET("/noc-data", pageH.NocData)
 		nocPages.GET("/noc-workflows", pageH.NocWorkflows)
 		nocPages.GET("/noc-backups", pageH.NocBackups)
 		nocPages.GET("/noc-cmd-output", pageH.NocCmdOutput)
@@ -190,6 +193,24 @@ func Setup(
 		nocAPI.GET("/keep-users", nocPassH.ListKeepUsers)
 		nocAPI.POST("/keep-users", nocPassH.CreateKeepUser)
 		nocAPI.DELETE("/keep-users/:id", nocPassH.DeleteKeepUser)
+	}
+
+	nocDataAPI := r.Group("/api/noc-data")
+	nocDataAPI.Use(middleware.AuthMiddleware(jwtManager), middleware.RoleGuard("noc", "admin"))
+	{
+		nocDataAPI.GET("/devices", nocDataH.ListDevices)
+		nocDataAPI.POST("/devices", nocDataH.CreateDevice)
+		nocDataAPI.DELETE("/devices/:id", nocDataH.DeleteDevice)
+		nocDataAPI.POST("/failed/run", nocDataH.RunFailedDevicesOneByOne)
+		nocDataAPI.POST("/failed/run/:id", nocDataH.RunFailedDevice)
+		nocDataAPI.GET("/credentials", nocDataH.ListCredentials)
+		nocDataAPI.POST("/credentials", nocDataH.CreateCredential)
+		nocDataAPI.DELETE("/credentials/:id", nocDataH.DeleteCredential)
+		nocDataAPI.GET("/exclusions", nocDataH.ListExclusions)
+		nocDataAPI.POST("/exclusions", nocDataH.CreateExclusion)
+		nocDataAPI.DELETE("/exclusions/:id", nocDataH.DeleteExclusion)
+		nocDataAPI.POST("/run", nocDataH.RunAll)
+		nocDataAPI.GET("/export.csv", nocDataH.ExportCSV)
 	}
 
 	// NOC Team workflow and backup API routes (role: noc, admin)
