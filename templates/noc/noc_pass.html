@@ -1,93 +1,455 @@
 {{define "content"}}
-<div x-data="nocPassPage()" x-init="init()" class="max-w-6xl mx-auto">
+<div x-data="nocPassPage()" x-init="init()" class="max-w-7xl mx-auto">
   <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
     <div>
       <h1 class="text-2xl font-bold text-[#f1f5f9]">NOC Pass</h1>
-      <p class="text-sm text-[#94a3b8] mt-1" x-show="tab === 'keep-users'">Protected usernames in this tab are skipped by the rotator delete step on every managed device.</p>
+      <p class="text-sm text-[#94a3b8] mt-1">Manage multiple NOC PASS policies sourced from current NOC Data. Each policy runs one device at a time.</p>
     </div>
-    <template x-if="tab === 'devices'">
-      <button @click="showAdd = true"
-        class="px-4 py-2 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white text-sm font-semibold transition-colors btn-press">
-        Add device
-      </button>
-    </template>
+    <button @click="createPolicy()" :disabled="creatingPolicy" class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-[#f97316] text-white hover:bg-[#ea580c] transition-all btn-press disabled:opacity-50">
+      <span x-text="creatingPolicy ? 'Adding...' : 'New Policy'"></span>
+    </button>
   </div>
 
   <div class="flex flex-wrap gap-2 mb-4">
-    <button type="button" @click="tab = 'devices'"
-      class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-      :class="tab === 'devices' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">
-      Devices
-    </button>
-    <button type="button" @click="tab = 'keep-users'"
-      class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-      :class="tab === 'keep-users' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">
-      Keep Users
-    </button>
+    <button type="button" @click="tab='policies'" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors" :class="tab==='policies' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">Policies</button>
+    <button type="button" @click="tab='exclusions'" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors" :class="tab==='exclusions' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">Exclusions</button>
+    <button type="button" @click="tab='saved-users'" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors" :class="tab==='saved-users' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">Saved Users</button>
+    <button type="button" @click="tab='keep-users'" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors" :class="tab==='keep-users' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">Keep Users</button>
   </div>
 
-  <div x-show="tab === 'devices'">
-    <div class="mb-4">
-      <input type="search" x-model.debounce.300ms="q" @input="fetchList()"
-        placeholder="Search name or IP / host…"
-        class="w-full max-w-md rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] text-[#f1f5f9] placeholder-[#475569] px-3 py-2 text-sm focus:ring-2 focus:ring-[#f97316] focus:border-[#f97316]">
+  <template x-if="loading">
+    <div class="space-y-4">
+      <div class="h-40 rounded-xl bg-[#1a2236] animate-pulse border border-[rgba(255,255,255,0.08)]"></div>
+      <div class="h-64 rounded-xl bg-[#1a2236] animate-pulse border border-[rgba(255,255,255,0.08)]"></div>
+    </div>
+  </template>
+
+  <div x-show="!loading && tab==='policies'" class="space-y-6">
+    <div class="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+      <section class="space-y-4">
+        <template x-if="policies.length === 0">
+          <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] p-5 text-sm text-[#94a3b8]">No policies yet.</div>
+        </template>
+
+        <template x-for="policy in policies" :key="policy.id">
+          <div class="rounded-xl border bg-[#1a2236] p-5 transition-colors" :class="selectedPolicyId===policy.id ? 'border-[#f97316]/50' : 'border-[rgba(255,255,255,0.08)]'">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+              <div class="min-w-0">
+                <button @click="selectPolicy(policy.id)" class="text-left">
+                  <h2 class="text-base font-semibold text-[#f1f5f9] truncate" x-text="policy.name || policy.target_label || ('Policy #' + policy.id)"></h2>
+                  <p class="text-xs text-[#94a3b8] mt-1">
+                    <span x-text="policy.target_label || 'All Networks'"></span>
+                    <span> · </span>
+                    <span x-text="policy.password_mode === 'manual' ? 'Manual passwords' : 'Random daily passwords'"></span>
+                  </p>
+                </button>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-1 text-[10px] uppercase rounded-full font-semibold" :class="policy.enabled ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[#475569]/30 text-[#94a3b8]'" x-text="policy.enabled ? 'Enabled' : 'Disabled'"></span>
+                <button @click="deletePolicy(policy)" :disabled="deletingPolicyId===policy.id || policies.length<=1" class="px-3 py-1.5 text-xs rounded-lg text-[#ef4444] hover:bg-red-500/10 disabled:opacity-40">Delete</button>
+              </div>
+            </div>
+
+            <div class="grid gap-4 md:grid-cols-2">
+              <div>
+                <label class="block text-xs text-[#94a3b8] mb-1">Policy Name</label>
+                <input x-model="policy.name" @focus="selectPolicy(policy.id)" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] px-3 py-2 text-sm">
+              </div>
+              <div class="flex items-end">
+                <label class="inline-flex items-center gap-2 text-sm text-[#f1f5f9]">
+                  <input type="checkbox" x-model="policy.enabled" @focus="selectPolicy(policy.id)" class="rounded border-[rgba(255,255,255,0.12)] bg-[#111827] text-[#f97316]">
+                  <span>Enabled</span>
+                </label>
+              </div>
+              <div>
+                <label class="block text-xs text-[#94a3b8] mb-1">Target Type</label>
+                <select x-model="policy.target_type" @change="syncTargetSelection(policy); selectPolicy(policy.id)" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] px-3 py-2 text-sm">
+                  <option value="all_networks">All Networks</option>
+                  <option value="network_type">FTTH / WiFi</option>
+                  <option value="province">Province</option>
+                  <option value="vendor">Vendor</option>
+                  <option value="model">Model</option>
+                  <option value="device">Device</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-[#94a3b8] mb-1">Target</label>
+                <select x-model="policy.target_value" @change="syncTargetSelection(policy); selectPolicy(policy.id)" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] px-3 py-2 text-sm">
+                  <template x-for="option in targetOptions(policy)" :key="option.key">
+                    <option :value="option.value" x-text="option.label"></option>
+                  </template>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-[#94a3b8] mb-1">Password Mode</label>
+                <select x-model="policy.password_mode" @focus="selectPolicy(policy.id)" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] px-3 py-2 text-sm">
+                  <option value="random">Random daily</option>
+                  <option value="manual">Manual</option>
+                </select>
+              </div>
+              <div x-show="policy.password_mode==='manual'" class="md:col-span-2">
+                <div class="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label class="block text-xs text-[#94a3b8] mb-1">Manual Fiberx Password</label>
+                    <input :type="showPassword ? 'text' : 'password'" x-model="manualPasswords[policy.id].fiberx" @focus="selectPolicy(policy.id)" autocomplete="new-password" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] px-3 py-2 text-sm">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-[#94a3b8] mb-1">Manual Support Password</label>
+                    <input :type="showPassword ? 'text' : 'password'" x-model="manualPasswords[policy.id].support" @focus="selectPolicy(policy.id)" autocomplete="new-password" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] px-3 py-2 text-sm">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div class="rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#111827] p-3">
+                <p class="text-[11px] uppercase tracking-wide text-[#64748b]">Active Date</p>
+                <p class="text-sm text-[#f1f5f9] mt-1" x-text="policy.active_password_date || '—'"></p>
+              </div>
+              <div class="rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#111827] p-3">
+                <p class="text-[11px] uppercase tracking-wide text-[#64748b]">Last Run</p>
+                <p class="text-sm text-[#f1f5f9] mt-1" x-text="fmtTime(policy.last_run_at)"></p>
+              </div>
+              <div class="rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#111827] p-3">
+                <p class="text-[11px] uppercase tracking-wide text-[#64748b]">Next Rotation</p>
+                <p class="text-sm text-[#f1f5f9] mt-1" x-text="fmtTime(policy.next_rotation_at)"></p>
+              </div>
+              <div class="rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#111827] p-3">
+                <p class="text-[11px] uppercase tracking-wide text-[#64748b]">Status</p>
+                <p class="text-sm mt-1" :class="policy.last_status==='ok' ? 'text-emerald-400' : (policy.last_status==='error' ? 'text-[#f87171]' : 'text-[#f1f5f9]')" x-text="policy.last_status || 'pending'"></p>
+              </div>
+            </div>
+
+            <div class="rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#111827] p-3 mt-4">
+              <div class="flex items-center justify-between gap-3">
+                <p class="text-xs text-[#94a3b8]">Managed accounts: <span class="font-mono text-[#f1f5f9]">fiberx</span>, <span class="font-mono text-[#f1f5f9]">support</span></p>
+                <button type="button" @click="showPassword=!showPassword" class="text-xs text-[#f97316] hover:underline" x-text="showPassword ? 'Hide Passwords' : 'Show Passwords'"></button>
+              </div>
+              <p class="text-xs text-[#94a3b8] mt-2">Fiberx password: <span class="font-mono text-[#f1f5f9] ml-1 break-all" x-text="showPassword ? (policy.active_fiberx_password || '—') : '•••••••••••••••'"></span></p>
+              <p class="text-xs text-[#94a3b8] mt-2">Support password: <span class="font-mono text-[#f1f5f9] ml-1 break-all" x-text="showPassword ? (policy.active_support_password || '—') : '•••••••••••••••'"></span></p>
+              <p class="text-xs text-[#94a3b8] mt-2 break-words" x-text="policy.last_message || 'No runs yet.'"></p>
+            </div>
+
+            <p class="text-xs text-[#ef4444] mt-3" x-show="policyErrors[policy.id]" x-text="policyErrors[policy.id]"></p>
+
+            <div class="flex flex-wrap justify-end gap-2 mt-4">
+              <button @click="savePolicy(policy)" :disabled="savingPolicyId===policy.id" class="px-4 py-2 text-sm rounded-lg bg-[#334155] text-white hover:bg-[#475569] disabled:opacity-50">Save</button>
+              <button @click="runPolicy(policy)" :disabled="runningPolicyId===policy.id" class="px-4 py-2 text-sm rounded-lg bg-[#f97316] text-white hover:bg-[#ea580c] disabled:opacity-50" x-text="runningPolicyId===policy.id ? 'Applying...' : 'Apply Now'"></button>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <section class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="text-sm font-semibold text-[#f1f5f9]">NOC Data Tree</h2>
+            <p class="text-xs text-[#94a3b8] mt-1">Click any node to prefill the selected policy target.</p>
+          </div>
+          <input type="search" x-model.debounce.250ms="q" @input="fetchDevices()" placeholder="Search site, model, host..." class="w-full sm:w-72 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] placeholder-[#475569] px-3 py-2 text-sm">
+        </div>
+
+        <p class="text-xs text-[#94a3b8]" x-show="selectedPolicy()">Selected policy: <span class="text-[#f1f5f9]" x-text="selectedPolicy()?.name || selectedPolicy()?.target_label || '—'"></span></p>
+
+        <template x-if="devices.length === 0">
+          <p class="text-sm text-[#94a3b8]">No NOC Data devices available yet.</p>
+        </template>
+
+        <div class="space-y-4" x-show="devices.length > 0">
+          <template x-for="networkGroup in treeGroups()" :key="networkGroup.key">
+            <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827]">
+              <div class="px-4 py-3 border-b border-[rgba(255,255,255,0.08)] flex items-center justify-between gap-3">
+                <div class="flex items-center gap-3 min-w-0">
+                  <button @click="toggleTreeNode(networkGroup.key)" class="shrink-0 p-1 rounded-md text-[#94a3b8] hover:text-[#f1f5f9] hover:bg-white/5 transition-colors" :aria-expanded="isTreeNodeExpanded(networkGroup.key)">
+                    <svg class="w-4 h-4 transition-transform" :class="isTreeNodeExpanded(networkGroup.key) ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                  </button>
+                  <button @click="openTarget('network_type', networkGroup.value, networkGroup.label)" class="text-sm font-semibold text-[#f1f5f9] hover:text-[#fdba74] text-left transition-colors truncate" x-text="networkGroup.label"></button>
+                </div>
+                <span class="text-xs text-[#94a3b8]" x-text="networkGroup.count + ' devices'"></span>
+              </div>
+              <div x-show="isTreeNodeExpanded(networkGroup.key)" class="p-4 space-y-4">
+                <template x-for="provinceGroup in networkGroup.children" :key="provinceGroup.key">
+                  <div>
+                    <div class="flex items-center gap-3">
+                      <button @click="toggleTreeNode(provinceGroup.key)" class="shrink-0 p-1 rounded-md text-[#64748b] hover:text-[#cbd5e1] hover:bg-white/5 transition-colors" :aria-expanded="isTreeNodeExpanded(provinceGroup.key)">
+                        <svg class="w-4 h-4 transition-transform" :class="isTreeNodeExpanded(provinceGroup.key) ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                      </button>
+                      <button @click="openTarget('province', provinceGroup.value, provinceGroup.label)" class="text-xs font-semibold uppercase tracking-[0.16em] text-[#64748b] hover:text-[#cbd5e1] transition-colors text-left" x-text="provinceGroup.label"></button>
+                    </div>
+                    <div x-show="isTreeNodeExpanded(provinceGroup.key)" class="mt-3 space-y-3">
+                      <template x-for="vendorGroup in provinceGroup.children" :key="vendorGroup.key">
+                        <div class="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#0f172a] overflow-hidden">
+                          <div class="px-4 py-2.5 border-b border-[rgba(255,255,255,0.08)] flex items-center justify-between gap-3">
+                            <div class="flex items-center gap-3 min-w-0">
+                              <button @click="toggleTreeNode(vendorGroup.key)" class="shrink-0 p-1 rounded-md text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-white/5 transition-colors" :aria-expanded="isTreeNodeExpanded(vendorGroup.key)">
+                                <svg class="w-4 h-4 transition-transform" :class="isTreeNodeExpanded(vendorGroup.key) ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                              </button>
+                              <button @click="openTarget('vendor', vendorGroup.value, vendorGroup.label)" class="text-sm font-medium text-[#e2e8f0] hover:text-[#fdba74] text-left transition-colors truncate" x-text="vendorGroup.label"></button>
+                            </div>
+                            <span class="text-xs text-[#94a3b8]" x-text="vendorGroup.count + ' devices'"></span>
+                          </div>
+                          <div x-show="isTreeNodeExpanded(vendorGroup.key)" class="divide-y divide-[rgba(255,255,255,0.06)]">
+                            <template x-for="modelGroup in vendorGroup.children" :key="modelGroup.key">
+                              <div>
+                                <div class="px-4 py-2.5 flex items-center justify-between gap-3 bg-[#111827]">
+                                  <div class="flex items-center gap-3 min-w-0">
+                                    <button @click="toggleTreeNode(modelGroup.key)" class="shrink-0 p-1 rounded-md text-[#94a3b8] hover:text-[#cbd5e1] hover:bg-white/5 transition-colors" :aria-expanded="isTreeNodeExpanded(modelGroup.key)">
+                                      <svg class="w-4 h-4 transition-transform" :class="isTreeNodeExpanded(modelGroup.key) ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                                    </button>
+                                    <button @click="openTarget('model', modelGroup.value, modelGroup.label)" class="text-sm text-[#cbd5e1] hover:text-[#fdba74] text-left transition-colors truncate" x-text="modelGroup.label"></button>
+                                  </div>
+                                  <span class="text-xs text-[#94a3b8]" x-text="modelGroup.count + ' devices'"></span>
+                                </div>
+                                <div x-show="isTreeNodeExpanded(modelGroup.key)" class="divide-y divide-[rgba(255,255,255,0.04)]">
+                                  <template x-for="device in modelGroup.devices" :key="device.host">
+                                    <div class="px-4 py-3 flex items-center justify-between gap-3">
+                                      <div class="min-w-0">
+                                        <button @click="openTarget('device', device.host, device.display_name + ' (' + device.host + ')')" class="text-sm font-semibold text-[#f8fafc] truncate hover:text-[#fdba74] transition-colors text-left" x-text="device.display_name"></button>
+                                        <p class="text-xs font-mono text-[#94a3b8] truncate" x-text="device.host"></p>
+                                        <p class="text-[11px] text-[#64748b] truncate" x-text="device.site || device.model || device.source_vendor || device.vendor"></p>
+                                      </div>
+                                      <button @click="openTarget('device', device.host, device.display_name + ' (' + device.host + ')')" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-[#f97316]/20 text-[#fdba74] hover:bg-[#f97316]/30 transition-colors">Use Target</button>
+                                    </div>
+                                  </template>
+                                </div>
+                              </div>
+                            </template>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div x-show="!loading && tab==='exclusions'" class="space-y-4">
+    <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] p-4">
+      <p class="text-sm font-semibold text-[#f1f5f9]">Excluded IPs And Ranges</p>
+      <p class="text-xs text-[#94a3b8] mt-1">Any host matching one of these subnet and range rules will be skipped by NOC PASS rotation, user add, and user delete actions.</p>
+      <form @submit.prevent="submitExclusion()" class="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+        <input x-model="exclusionForm.subnet" required placeholder="10.90.20.0/24" class="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9]">
+        <input x-model="exclusionForm.target" required placeholder="18 or 10.90.20.18-10.90.20.25" class="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9]">
+        <button type="submit" :disabled="savingExclusion" class="px-4 py-2 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white text-sm font-semibold disabled:opacity-50" x-text="savingExclusion ? 'Saving...' : 'Add Exclusion'"></button>
+      </form>
+      <p class="text-xs text-[#ef4444] mt-2" x-show="exclusionError" x-text="exclusionError"></p>
     </div>
 
-    <template x-if="loading">
-      <div class="h-40 rounded-xl bg-[#1a2236] animate-pulse border border-[rgba(255,255,255,0.08)]"></div>
-    </template>
-
-    <template x-if="!loading && devices.length === 0">
-      <p class="text-[#94a3b8] text-sm py-8">No devices yet. Add one with admin SSH access.</p>
-    </template>
-
-    <div class="grid gap-3 sm:grid-cols-2" x-show="!loading && devices.length > 0">
-      <template x-for="d in devices" :key="d.id">
-        <button type="button" @click="openDetail(d)"
-          class="mission-card text-left rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] p-4 hover:border-[#f97316]/40 transition-colors">
-          <div class="flex items-start justify-between gap-2">
-            <div>
-              <p class="font-semibold text-[#f1f5f9]" x-text="d.display_name"></p>
-              <p class="text-xs font-mono text-[#94a3b8] mt-0.5" x-text="d.host"></p>
-              <p class="text-[11px] text-[#475569] mt-1">
-                <span x-text="d.vendor"></span>
-                <span> · </span>
-                <span class="font-mono" x-text="(d.accounts || []).map(a => a.username).join(' · ')"></span>
-              </p>
+    <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] overflow-hidden">
+      <template x-if="exclusions.length === 0">
+        <p class="text-sm text-[#94a3b8] p-4">No NOC PASS exclusions yet.</p>
+      </template>
+      <template x-if="exclusions.length > 0">
+        <div class="divide-y divide-[rgba(255,255,255,0.06)]">
+          <template x-for="item in exclusions" :key="item.id">
+            <div class="flex items-center justify-between gap-3 px-4 py-3">
+              <div class="min-w-0">
+                <p class="text-sm text-[#f1f5f9] font-mono truncate" x-text="item.subnet"></p>
+                <p class="text-xs text-[#94a3b8] font-mono truncate" x-text="item.target"></p>
+              </div>
+              <button type="button" @click="deleteExclusion(item)" class="px-3 py-1.5 text-xs rounded-lg text-[#ef4444] hover:bg-red-500/10">Delete</button>
             </div>
-            <span class="shrink-0 text-[10px] uppercase font-bold px-2 py-0.5 rounded"
-              :class="d.last_apply_ok ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'"
-              x-text="d.last_apply_ok ? 'OK' : 'Issue'"></span>
-          </div>
-        </button>
+          </template>
+        </div>
       </template>
     </div>
   </div>
 
-  <div x-show="tab === 'keep-users'" class="space-y-4">
-    <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] p-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
+  <div x-show="!loading && tab==='saved-users'" class="space-y-4">
+    <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] p-4 space-y-4">
+      <div>
+        <p class="text-sm font-semibold text-[#f1f5f9]">Managed Saved Users</p>
+        <p class="text-xs text-[#94a3b8] mt-1">These users are created on the selected devices, protected from NOC PASS deletion, and removed from devices before local hard delete.</p>
+      </div>
+      <div class="grid gap-4 lg:grid-cols-3">
         <div>
-          <p class="text-sm font-semibold text-[#f1f5f9]">Protected usernames</p>
-          <p class="text-xs text-[#94a3b8] mt-1">Default protected users: <span class="font-mono">fiberx</span>, <span class="font-mono">readOnly</span>, <span class="font-mono">dev</span>. The rotator also protects its own admin login automatically.</p>
+          <label class="block text-xs text-[#94a3b8] mb-1">Username</label>
+          <input x-model="savedUserForm.username" placeholder="noc-ops" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9] font-mono">
+        </div>
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">Password</label>
+          <input type="password" x-model="savedUserForm.password" placeholder="Password" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9] font-mono">
+        </div>
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">Privilege</label>
+          <select x-model="savedUserForm.privilege" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9]">
+            <option value="full">Full</option>
+            <option value="write">Write</option>
+            <option value="read">Read</option>
+          </select>
         </div>
       </div>
+
+      <div class="rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#111827] p-4 space-y-4">
+        <div>
+          <p class="text-sm font-semibold text-[#f1f5f9]">Target Builder</p>
+          <p class="text-xs text-[#94a3b8] mt-1">Pick from `WiFi / FTTH`, then province, then vendor, and add as many targets as you want.</p>
+        </div>
+        <div class="grid gap-4 xl:grid-cols-5">
+          <div>
+            <label class="block text-xs text-[#94a3b8] mb-1">Network</label>
+            <select x-model="savedUserPicker.network_type" @change="onSavedUserNetworkChange()" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#0f172a] px-3 py-2 text-sm text-[#f1f5f9]">
+              <option value="">Select network</option>
+              <template x-for="option in savedUserNetworkOptions()" :key="option.value">
+                <option :value="option.value" x-text="option.label"></option>
+              </template>
+            </select>
+            <button type="button" @click="addSavedUserTarget('network_types', savedUserPicker.network_type)" :disabled="!savedUserPicker.network_type" class="mt-2 w-full px-3 py-2 rounded-lg bg-[#f97316]/15 text-[#fdba74] text-xs font-semibold disabled:opacity-40">Add Network</button>
+          </div>
+          <div>
+            <label class="block text-xs text-[#94a3b8] mb-1">Province</label>
+            <select x-model="savedUserPicker.province" @change="onSavedUserProvinceChange()" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#0f172a] px-3 py-2 text-sm text-[#f1f5f9]">
+              <option value="">Select province</option>
+              <template x-for="option in savedUserProvinceOptions()" :key="option.value">
+                <option :value="option.value" x-text="option.label"></option>
+              </template>
+            </select>
+            <button type="button" @click="addSavedUserTarget('provinces', savedUserPicker.province)" :disabled="!savedUserPicker.province" class="mt-2 w-full px-3 py-2 rounded-lg bg-[#f97316]/15 text-[#fdba74] text-xs font-semibold disabled:opacity-40">Add Province</button>
+          </div>
+          <div>
+            <label class="block text-xs text-[#94a3b8] mb-1">Vendor</label>
+            <select x-model="savedUserPicker.vendor" @change="onSavedUserVendorChange()" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#0f172a] px-3 py-2 text-sm text-[#f1f5f9]">
+              <option value="">Select vendor</option>
+              <template x-for="option in savedUserVendorOptions()" :key="option.value">
+                <option :value="option.value" x-text="option.label"></option>
+              </template>
+            </select>
+            <button type="button" @click="addSavedUserTarget('vendors', savedUserPicker.vendor)" :disabled="!savedUserPicker.vendor" class="mt-2 w-full px-3 py-2 rounded-lg bg-[#f97316]/15 text-[#fdba74] text-xs font-semibold disabled:opacity-40">Add Vendor</button>
+          </div>
+          <div>
+            <label class="block text-xs text-[#94a3b8] mb-1">Model</label>
+            <select x-model="savedUserPicker.model" @change="onSavedUserModelChange()" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#0f172a] px-3 py-2 text-sm text-[#f1f5f9]">
+              <option value="">Select model</option>
+              <template x-for="option in savedUserModelOptions()" :key="option.value">
+                <option :value="option.value" x-text="option.label"></option>
+              </template>
+            </select>
+            <button type="button" @click="addSavedUserTarget('models', savedUserPicker.model)" :disabled="!savedUserPicker.model" class="mt-2 w-full px-3 py-2 rounded-lg bg-[#f97316]/15 text-[#fdba74] text-xs font-semibold disabled:opacity-40">Add Model</button>
+          </div>
+          <div>
+            <label class="block text-xs text-[#94a3b8] mb-1">Device</label>
+            <select x-model="savedUserPicker.device" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#0f172a] px-3 py-2 text-sm text-[#f1f5f9]">
+              <option value="">Select device</option>
+              <template x-for="option in savedUserDeviceOptions()" :key="option.value">
+                <option :value="option.value" x-text="option.label"></option>
+              </template>
+            </select>
+            <button type="button" @click="addSavedUserTarget('devices', savedUserPicker.device)" :disabled="!savedUserPicker.device" class="mt-2 w-full px-3 py-2 rounded-lg bg-[#f97316]/15 text-[#fdba74] text-xs font-semibold disabled:opacity-40">Add Device</button>
+          </div>
+        </div>
+
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div class="rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#0f172a] p-3">
+            <p class="text-[11px] uppercase tracking-wide text-[#64748b]">Networks</p>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <template x-for="value in (savedUserForm.network_types || [])" :key="'network-' + value">
+                <button type="button" @click="removeSavedUserTarget('network_types', value)" class="px-2.5 py-1 rounded-full bg-[#1e293b] text-[#f1f5f9] text-xs">
+                  <span x-text="savedUserTargetLabel('network_types', value)"></span>
+                  <span class="ml-1 text-[#94a3b8]">×</span>
+                </button>
+              </template>
+              <p class="text-xs text-[#64748b]" x-show="(savedUserForm.network_types || []).length === 0">No networks selected</p>
+            </div>
+          </div>
+          <div class="rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#0f172a] p-3">
+            <p class="text-[11px] uppercase tracking-wide text-[#64748b]">Provinces</p>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <template x-for="value in (savedUserForm.provinces || [])" :key="'province-' + value">
+                <button type="button" @click="removeSavedUserTarget('provinces', value)" class="px-2.5 py-1 rounded-full bg-[#1e293b] text-[#f1f5f9] text-xs">
+                  <span x-text="savedUserTargetLabel('provinces', value)"></span>
+                  <span class="ml-1 text-[#94a3b8]">×</span>
+                </button>
+              </template>
+              <p class="text-xs text-[#64748b]" x-show="(savedUserForm.provinces || []).length === 0">No provinces selected</p>
+            </div>
+          </div>
+          <div class="rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#0f172a] p-3">
+            <p class="text-[11px] uppercase tracking-wide text-[#64748b]">Vendors</p>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <template x-for="value in (savedUserForm.vendors || [])" :key="'vendor-' + value">
+                <button type="button" @click="removeSavedUserTarget('vendors', value)" class="px-2.5 py-1 rounded-full bg-[#1e293b] text-[#f1f5f9] text-xs">
+                  <span x-text="savedUserTargetLabel('vendors', value)"></span>
+                  <span class="ml-1 text-[#94a3b8]">×</span>
+                </button>
+              </template>
+              <p class="text-xs text-[#64748b]" x-show="(savedUserForm.vendors || []).length === 0">No vendors selected</p>
+            </div>
+          </div>
+          <div class="rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#0f172a] p-3">
+            <p class="text-[11px] uppercase tracking-wide text-[#64748b]">Models</p>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <template x-for="value in (savedUserForm.models || [])" :key="'model-' + value">
+                <button type="button" @click="removeSavedUserTarget('models', value)" class="px-2.5 py-1 rounded-full bg-[#1e293b] text-[#f1f5f9] text-xs">
+                  <span x-text="savedUserTargetLabel('models', value)"></span>
+                  <span class="ml-1 text-[#94a3b8]">×</span>
+                </button>
+              </template>
+              <p class="text-xs text-[#64748b]" x-show="(savedUserForm.models || []).length === 0">No models selected</p>
+            </div>
+          </div>
+          <div class="rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#0f172a] p-3">
+            <p class="text-[11px] uppercase tracking-wide text-[#64748b]">Devices</p>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <template x-for="value in (savedUserForm.devices || [])" :key="'device-' + value">
+                <button type="button" @click="removeSavedUserTarget('devices', value)" class="px-2.5 py-1 rounded-full bg-[#1e293b] text-[#f1f5f9] text-xs">
+                  <span x-text="savedUserTargetLabel('devices', value)"></span>
+                  <span class="ml-1 text-[#94a3b8]">×</span>
+                </button>
+              </template>
+              <p class="text-xs text-[#64748b]" x-show="(savedUserForm.devices || []).length === 0">No devices selected</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-end">
+        <button type="button" @click="submitSavedUser()" :disabled="savedUserSaving" class="px-4 py-2 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white text-sm font-semibold disabled:opacity-50" x-text="savedUserSaving ? 'Saving...' : 'Add Saved User'"></button>
+      </div>
+      <p class="text-xs text-[#ef4444]" x-show="savedUserError" x-text="savedUserError"></p>
+    </div>
+
+    <div class="space-y-4">
+      <template x-if="savedUsers.length === 0">
+        <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] p-4 text-sm text-[#94a3b8]">No saved users yet.</div>
+      </template>
+      <template x-for="user in savedUsers" :key="user.id">
+        <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] p-4 space-y-3">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-sm font-semibold text-[#f1f5f9]" x-text="user.username"></p>
+              <p class="text-xs text-[#94a3b8] mt-1">Privilege: <span class="text-[#f1f5f9]" x-text="savedUserTargetLabel('privilege', user.privilege)"></span> · Matches <span class="text-[#f1f5f9]" x-text="user.matching_count"></span> device(s)</p>
+            </div>
+            <button type="button" @click="deleteSavedUser(user)" class="px-3 py-1.5 text-xs rounded-lg text-[#ef4444] hover:bg-red-500/10">Delete</button>
+          </div>
+          <div class="rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#111827] p-3">
+            <p class="text-[11px] uppercase tracking-wide text-[#64748b]">Targets</p>
+            <p class="text-xs text-[#94a3b8] mt-2 break-words">Network: <span class="text-[#f1f5f9]" x-text="savedUserValueList('network_types', user.network_types) || '—'"></span></p>
+            <p class="text-xs text-[#94a3b8] mt-1 break-words">Province: <span class="text-[#f1f5f9]" x-text="savedUserValueList('provinces', user.provinces) || '—'"></span></p>
+            <p class="text-xs text-[#94a3b8] mt-1 break-words">Vendor: <span class="text-[#f1f5f9]" x-text="savedUserValueList('vendors', user.vendors) || '—'"></span></p>
+            <p class="text-xs text-[#94a3b8] mt-1 break-words">Model: <span class="text-[#f1f5f9]" x-text="savedUserValueList('models', user.models) || '—'"></span></p>
+            <p class="text-xs text-[#94a3b8] mt-1 break-words">Device: <span class="text-[#f1f5f9]" x-text="savedUserValueList('devices', user.devices) || '—'"></span></p>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <div x-show="!loading && tab==='keep-users'" class="space-y-4">
+    <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] p-4">
+      <p class="text-sm font-semibold text-[#f1f5f9]">Protected usernames</p>
+      <p class="text-xs text-[#94a3b8] mt-1">Default protected users: <span class="font-mono">fiberx</span>, <span class="font-mono">support</span>, <span class="font-mono">dev</span>. Usernames keep the exact case you type, but matching stays case-insensitive.</p>
       <form @submit.prevent="submitKeepUser()" class="mt-4 flex flex-col sm:flex-row gap-3">
-        <input x-model="keepUserForm.username" required placeholder="username"
-          class="flex-1 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9] font-mono">
-        <button type="submit" :disabled="keepUserSaving"
-          class="px-4 py-2 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white text-sm font-semibold disabled:opacity-50">
-          Add keep user
-        </button>
+        <input x-model="keepUserForm.username" required placeholder="Username" class="flex-1 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9] font-mono">
+        <button type="submit" :disabled="keepUserSaving" class="px-4 py-2 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white text-sm font-semibold disabled:opacity-50">Add keep user</button>
       </form>
       <p class="text-xs text-[#ef4444] mt-2" x-show="keepUserError" x-text="keepUserError"></p>
     </div>
 
-    <template x-if="keepUsersLoading">
-      <div class="h-32 rounded-xl bg-[#1a2236] animate-pulse border border-[rgba(255,255,255,0.08)]"></div>
-    </template>
-
-    <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] overflow-hidden" x-show="!keepUsersLoading">
+    <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] overflow-hidden">
       <template x-if="keepUsers.length === 0">
         <p class="text-sm text-[#94a3b8] p-4">No custom keep users yet.</p>
       </template>
@@ -96,95 +458,9 @@
           <template x-for="u in keepUsers" :key="u.id">
             <div class="flex items-center justify-between gap-3 px-4 py-3">
               <span class="font-mono text-sm text-[#f1f5f9]" x-text="u.username"></span>
-              <button type="button" @click="deleteKeepUser(u)"
-                class="px-3 py-1.5 text-xs rounded-lg text-[#ef4444] hover:bg-red-500/10">
-                Remove
-              </button>
+              <button type="button" @click="deleteKeepUser(u)" class="px-3 py-1.5 text-xs rounded-lg text-[#ef4444] hover:bg-red-500/10">Remove</button>
             </div>
           </template>
-        </div>
-      </template>
-    </div>
-  </div>
-
-  <div x-show="showAdd" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" @keydown.escape.window="showAdd = false">
-    <div @click.away="showAdd = false" class="w-full max-w-lg rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-2xl">
-      <h2 class="text-lg font-semibold text-[#f1f5f9] mb-4">Add NOC Pass device</h2>
-      <form @submit.prevent="submitAdd()" class="space-y-3">
-        <div>
-          <label class="block text-xs text-[#94a3b8] mb-1">Display name</label>
-          <input x-model="form.display_name" required class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
-        </div>
-        <div>
-          <label class="block text-xs text-[#94a3b8] mb-1">Host (IP or DNS)</label>
-          <input x-model="form.host" required class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9] font-mono">
-        </div>
-        <div>
-          <label class="block text-xs text-[#94a3b8] mb-1">Vendor</label>
-          <select x-model="form.vendor" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
-            <option value="cisco_ios">Cisco IOS / IOS-XE</option>
-            <option value="cisco_nexus">Cisco Nexus</option>
-            <option value="mikrotik">MikroTik</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs text-[#94a3b8] mb-1">Admin SSH username</label>
-          <input x-model="form.admin_username" required autocomplete="off" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
-        </div>
-        <div>
-          <label class="block text-xs text-[#94a3b8] mb-1">Admin SSH password</label>
-          <input type="password" x-model="form.admin_password" required autocomplete="new-password" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
-        </div>
-        <p class="text-xs text-[#ef4444]" x-show="formError" x-text="formError"></p>
-        <div class="flex justify-end gap-2 pt-2">
-          <button type="button" @click="showAdd = false" class="px-4 py-2 text-sm rounded-lg text-[#94a3b8] hover:bg-white/5">Cancel</button>
-          <button type="submit" :disabled="saving" class="px-4 py-2 text-sm rounded-lg bg-[#f97316] text-white font-semibold disabled:opacity-50">Save</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <div x-show="detail" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-    <div @click.away="detail = null" class="w-full max-w-lg rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-2xl">
-      <template x-if="detail">
-        <div>
-          <h2 class="text-lg font-semibold text-[#f1f5f9]" x-text="detail.display_name"></h2>
-          <p class="text-xs font-mono text-[#94a3b8] mt-1" x-text="detail.host"></p>
-          <div class="mt-4 space-y-3">
-            <template x-if="cred.pending">
-              <p class="text-sm text-amber-400">Provisioning… refresh in a moment. <span x-show="detail.last_apply_error" class="block text-xs text-[#94a3b8] mt-1" x-text="detail.last_apply_error"></span></p>
-            </template>
-            <template x-if="!cred.pending">
-              <div class="space-y-3">
-                <div class="space-y-2">
-                  <div class="flex items-center justify-between gap-2">
-                    <p class="text-xs text-[#94a3b8]">Rotating NOC logins <span class="text-[#475569]">(same 15-char password on both; rotates every 24h)</span></p>
-                    <button type="button" @click="showPass = !showPass" class="text-xs text-[#f97316] hover:underline shrink-0" x-text="showPass ? 'Hide passwords' : 'Show passwords'"></button>
-                  </div>
-                  <template x-for="a in (cred.accounts || [])" :key="a.username">
-                    <div class="rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#1a2236]/80 px-3 py-2.5 space-y-1">
-                      <p class="font-mono text-sm text-[#f1f5f9] select-all" x-text="a.username"></p>
-                      <p class="text-[11px] text-[#64748b]" x-text="a.hint"></p>
-                      <p class="text-[11px] text-[#94a3b8] pt-1 border-t border-[rgba(255,255,255,0.06)]">
-                        <span class="text-[#64748b]">Password</span>
-                        <span class="font-mono text-sm text-[#f1f5f9] ml-2 break-all select-all" x-text="showPass ? (cred.password || '—') : '•••••••••••••••'"></span>
-                      </p>
-                    </div>
-                  </template>
-                </div>
-                <p class="text-[11px] text-[#475569]">Protected from deletion: <span class="font-mono">fiberx</span>, <span class="font-mono">readOnly</span>, <span class="font-mono">dev</span>, the device admin login, and every username from the Keep Users tab.</p>
-                <p class="text-[11px] text-[#475569]" x-show="cred.next_rotation_at">
-                  Next rotation (approx): <span x-text="fmtTime(cred.next_rotation_at)"></span>
-                </p>
-              </div>
-            </template>
-          </div>
-          <div class="flex flex-wrap gap-2 mt-6">
-            <button type="button" @click="refreshCred()" class="px-3 py-1.5 text-xs rounded-lg bg-[#1a2236] border border-[rgba(255,255,255,0.08)] text-[#f1f5f9]">Refresh</button>
-            <button type="button" @click="rotateNow()" class="px-3 py-1.5 text-xs rounded-lg bg-[#3b82f6]/20 text-[#60a5fa] border border-[#3b82f6]/30">Rotate now</button>
-            <button type="button" @click="deleteDevice()" class="px-3 py-1.5 text-xs rounded-lg text-[#ef4444] hover:bg-red-500/10 ml-auto">Remove</button>
-            <button type="button" @click="detail = null" class="px-3 py-1.5 text-xs rounded-lg text-[#94a3b8]">Close</button>
-          </div>
         </div>
       </template>
     </div>
@@ -194,92 +470,245 @@
 <script>
 function nocPassPage() {
   return {
-    tab: 'devices',
+    tab: 'policies',
+    loading: true,
     q: '',
     devices: [],
-    loading: true,
+    policies: [],
+    exclusions: [],
+    manualPasswords: {},
+    selectedPolicyId: null,
+    creatingPolicy: false,
+    savingPolicyId: null,
+    runningPolicyId: null,
+    deletingPolicyId: null,
+    policyErrors: {},
     keepUsers: [],
-    keepUsersLoading: true,
+    savedUsers: [],
+    exclusionForm: { subnet: '', target: '' },
+    keepUserForm: { username: '' },
+    savedUserForm: { username: '', password: '', privilege: 'full', network_types: [], provinces: [], vendors: [], models: [], devices: [] },
+    savedUserPicker: { network_type: '', province: '', vendor: '', model: '', device: '' },
     keepUserSaving: false,
     keepUserError: '',
-    keepUserForm: {
-      username: ''
-    },
-    showAdd: false,
-    saving: false,
-    formError: '',
-    form: {
-      display_name: '',
-      host: '',
-      vendor: 'cisco_ios',
-      admin_username: '',
-      admin_password: ''
-    },
-    detail: null,
-    cred: { pending: true, accounts: [], password: '', next_rotation_at: null },
-    showPass: false,
+    savingExclusion: false,
+    exclusionError: '',
+    savedUserSaving: false,
+    savedUserError: '',
+    showPassword: false,
+    expandedTreeNodes: {},
 
     async init() {
-      await Promise.all([this.fetchList(), this.fetchKeepUsers()]);
-    },
-
-    async fetchList() {
-      this.loading = true;
-      try {
-        const res = await fetch('/api/noc-pass/devices?q=' + encodeURIComponent(this.q));
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to load');
-        this.devices = data.devices || [];
-      } catch (e) {
-        console.error(e);
-        this.devices = [];
-      }
+      await this.fetchAll();
       this.loading = false;
     },
 
-    async fetchKeepUsers() {
-      this.keepUsersLoading = true;
-      try {
-        const res = await fetch('/api/noc-pass/keep-users');
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to load');
-        this.keepUsers = data.users || [];
-      } catch (e) {
-        console.error(e);
-        this.keepUsers = [];
-      }
-      this.keepUsersLoading = false;
+    async fetchAll() {
+      await Promise.all([this.fetchDevices(), this.fetchPolicies(), this.fetchExclusions(), this.fetchKeepUsers(), this.fetchSavedUsers()]);
     },
 
-    async submitAdd() {
-      this.formError = '';
-      this.saving = true;
-      const body = {
-        display_name: this.form.display_name,
-        host: this.form.host,
-        vendor: this.form.vendor,
-        admin_username: this.form.admin_username,
-        admin_password: this.form.admin_password
-      };
+    async fetchDevices() {
+      const res = await fetch('/api/noc-pass/devices?q=' + encodeURIComponent(this.q));
+      const data = await res.json();
+      this.devices = data.devices || [];
+    },
+
+    async fetchPolicies() {
+      const res = await fetch('/api/noc-pass/policies');
+      const data = await res.json();
+      this.policies = data.policies || [];
+      const nextManuals = {};
+      for (const policy of this.policies) {
+        nextManuals[policy.id] = this.manualPasswords[policy.id] || { fiberx: '', support: '' };
+        this.syncTargetSelection(policy);
+      }
+      this.manualPasswords = nextManuals;
+      if (!this.selectedPolicyId && this.policies.length > 0) this.selectedPolicyId = this.policies[0].id;
+      if (this.selectedPolicyId && !this.policies.find(p => p.id === this.selectedPolicyId)) {
+        this.selectedPolicyId = this.policies[0]?.id || null;
+      }
+    },
+
+    async fetchExclusions() {
+      const res = await fetch('/api/noc-pass/exclusions');
+      const data = await res.json();
+      this.exclusions = data.exclusions || [];
+    },
+
+    async fetchKeepUsers() {
+      const res = await fetch('/api/noc-pass/keep-users');
+      const data = await res.json();
+      this.keepUsers = data.users || [];
+    },
+
+    async fetchSavedUsers() {
+      const res = await fetch('/api/noc-pass/saved-users');
+      const data = await res.json();
+      this.savedUsers = data.users || [];
+    },
+
+    selectedPolicy() {
+      return (this.policies || []).find(p => p.id === this.selectedPolicyId) || null;
+    },
+
+    selectPolicy(id) {
+      this.selectedPolicyId = id;
+    },
+
+    targetOptions(policy) {
+      if (!policy) return [];
+      if (policy.target_type === 'all_networks') return [{ key: 'all-networks', value: 'all', label: 'All Networks' }];
+      if (policy.target_type === 'network_type') return [{ key: 'ftth', value: 'ftth', label: 'FTTH' }, { key: 'wifi', value: 'wifi', label: 'WiFi' }];
+      if (policy.target_type === 'province') return [...new Map((this.devices || []).map(d => [(d.province || 'Unknown').toLowerCase(), { key: 'province-' + (d.province || 'Unknown'), value: (d.province || 'Unknown'), label: (d.province || 'Unknown') }])).values()].sort((a, b) => a.label.localeCompare(b.label));
+      if (policy.target_type === 'vendor') return [...new Map((this.devices || []).map(d => [this.vendorValue(d), { key: 'vendor-' + this.vendorValue(d), value: this.vendorValue(d), label: this.vendorLabel(d) }])).values()].sort((a, b) => a.label.localeCompare(b.label));
+      if (policy.target_type === 'model') return [...new Map((this.devices || []).filter(d => (d.model || '').trim() !== '').map(d => [(d.model || '').trim(), { key: 'model-' + (d.model || '').trim(), value: (d.model || '').trim(), label: (d.model || '').trim() }])).values()].sort((a, b) => a.label.localeCompare(b.label));
+      return (this.devices || []).map(d => ({ key: 'device-' + d.host, value: d.host, label: d.display_name + ' (' + d.host + ')' })).sort((a, b) => a.label.localeCompare(b.label));
+    },
+
+    syncTargetSelection(policy) {
+      if (!policy) return;
+      if (policy.target_type === 'all_networks') {
+        policy.target_value = 'all';
+        policy.target_label = 'All Networks';
+        return;
+      }
+      const options = this.targetOptions(policy);
+      const option = options.find(o => String(o.value) === String(policy.target_value));
+      if (option) {
+        policy.target_label = option.label;
+      } else if (options[0]) {
+        policy.target_value = options[0].value;
+        policy.target_label = options[0].label;
+      }
+    },
+
+    openTarget(type, value, label) {
+      const policy = this.selectedPolicy();
+      if (!policy) return;
+      policy.target_type = type;
+      policy.target_value = value;
+      policy.target_label = label;
+      this.syncTargetSelection(policy);
+    },
+
+    async createPolicy() {
+      this.creatingPolicy = true;
       try {
-        const res = await fetch('/api/noc-pass/devices', {
-          method: 'POST',
+        const res = await fetch('/api/noc-pass/policies', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) return;
+        await this.fetchPolicies();
+        if (data.policy?.id) this.selectedPolicyId = data.policy.id;
+      } finally {
+        this.creatingPolicy = false;
+      }
+    },
+
+    async savePolicy(policy) {
+      if (!policy) return;
+      this.savingPolicyId = policy.id;
+      this.policyErrors = { ...this.policyErrors, [policy.id]: '' };
+      try {
+        const res = await fetch('/api/noc-pass/policies/' + policy.id, {
+          method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
+          body: JSON.stringify({
+            name: policy.name,
+            enabled: policy.enabled,
+            target_type: policy.target_type,
+            target_value: policy.target_value,
+            target_label: policy.target_label,
+            password_mode: policy.password_mode,
+            manual_fiberx_password: policy.password_mode === 'manual' ? (this.manualPasswords[policy.id]?.fiberx || '') : '',
+            manual_support_password: policy.password_mode === 'manual' ? (this.manualPasswords[policy.id]?.support || '') : ''
+          })
         });
         const data = await res.json();
         if (!res.ok) {
-          this.formError = data.error || 'Save failed';
+          this.policyErrors = { ...this.policyErrors, [policy.id]: data.error || 'Save failed' };
           return;
         }
-        this.showAdd = false;
-        this.form = { display_name: '', host: '', vendor: 'cisco_ios', admin_username: '', admin_password: '' };
-        await this.fetchList();
-      } catch (e) {
-        this.formError = 'Network error';
+        const idx = this.policies.findIndex(p => p.id === policy.id);
+        if (idx >= 0 && data.policy) this.policies.splice(idx, 1, data.policy);
+      } catch (_) {
+        this.policyErrors = { ...this.policyErrors, [policy.id]: 'Network error' };
       } finally {
-        this.saving = false;
+        this.savingPolicyId = null;
       }
+    },
+
+    async runPolicy(policy) {
+      if (!policy) return;
+      this.runningPolicyId = policy.id;
+      this.policyErrors = { ...this.policyErrors, [policy.id]: '' };
+      try {
+        await this.savePolicy(policy);
+        if (this.policyErrors[policy.id]) return;
+        const res = await fetch('/api/noc-pass/policies/' + policy.id + '/run', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) {
+          this.policyErrors = { ...this.policyErrors, [policy.id]: data.error || 'Apply failed' };
+        }
+        if (data.policy) {
+          const idx = this.policies.findIndex(p => p.id === policy.id);
+          if (idx >= 0) this.policies.splice(idx, 1, data.policy);
+        }
+        await this.fetchDevices();
+      } catch (_) {
+        this.policyErrors = { ...this.policyErrors, [policy.id]: 'Network error' };
+      } finally {
+        this.runningPolicyId = null;
+      }
+    },
+
+    async deletePolicy(policy) {
+      if (!policy || this.policies.length <= 1 || !confirm('Delete this policy?')) return;
+      this.deletingPolicyId = policy.id;
+      try {
+        const res = await fetch('/api/noc-pass/policies/' + policy.id, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) {
+          this.policyErrors = { ...this.policyErrors, [policy.id]: data.error || 'Delete failed' };
+          return;
+        }
+        await this.fetchPolicies();
+      } finally {
+        this.deletingPolicyId = null;
+      }
+    },
+
+    async submitExclusion() {
+      this.exclusionError = '';
+      this.savingExclusion = true;
+      try {
+        const res = await fetch('/api/noc-pass/exclusions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.exclusionForm)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          this.exclusionError = data.error || 'Save failed';
+          return;
+        }
+        this.exclusionForm = { subnet: '', target: '' };
+        await this.fetchExclusions();
+      } catch (_) {
+        this.exclusionError = 'Network error';
+      } finally {
+        this.savingExclusion = false;
+      }
+    },
+
+    async deleteExclusion(item) {
+      if (!item || !confirm('Delete this NOC PASS exclusion?')) return;
+      const res = await fetch('/api/noc-pass/exclusions/' + item.id, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Delete failed');
+        return;
+      }
+      await this.fetchExclusions();
     },
 
     async submitKeepUser() {
@@ -298,7 +727,7 @@ function nocPassPage() {
         }
         this.keepUserForm.username = '';
         await this.fetchKeepUsers();
-      } catch (e) {
+      } catch (_) {
         this.keepUserError = 'Network error';
       } finally {
         this.keepUserSaving = false;
@@ -316,58 +745,265 @@ function nocPassPage() {
       await this.fetchKeepUsers();
     },
 
-    async openDetail(d) {
-      this.detail = d;
-      this.showPass = false;
-      await this.refreshCred();
+    savedUserFilteredDevices({ includePicker = false, upTo = '' } = {}) {
+      const selected = this.savedUserForm || {};
+      return (this.devices || []).filter(d => {
+        const network = ((d.network_type || 'wifi').toLowerCase() === 'ftth' ? 'ftth' : 'wifi');
+        const province = (d.province || 'Unknown').toLowerCase();
+        const vendor = this.vendorValue(d);
+        const model = (d.model || '').trim().toLowerCase();
+
+        if ((selected.network_types || []).length > 0 && !(selected.network_types || []).includes(network)) return false;
+        if (includePicker && ['network_type', 'province', 'vendor', 'model', 'device'].includes(upTo) && this.savedUserPicker.network_type && network !== this.savedUserPicker.network_type) return false;
+
+        if ((selected.provinces || []).length > 0 && !(selected.provinces || []).includes(province)) return false;
+        if (includePicker && ['province', 'vendor', 'model', 'device'].includes(upTo) && this.savedUserPicker.province && province !== this.savedUserPicker.province) return false;
+
+        if ((selected.vendors || []).length > 0 && !(selected.vendors || []).includes(vendor)) return false;
+        if (includePicker && ['vendor', 'model', 'device'].includes(upTo) && this.savedUserPicker.vendor && vendor !== this.savedUserPicker.vendor) return false;
+
+        if ((selected.models || []).length > 0 && !(selected.models || []).includes(model)) return false;
+        if (includePicker && ['model', 'device'].includes(upTo) && this.savedUserPicker.model && model !== this.savedUserPicker.model) return false;
+
+        if ((selected.devices || []).length > 0) {
+          const host = (d.host || '').toLowerCase();
+          if (!(selected.devices || []).includes(host)) return false;
+        }
+        if (includePicker && upTo === 'device' && this.savedUserPicker.device) {
+          const host = (d.host || '').toLowerCase();
+          if (host !== this.savedUserPicker.device) return false;
+        }
+
+        return true;
+      });
     },
 
-    async refreshCred() {
-      if (!this.detail) return;
-      const res = await fetch('/api/noc-pass/devices/' + this.detail.id + '/credential');
-      const data = await res.json();
-      this.cred = {
-        pending: data.pending === true,
-        accounts: data.accounts || [],
-        password: data.password || '',
-        next_rotation_at: data.next_rotation_at || null
+    savedUserNetworkOptions() {
+      return [...new Map((this.devices || []).map(d => [((d.network_type || 'wifi').toLowerCase() === 'ftth' ? 'ftth' : 'wifi'), { value: ((d.network_type || 'wifi').toLowerCase() === 'ftth' ? 'ftth' : 'wifi'), label: ((d.network_type || 'wifi').toLowerCase() === 'ftth' ? 'FTTH' : 'WiFi') }])).values()].sort((a, b) => a.label.localeCompare(b.label));
+    },
+
+    savedUserProvinceOptions() {
+      return [...new Map((this.devices || []).filter(d => {
+        const network = ((d.network_type || 'wifi').toLowerCase() === 'ftth' ? 'ftth' : 'wifi');
+        if ((this.savedUserForm.network_types || []).length > 0 && !(this.savedUserForm.network_types || []).includes(network)) return false;
+        if (this.savedUserPicker.network_type && network !== this.savedUserPicker.network_type) return false;
+        return true;
+      }).map(d => [(d.province || 'Unknown').toLowerCase(), { value: (d.province || 'Unknown').toLowerCase(), label: (d.province || 'Unknown') }])).values()].sort((a, b) => a.label.localeCompare(b.label));
+    },
+
+    savedUserVendorOptions() {
+      return [...new Map((this.devices || []).filter(d => {
+        const network = ((d.network_type || 'wifi').toLowerCase() === 'ftth' ? 'ftth' : 'wifi');
+        const province = (d.province || 'Unknown').toLowerCase();
+        if ((this.savedUserForm.network_types || []).length > 0 && !(this.savedUserForm.network_types || []).includes(network)) return false;
+        if (this.savedUserPicker.network_type && network !== this.savedUserPicker.network_type) return false;
+        if ((this.savedUserForm.provinces || []).length > 0 && !(this.savedUserForm.provinces || []).includes(province)) return false;
+        if (this.savedUserPicker.province && province !== this.savedUserPicker.province) return false;
+        return true;
+      }).map(d => [this.vendorValue(d), { value: this.vendorValue(d), label: this.vendorLabel(d) }])).values()].sort((a, b) => a.label.localeCompare(b.label));
+    },
+
+    savedUserModelOptions() {
+      return [...new Map((this.devices || []).filter(d => {
+        const network = ((d.network_type || 'wifi').toLowerCase() === 'ftth' ? 'ftth' : 'wifi');
+        const province = (d.province || 'Unknown').toLowerCase();
+        const vendor = this.vendorValue(d);
+        if ((this.savedUserForm.network_types || []).length > 0 && !(this.savedUserForm.network_types || []).includes(network)) return false;
+        if (this.savedUserPicker.network_type && network !== this.savedUserPicker.network_type) return false;
+        if ((this.savedUserForm.provinces || []).length > 0 && !(this.savedUserForm.provinces || []).includes(province)) return false;
+        if (this.savedUserPicker.province && province !== this.savedUserPicker.province) return false;
+        if ((this.savedUserForm.vendors || []).length > 0 && !(this.savedUserForm.vendors || []).includes(vendor)) return false;
+        if (this.savedUserPicker.vendor && vendor !== this.savedUserPicker.vendor) return false;
+        return true;
+      }).filter(d => (d.model || '').trim() !== '').map(d => [(d.model || '').trim().toLowerCase(), { value: (d.model || '').trim().toLowerCase(), label: (d.model || '').trim() }])).values()].sort((a, b) => a.label.localeCompare(b.label));
+    },
+
+    savedUserDeviceOptions() {
+      return (this.devices || []).filter(d => {
+        const network = ((d.network_type || 'wifi').toLowerCase() === 'ftth' ? 'ftth' : 'wifi');
+        const province = (d.province || 'Unknown').toLowerCase();
+        const vendor = this.vendorValue(d);
+        const model = (d.model || '').trim().toLowerCase();
+        if ((this.savedUserForm.network_types || []).length > 0 && !(this.savedUserForm.network_types || []).includes(network)) return false;
+        if (this.savedUserPicker.network_type && network !== this.savedUserPicker.network_type) return false;
+        if ((this.savedUserForm.provinces || []).length > 0 && !(this.savedUserForm.provinces || []).includes(province)) return false;
+        if (this.savedUserPicker.province && province !== this.savedUserPicker.province) return false;
+        if ((this.savedUserForm.vendors || []).length > 0 && !(this.savedUserForm.vendors || []).includes(vendor)) return false;
+        if (this.savedUserPicker.vendor && vendor !== this.savedUserPicker.vendor) return false;
+        if ((this.savedUserForm.models || []).length > 0 && !(this.savedUserForm.models || []).includes(model)) return false;
+        if (this.savedUserPicker.model && model !== this.savedUserPicker.model) return false;
+        return true;
+      }).map(d => ({ value: (d.host || '').toLowerCase(), label: d.display_name + ' (' + d.host + ')' })).sort((a, b) => a.label.localeCompare(b.label));
+    },
+
+    onSavedUserNetworkChange() {
+      this.savedUserPicker.province = '';
+      this.savedUserPicker.vendor = '';
+      this.savedUserPicker.model = '';
+      this.savedUserPicker.device = '';
+    },
+
+    onSavedUserProvinceChange() {
+      this.savedUserPicker.vendor = '';
+      this.savedUserPicker.model = '';
+      this.savedUserPicker.device = '';
+    },
+
+    onSavedUserVendorChange() {
+      this.savedUserPicker.model = '';
+      this.savedUserPicker.device = '';
+    },
+
+    onSavedUserModelChange() {
+      this.savedUserPicker.device = '';
+    },
+
+    addSavedUserTarget(kind, value) {
+      const trimmed = String(value || '').trim().toLowerCase();
+      if (!trimmed) return;
+      const current = Array.isArray(this.savedUserForm[kind]) ? [...this.savedUserForm[kind]] : [];
+      if (!current.includes(trimmed)) current.push(trimmed);
+      this.savedUserForm = { ...this.savedUserForm, [kind]: current };
+      if (kind === 'network_types') this.savedUserPicker.network_type = '';
+      if (kind === 'provinces') this.savedUserPicker.province = '';
+      if (kind === 'vendors') this.savedUserPicker.vendor = '';
+      if (kind === 'models') this.savedUserPicker.model = '';
+      if (kind === 'devices') this.savedUserPicker.device = '';
+    },
+
+    removeSavedUserTarget(kind, value) {
+      const trimmed = String(value || '').trim().toLowerCase();
+      this.savedUserForm = {
+        ...this.savedUserForm,
+        [kind]: (this.savedUserForm[kind] || []).filter(item => String(item).trim().toLowerCase() !== trimmed)
       };
-      if (this.detail) {
-        this.detail.last_apply_error = data.last_apply_error || this.detail.last_apply_error;
-        this.detail.last_apply_ok = data.last_apply_ok !== false;
+    },
+
+    savedUserTargetLabel(kind, value) {
+      const trimmed = String(value || '').trim();
+      if (!trimmed) return '';
+      if (kind === 'network_types') return trimmed.toLowerCase() === 'ftth' ? 'FTTH' : 'WiFi';
+      if (kind === 'vendors') {
+        if (trimmed.toLowerCase() === 'cisco_nexus') return 'Cisco Nexus';
+        if (trimmed.toLowerCase() === 'cisco_ios') return 'Cisco';
+        if (trimmed.toLowerCase() === 'mikrotik') return 'Microtik';
+        if (trimmed.toLowerCase() === 'huawei') return 'Huawei';
+        if (trimmed.toLowerCase() === 'nokia') return 'Nokia';
+      }
+      if (kind === 'privilege') {
+        if (trimmed.toLowerCase() === 'write') return 'Write';
+        if (trimmed.toLowerCase() === 'read') return 'Read';
+        return 'Full';
+      }
+      if (kind === 'devices') {
+        const device = (this.devices || []).find(d => (d.host || '').toLowerCase() === trimmed.toLowerCase());
+        return device ? (device.display_name + ' (' + device.host + ')') : trimmed;
+      }
+      return trimmed.split(' ').map(part => part ? (part[0].toUpperCase() + part.slice(1)) : '').join(' ');
+    },
+
+    savedUserValueList(kind, values) {
+      return (values || []).map(value => this.savedUserTargetLabel(kind, value)).join(', ');
+    },
+
+    async submitSavedUser() {
+      this.savedUserError = '';
+      this.savedUserSaving = true;
+      try {
+        const res = await fetch('/api/noc-pass/saved-users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.savedUserForm)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          this.savedUserError = data.error || 'Save failed';
+          return;
+        }
+        this.savedUserForm = { username: '', password: '', privilege: 'full', network_types: [], provinces: [], vendors: [], models: [], devices: [] };
+        this.savedUserPicker = { network_type: '', province: '', vendor: '', model: '', device: '' };
+        await this.fetchSavedUsers();
+      } catch (_) {
+        this.savedUserError = 'Network error';
+      } finally {
+        this.savedUserSaving = false;
       }
     },
 
-    fmtTime(iso) {
-      if (!iso) return '';
-      try {
-        return new Date(iso).toLocaleString();
-      } catch (_) { return iso; }
-    },
-
-    async rotateNow() {
-      if (!this.detail) return;
-      const res = await fetch('/api/noc-pass/devices/' + this.detail.id + '/rotate', { method: 'POST' });
+    async deleteSavedUser(user) {
+      if (!user || !confirm('Delete this saved user from devices first, then hard delete it locally?')) return;
+      const res = await fetch('/api/noc-pass/saved-users/' + user.id, { method: 'DELETE' });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || 'Rotate failed');
-        return;
-      }
-      if (data.device) this.detail = data.device;
-      await this.refreshCred();
-      await this.fetchList();
-    },
-
-    async deleteDevice() {
-      if (!this.detail || !confirm('Remove this device from NOC Pass?')) return;
-      const res = await fetch('/api/noc-pass/devices/' + this.detail.id, { method: 'DELETE' });
-      if (!res.ok) {
-        const data = await res.json();
         alert(data.error || 'Delete failed');
         return;
       }
-      this.detail = null;
-      await this.fetchList();
+      await this.fetchSavedUsers();
+    },
+
+    fmtTime(iso) {
+      if (!iso) return '—';
+      try { return new Date(iso).toLocaleString(); } catch (_) { return iso; }
+    },
+
+    vendorValue(d) {
+      const v = (d.source_vendor || d.vendor || '').toLowerCase();
+      if (v === 'cisco_ios' || v === 'cisco') return 'cisco_ios';
+      if (v === 'cisco_nexus') return 'cisco_nexus';
+      if (v === 'mikrotik') return 'mikrotik';
+      if (v === 'huawei') return 'huawei';
+      if (v === 'nokia') return 'nokia';
+      return v || 'unknown';
+    },
+
+    vendorLabel(d) {
+      const v = this.vendorValue(d);
+      if (v === 'cisco_nexus') return 'Cisco Nexus';
+      if (v === 'cisco_ios' || v === 'cisco') return 'Cisco';
+      if (v === 'mikrotik') return 'Microtik';
+      if (v === 'huawei') return 'Huawei';
+      if (v === 'nokia') return 'Nokia';
+      return v || 'Unknown';
+    },
+
+    isTreeNodeExpanded(key) { return !!this.expandedTreeNodes[key]; },
+    toggleTreeNode(key) { this.expandedTreeNodes = { ...this.expandedTreeNodes, [key]: !this.expandedTreeNodes[key] }; },
+
+    treeGroups() {
+      const byNetwork = {};
+      for (const d of this.devices || []) {
+        const network = (d.network_type || 'wifi').toLowerCase() === 'ftth' ? 'ftth' : 'wifi';
+        const province = (d.province || 'Unknown').trim() || 'Unknown';
+        const vendorValue = this.vendorValue(d);
+        const vendorLabel = this.vendorLabel(d);
+        const model = (d.model || 'Unknown Model').trim() || 'Unknown Model';
+        byNetwork[network] ??= { key: network, value: network, label: network === 'ftth' ? 'FTTH' : 'WiFi', count: 0, children: {} };
+        const networkNode = byNetwork[network];
+        networkNode.count += 1;
+        networkNode.children[province] ??= { key: network + '-' + province, value: province, label: province, count: 0, children: {} };
+        const provinceNode = networkNode.children[province];
+        provinceNode.count += 1;
+        provinceNode.children[vendorValue] ??= { key: network + '-' + province + '-' + vendorValue, value: vendorValue, label: vendorLabel, count: 0, children: {} };
+        const vendorNode = provinceNode.children[vendorValue];
+        vendorNode.count += 1;
+        vendorNode.children[model] ??= { key: network + '-' + province + '-' + vendorValue + '-' + model, value: model, label: model, count: 0, devices: [] };
+        const modelNode = vendorNode.children[model];
+        modelNode.count += 1;
+        modelNode.devices.push(d);
+      }
+      return Object.values(byNetwork).sort((a, b) => a.label.localeCompare(b.label)).map(networkNode => ({
+        ...networkNode,
+        children: Object.values(networkNode.children).sort((a, b) => a.label.localeCompare(b.label)).map(provinceNode => ({
+          ...provinceNode,
+          children: Object.values(provinceNode.children).sort((a, b) => a.label.localeCompare(b.label)).map(vendorNode => ({
+            ...vendorNode,
+            children: Object.values(vendorNode.children).sort((a, b) => a.label.localeCompare(b.label)).map(modelNode => ({
+              ...modelNode,
+              devices: [...modelNode.devices].sort((a, b) => (a.display_name || '').localeCompare(b.display_name || ''))
+            }))
+          }))
+        }))
+      }));
     }
   };
 }

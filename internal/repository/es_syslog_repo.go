@@ -95,7 +95,7 @@ func (r *EsSyslogRepository) FindOpenSlackIncidentByChannelFingerprint(channelID
 // ListOpenSlackIncidentsDueReminder returns unresolved incidents with NextReminderAt <= until.
 func (r *EsSyslogRepository) ListOpenSlackIncidentsDueReminder(until time.Time) ([]models.EsSyslogSlackIncident, error) {
 	var list []models.EsSyslogSlackIncident
-	err := r.db.Where("resolved_at IS NULL AND next_reminder_at <= ?", until).
+	err := r.db.Where("resolved_at IS NULL AND snoozed_at IS NULL AND next_reminder_at <= ?", until).
 		Order("next_reminder_at ASC").Limit(50).Find(&list).Error
 	return list, err
 }
@@ -114,6 +114,27 @@ func (r *EsSyslogRepository) MarkSlackIncidentResolved(id uint, resolvedBy strin
 func (r *EsSyslogRepository) BumpSlackIncidentReminder(id uint, next time.Time) error {
 	return r.db.Model(&models.EsSyslogSlackIncident{}).Where("id = ?", id).
 		Update("next_reminder_at", next).Error
+}
+
+func (r *EsSyslogRepository) SnoozeSlackIncident(id uint, snoozedBy string, at time.Time) error {
+	far := at.AddDate(50, 0, 0)
+	return r.db.Model(&models.EsSyslogSlackIncident{}).
+		Where("id = ? AND resolved_at IS NULL", id).
+		Updates(map[string]interface{}{
+			"snoozed_at":       at,
+			"snoozed_by":       snoozedBy,
+			"next_reminder_at": far,
+		}).Error
+}
+
+func (r *EsSyslogRepository) UnsnoozeSlackIncident(id uint, nextReminderAt time.Time) error {
+	return r.db.Model(&models.EsSyslogSlackIncident{}).
+		Where("id = ? AND resolved_at IS NULL", id).
+		Updates(map[string]interface{}{
+			"snoozed_at":       nil,
+			"snoozed_by":       "",
+			"next_reminder_at": nextReminderAt,
+		}).Error
 }
 
 func (r *EsSyslogRepository) AlertsForSlackIncident(incidentID uint) ([]models.EsSyslogAlert, error) {

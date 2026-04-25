@@ -47,6 +47,7 @@ type CommandSet struct {
 	AAA         string
 	Syslog      string
 	LayerMode   string
+	TCPStatus   string
 	Identity    string
 	Routerboard string
 }
@@ -133,6 +134,7 @@ func CommandsForVendor(v string) (CommandSet, []string, error) {
 			AAA:         "display current-configuration",
 			Syslog:      "display current-configuration",
 			LayerMode:   "display ip routing-table",
+			TCPStatus:   "display tcp status",
 		}
 		return set, []string{
 			"screen-length 0 temporary",
@@ -140,13 +142,9 @@ func CommandsForVendor(v string) (CommandSet, []string, error) {
 			set.HardwareID,
 			set.IntStatus,
 			set.DefaultGW,
-			set.Users,
-			set.VTY,
-			set.SNMP,
-			set.NTP,
-			set.AAA,
-			set.Syslog,
 			set.LayerMode,
+			set.TCPStatus,
+			set.Users,
 		}, nil
 	default:
 		return CommandSet{}, nil, fmt.Errorf("unsupported vendor %q", v)
@@ -208,14 +206,14 @@ func CollectSnapshot(d *models.NocDataDevice, sections map[string]string) Snapsh
 		s.AAAEnabled = parseMikrotikAAA(sections["/radius print detail"])
 		s.SyslogEnabled = hasSignal(sections["/system logging print"])
 	case "huawei":
-		s.Hostname, s.Uptime = parseHuaweiDisplayVersion(sections["display version"])
-		s.Model, s.Version, s.Serial = parseHuaweiElabel(sections["display elabel"])
+		s.Hostname, s.Version, s.Uptime = parseHuaweiDisplayVersion(sections["display version"])
+		s.Model, _, s.Serial = parseHuaweiElabel(sections["display elabel"])
 		s.IFUp, s.IFDown = parseHuaweiInterfaces(sections["display interface description | include GE"])
 		s.DefaultRouter = parseHuaweiDefaultRouter(sections["display ip routing-table"])
 		s.LayerMode = parseHuaweiLayerMode(sections["display ip routing-table"])
 		s.Users = parseHuaweiUsers(sections["display current-configuration"])
 		s.UserCount = len(s.Users)
-		s.SSHEnabled, s.TelnetEnabled = parseHuaweiServices(sections["display current-configuration"])
+		s.SSHEnabled, s.TelnetEnabled = parseHuaweiServices(sections["display tcp status"], sections["display current-configuration"])
 		s.SNMPEnabled = parseHuaweiSNMP(sections["display current-configuration"])
 		s.NTPEnabled = parseHuaweiNTP(sections["display current-configuration"])
 		s.AAAEnabled = parseHuaweiAAA(sections["display current-configuration"])
@@ -279,8 +277,8 @@ func ProbeOutputLooksValid(vendor, cmd, out string) bool {
 			return false
 		}
 
-		hostname, uptime := parseHuaweiDisplayVersion(trimmed)
-		if hostname != "" || uptime != "" {
+		hostname, version, uptime := parseHuaweiDisplayVersion(trimmed)
+		if hostname != "" || version != "" || uptime != "" {
 			return true
 		}
 
@@ -398,6 +396,7 @@ func parseCiscoVersion(sections map[string]string) (string, string, string, stri
 	var hostname, model, version, serial, uptime string
 	iosVersionRe := regexp.MustCompile(`(?i)^cisco ios software,.*?\bversion\s+([^,\n]+)`)
 	nxosVersionRe := regexp.MustCompile(`(?i)^nxos:\s+version\s+([^\r\n]+)$`)
+	nxosImageRe := regexp.MustCompile(`(?i)^NXOS image file is:\s*(.+)$`)
 	genericCiscoVersionRe := regexp.MustCompile(`(?i)\bversion\s+([^,\r\n]+)`)
 	serialRe := regexp.MustCompile(`(?i)(processor board id|system serial number|serial number)\s*[:#]?\s*(\S+)`)
 	iosModelRe := regexp.MustCompile(`(?i)^cisco\s+(\S+)\s+\([^)]+\)\s+processor`)
@@ -442,6 +441,9 @@ func parseCiscoVersion(sections map[string]string) (string, string, string, stri
 					version = strings.TrimSpace(m[1])
 				}
 			}
+		}
+		if m := nxosImageRe.FindStringSubmatch(trimmed); len(m) > 1 {
+			version = strings.Trim(strings.TrimSpace(m[1]), `"`)
 		}
 		if serial == "" {
 			if m := serialRe.FindStringSubmatch(trimmed); len(m) > 2 {
@@ -506,10 +508,12 @@ func parseCiscoVTY(out string) (bool, bool) {
 	return ssh, telnet
 }
 
-func parseHuaweiDisplayVersion(out string) (string, string) {
+func parseHuaweiDisplayVersion(out string) (string, string, string) {
 	lines := strings.Split(out, "\n")
-	var hostname, uptime string
+	var hostname, version, uptime string
 	promptRe := regexp.MustCompile(`<([A-Za-z0-9._:-]+)>`)
+	softwareVersionRe := regexp.MustCompile(`(?i)^Software\s+Version\s*:\s*.*?\bSoftware\s*,\s*(Version\s+.+)$`)
+	versionRe := regexp.MustCompile(`(?i)\bsoftware\s*,?\s+(Version\s+.+)$`)
 	uptimeRe := regexp.MustCompile(`(?i)(?:^|.*\s)HUAWEI\s+(\S+)\s+.+?\s+uptime is\s+(.+)$`)
 
 	for _, line := range lines {
@@ -522,6 +526,13 @@ func parseHuaweiDisplayVersion(out string) (string, string) {
 				hostname = strings.TrimSpace(m[1])
 			}
 		}
+		if m := softwareVersionRe.FindStringSubmatch(trimmed); len(m) > 1 {
+			version = strings.TrimSpace(m[1])
+		} else if version == "" {
+			if m := versionRe.FindStringSubmatch(trimmed); len(m) > 1 {
+				version = strings.TrimSpace(m[1])
+			}
+		}
 		if uptime == "" {
 			if m := uptimeRe.FindStringSubmatch(trimmed); len(m) > 2 {
 				uptime = strings.TrimSpace(m[2])
@@ -529,7 +540,7 @@ func parseHuaweiDisplayVersion(out string) (string, string) {
 		}
 	}
 
-	return hostname, uptime
+	return hostname, version, uptime
 }
 
 func parseHuaweiElabel(out string) (string, string, string) {
@@ -653,8 +664,12 @@ func parseHuaweiUsers(out string) []string {
 	return uniqueSorted(users)
 }
 
-func parseHuaweiServices(out string) (bool, bool) {
-	lower := strings.ToLower(out)
+func parseHuaweiServices(tcpStatusOut, configOut string) (bool, bool) {
+	if ssh, telnet, ok := parseHuaweiTCPStatusServices(tcpStatusOut); ok {
+		return ssh, telnet
+	}
+
+	lower := strings.ToLower(configOut)
 	ssh := strings.Contains(lower, "stelnet server enable") ||
 		strings.Contains(lower, "ssh server enable") ||
 		strings.Contains(lower, "protocol inbound ssh") ||
@@ -663,6 +678,49 @@ func parseHuaweiServices(out string) (bool, bool) {
 		strings.Contains(lower, "protocol inbound telnet") ||
 		strings.Contains(lower, "protocol inbound all")
 	return ssh, telnet
+}
+
+func parseHuaweiTCPStatusServices(out string) (bool, bool, bool) {
+	var ssh, telnet, sawListening bool
+	for _, line := range strings.Split(out, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		fields := strings.Fields(trimmed)
+		if len(fields) < 5 || !strings.EqualFold(fields[len(fields)-1], "Listening") {
+			continue
+		}
+		port := ""
+		for _, field := range fields[1 : len(fields)-1] {
+			port = localTCPPort(field)
+			if port != "" {
+				break
+			}
+		}
+		if port != "" {
+			sawListening = true
+		}
+		switch port {
+		case "22":
+			ssh = true
+		case "23":
+			telnet = true
+		}
+	}
+	return ssh, telnet, sawListening
+}
+
+func localTCPPort(localAddr string) string {
+	localAddr = strings.TrimSpace(localAddr)
+	if localAddr == "" {
+		return ""
+	}
+	idx := strings.LastIndex(localAddr, ":")
+	if idx < 0 || idx == len(localAddr)-1 {
+		return ""
+	}
+	return strings.TrimSpace(localAddr[idx+1:])
 }
 
 func parseHuaweiSNMP(out string) bool {

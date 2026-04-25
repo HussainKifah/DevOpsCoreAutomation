@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	auth "github.com/Flafl/DevOpsCore/internal/Auth"
 	"github.com/Flafl/DevOpsCore/internal/crypto"
@@ -671,6 +672,16 @@ type EnrichedRun struct {
 // Returns all runs enriched with device info, newest first.
 func (h *WorkflowHandler) GetRunsByType(c *gin.Context) {
 	jobType := c.Query("type") // "backup", "command", or "" for all
+	var dayStart, dayEnd time.Time
+	if rawDate := strings.TrimSpace(c.Query("date")); rawDate != "" {
+		day, err := time.Parse("2006-01-02", rawDate)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date"})
+			return
+		}
+		dayStart = time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC)
+		dayEnd = dayStart.Add(24 * time.Hour)
+	}
 
 	jobs, err := h.repo.ListJobs()
 	if err != nil {
@@ -691,6 +702,12 @@ func (h *WorkflowHandler) GetRunsByType(c *gin.Context) {
 			continue
 		}
 		for _, r := range runs {
+			if !dayStart.IsZero() {
+				started := r.StartedAt.UTC()
+				if started.Before(dayStart) || !started.Before(dayEnd) {
+					continue
+				}
+			}
 			s := r.StartedAt.UTC().Format("2006-01-02T15:04:05Z")
 			er := EnrichedRun{
 				ID:         r.ID,
@@ -741,6 +758,212 @@ func (h *WorkflowHandler) GetRunOutput(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"output": run.Output})
+}
+
+type BackupCompareLine struct {
+	Text  string `json:"text"`
+	Count int    `json:"count"`
+}
+
+type BackupCompareDevice struct {
+	Host             string              `json:"host"`
+	DeviceName       string              `json:"device_name"`
+	Vendor           string              `json:"vendor"`
+	BaseRunID        uint                `json:"base_run_id,omitempty"`
+	CompareRunID     uint                `json:"compare_run_id,omitempty"`
+	BaseStartedAt    *string             `json:"base_started_at,omitempty"`
+	CompareStartedAt *string             `json:"compare_started_at,omitempty"`
+	BaseSize         int                 `json:"base_size"`
+	CompareSize      int                 `json:"compare_size"`
+	AddedLines       []BackupCompareLine `json:"added_lines,omitempty"`
+	RemovedLines     []BackupCompareLine `json:"removed_lines,omitempty"`
+}
+
+type BackupCompareResponse struct {
+	BaseDate    string                `json:"base_date"`
+	CompareDate string                `json:"compare_date"`
+	Changed     []BackupCompareDevice `json:"changed"`
+	Added       []BackupCompareDevice `json:"added"`
+	Missing     []BackupCompareDevice `json:"missing"`
+	Unchanged   int                   `json:"unchanged"`
+}
+
+// CompareBackups compares latest successful backup output per device between two dates.
+func (h *WorkflowHandler) CompareBackups(c *gin.Context) {
+	baseRaw := strings.TrimSpace(c.Query("base"))
+	compareRaw := strings.TrimSpace(c.Query("compare"))
+	baseDay, err := time.Parse("2006-01-02", baseRaw)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid base date"})
+		return
+	}
+	compareDay, err := time.Parse("2006-01-02", compareRaw)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid compare date"})
+		return
+	}
+
+	baseRuns, err := h.latestBackupRunsByHost(baseDay)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	compareRuns, err := h.latestBackupRunsByHost(compareDay)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	resp := BackupCompareResponse{
+		BaseDate:    baseRaw,
+		CompareDate: compareRaw,
+		Changed:     []BackupCompareDevice{},
+		Added:       []BackupCompareDevice{},
+		Missing:     []BackupCompareDevice{},
+	}
+
+	seen := make(map[string]struct{}, len(baseRuns)+len(compareRuns))
+	for host, baseRun := range baseRuns {
+		seen[host] = struct{}{}
+		compareRun, ok := compareRuns[host]
+		if !ok {
+			resp.Missing = append(resp.Missing, backupCompareDeviceFromRun(baseRun, nil, nil, nil))
+			continue
+		}
+		if baseRun.Output == compareRun.Output {
+			resp.Unchanged++
+			continue
+		}
+		added, removed := compareBackupLines(baseRun.Output, compareRun.Output)
+		resp.Changed = append(resp.Changed, backupCompareDeviceFromRun(baseRun, compareRun, added, removed))
+	}
+	for host, compareRun := range compareRuns {
+		if _, ok := seen[host]; ok {
+			continue
+		}
+		resp.Added = append(resp.Added, backupCompareDeviceFromRun(nil, compareRun, nil, nil))
+	}
+
+	sort.Slice(resp.Changed, func(i, j int) bool { return resp.Changed[i].Host < resp.Changed[j].Host })
+	sort.Slice(resp.Added, func(i, j int) bool { return resp.Added[i].Host < resp.Added[j].Host })
+	sort.Slice(resp.Missing, func(i, j int) bool { return resp.Missing[i].Host < resp.Missing[j].Host })
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *WorkflowHandler) latestBackupRunsByHost(day time.Time) (map[string]*models.WorkflowRun, error) {
+	start := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC)
+	end := start.Add(24 * time.Hour)
+	jobs, err := h.repo.ListJobs()
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]*models.WorkflowRun)
+	for i := range jobs {
+		j := jobs[i]
+		if j.JobType != "backup" {
+			continue
+		}
+		runs, err := h.repo.ListRunsForJob(j.ID, 500)
+		if err != nil {
+			continue
+		}
+		for i := range runs {
+			r := runs[i]
+			if r.Status != "ok" {
+				continue
+			}
+			started := r.StartedAt.UTC()
+			if started.Before(start) || !started.Before(end) {
+				continue
+			}
+			hostKey := strings.ToLower(strings.TrimSpace(firstNonEmpty(r.Host, j.Device.Host, r.DeviceName, j.TargetLabel)))
+			if hostKey == "" {
+				continue
+			}
+			if strings.TrimSpace(r.Host) == "" {
+				r.Host = firstNonEmpty(j.Device.Host, r.DeviceName, j.TargetLabel)
+			}
+			if strings.TrimSpace(r.DeviceName) == "" {
+				r.DeviceName = firstNonEmpty(j.Device.Name, j.TargetLabel, r.Host)
+			}
+			if strings.TrimSpace(r.Vendor) == "" {
+				r.Vendor = j.Device.Vendor
+			}
+			current := out[hostKey]
+			if current == nil || r.StartedAt.After(current.StartedAt) {
+				runCopy := r
+				out[hostKey] = &runCopy
+			}
+		}
+	}
+	return out, nil
+}
+
+func backupCompareDeviceFromRun(baseRun, compareRun *models.WorkflowRun, added, removed []BackupCompareLine) BackupCompareDevice {
+	source := compareRun
+	if source == nil {
+		source = baseRun
+	}
+	item := BackupCompareDevice{}
+	if source != nil {
+		item.Host = source.Host
+		item.DeviceName = source.DeviceName
+		item.Vendor = source.Vendor
+	}
+	if baseRun != nil {
+		baseStarted := baseRun.StartedAt.UTC().Format("2006-01-02T15:04:05Z")
+		item.BaseRunID = baseRun.ID
+		item.BaseStartedAt = &baseStarted
+		item.BaseSize = len(baseRun.Output)
+	}
+	if compareRun != nil {
+		compareStarted := compareRun.StartedAt.UTC().Format("2006-01-02T15:04:05Z")
+		item.CompareRunID = compareRun.ID
+		item.CompareStartedAt = &compareStarted
+		item.CompareSize = len(compareRun.Output)
+	}
+	item.AddedLines = added
+	item.RemovedLines = removed
+	return item
+}
+
+func compareBackupLines(baseOutput, compareOutput string) ([]BackupCompareLine, []BackupCompareLine) {
+	baseCounts := backupLineCounts(baseOutput)
+	compareCounts := backupLineCounts(compareOutput)
+	added := make([]BackupCompareLine, 0)
+	removed := make([]BackupCompareLine, 0)
+	for line, compareCount := range compareCounts {
+		if diff := compareCount - baseCounts[line]; diff > 0 {
+			added = append(added, BackupCompareLine{Text: line, Count: diff})
+		}
+	}
+	for line, baseCount := range baseCounts {
+		if diff := baseCount - compareCounts[line]; diff > 0 {
+			removed = append(removed, BackupCompareLine{Text: line, Count: diff})
+		}
+	}
+	sort.Slice(added, func(i, j int) bool { return added[i].Text < added[j].Text })
+	sort.Slice(removed, func(i, j int) bool { return removed[i].Text < removed[j].Text })
+	const maxLines = 200
+	if len(added) > maxLines {
+		added = added[:maxLines]
+	}
+	if len(removed) > maxLines {
+		removed = removed[:maxLines]
+	}
+	return added, removed
+}
+
+func backupLineCounts(output string) map[string]int {
+	counts := make(map[string]int)
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "!Time:") || strings.HasPrefix(line, "# Time:") {
+			continue
+		}
+		counts[line]++
+	}
+	return counts
 }
 
 func firstNonEmpty(values ...string) string {

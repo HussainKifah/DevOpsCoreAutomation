@@ -1,17 +1,17 @@
 package nocpass
 
-// Fixed NOC local accounts on every managed device (same rotating password on both).
+// Fixed NOC local accounts on every managed device.
 const (
-	UserFiberx   = "fiberx"
-	UserReadOnly = "readOnly"
-	UserDev      = "dev"
+	UserFiberx  = "fiberx"
+	UserSupport = "support"
+	UserDev     = "dev"
 )
 
-// AccountSummary describes the two accounts for API/UI.
+// AccountSummary describes the managed accounts for API/UI.
 var AccountSummary = []struct {
 	Username string
 	Hint     string
 }{
 	{UserFiberx, "privilege 15 (full)"},
-	{UserReadOnly, "privilege 13 (read-only)"},
+	{UserSupport, "write-capable support access"},
 }

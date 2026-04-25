@@ -30,6 +30,7 @@ func Setup(
 	nocPassH *handlers.NocPassHandler,
 	nocDataH *handlers.NocDataHandler,
 	esSyslogH *handlers.EsSyslogHandler,
+	ipCapacityH *handlers.IPCapacityHandler,
 	slackEventsH *handlers.SlackEventsHandler,
 ) {
 	// WebSocket endpoint (auth inside handler)
@@ -166,6 +167,7 @@ func Setup(
 		ipPages.GET("/ip-cmd-output", pageH.IPCmdOutput)
 		ipPages.GET("/ip-activity-log", pageH.IPActivityLog)
 		ipPages.GET("/ip-syslog-alerts", pageH.IPSyslogAlerts)
+		ipPages.GET("/ip-capacities", pageH.IPCapacities)
 	}
 
 	// NOC Pass pages (role: noc, admin)
@@ -186,6 +188,11 @@ func Setup(
 	nocAPI.Use(middleware.AuthMiddleware(jwtManager), middleware.RoleGuard("noc", "admin"))
 	{
 		nocAPI.GET("/devices", nocPassH.ListDevices)
+		nocAPI.GET("/policies", nocPassH.ListPolicies)
+		nocAPI.POST("/policies", nocPassH.CreatePolicy)
+		nocAPI.PUT("/policies/:id", nocPassH.UpdatePolicy)
+		nocAPI.DELETE("/policies/:id", nocPassH.DeletePolicy)
+		nocAPI.POST("/policies/:id/run", nocPassH.RunPolicyNow)
 		nocAPI.POST("/devices", nocPassH.CreateDevice)
 		nocAPI.DELETE("/devices/:id", nocPassH.DeleteDevice)
 		nocAPI.GET("/devices/:id/credential", nocPassH.Credential)
@@ -193,12 +200,20 @@ func Setup(
 		nocAPI.GET("/keep-users", nocPassH.ListKeepUsers)
 		nocAPI.POST("/keep-users", nocPassH.CreateKeepUser)
 		nocAPI.DELETE("/keep-users/:id", nocPassH.DeleteKeepUser)
+		nocAPI.GET("/saved-users", nocPassH.ListSavedUsers)
+		nocAPI.POST("/saved-users", nocPassH.CreateSavedUser)
+		nocAPI.DELETE("/saved-users/:id", nocPassH.DeleteSavedUser)
+		nocAPI.GET("/exclusions", nocPassH.ListExclusions)
+		nocAPI.POST("/exclusions", nocPassH.CreateExclusion)
+		nocAPI.DELETE("/exclusions/:id", nocPassH.DeleteExclusion)
 	}
 
 	nocDataAPI := r.Group("/api/noc-data")
 	nocDataAPI.Use(middleware.AuthMiddleware(jwtManager), middleware.RoleGuard("noc", "admin"))
 	{
 		nocDataAPI.GET("/devices", nocDataH.ListDevices)
+		nocDataAPI.GET("/history/dates", nocDataH.ListHistoryDates)
+		nocDataAPI.GET("/history", nocDataH.ListHistory)
 		nocDataAPI.POST("/devices", nocDataH.CreateDevice)
 		nocDataAPI.DELETE("/devices/:id", nocDataH.DeleteDevice)
 		nocDataAPI.POST("/failed/run", nocDataH.RunFailedDevicesOneByOne)
@@ -230,6 +245,7 @@ func Setup(
 		nocWfAPI.GET("/jobs/:id/runs", nocWorkflowH.GetRuns)
 
 		nocWfAPI.GET("/runs", nocWorkflowH.GetRunsByType)
+		nocWfAPI.GET("/backups/compare", nocWorkflowH.CompareBackups)
 		nocWfAPI.GET("/runs/:id/output", nocWorkflowH.GetRunOutput)
 
 		nocWfAPI.GET("/logs", nocWorkflowH.GetLogs)
@@ -252,6 +268,7 @@ func Setup(
 		wfAPI.GET("/jobs/:id/runs", workflowH.GetRuns)
 
 		wfAPI.GET("/runs", workflowH.GetRunsByType)
+		wfAPI.GET("/backups/compare", workflowH.CompareBackups)
 		wfAPI.GET("/runs/:id/output", workflowH.GetRunOutput)
 
 		wfAPI.GET("/logs", workflowH.GetLogs)
@@ -266,5 +283,19 @@ func Setup(
 		esAPI.POST("/filters", esSyslogH.CreateFilter)
 		esAPI.PUT("/filters/:id", esSyslogH.UpdateFilter)
 		esAPI.DELETE("/filters/:id", esSyslogH.DeleteFilter)
+	}
+
+	capacityAPI := r.Group("/api/ip/capacities")
+	capacityAPI.Use(middleware.AuthMiddleware(jwtManager), middleware.RoleGuard("ip", "admin"))
+	{
+		capacityAPI.GET("/nodes", ipCapacityH.ListNodes)
+		capacityAPI.POST("/nodes", ipCapacityH.CreateNode)
+		capacityAPI.PUT("/nodes/:id", ipCapacityH.UpdateNode)
+		capacityAPI.GET("/actions", ipCapacityH.ListActions)
+		capacityAPI.POST("/actions", ipCapacityH.CreateAction)
+		capacityAPI.PUT("/actions/:id", ipCapacityH.UpdateAction)
+		capacityAPI.DELETE("/actions/:id", ipCapacityH.DeleteAction)
+		capacityAPI.GET("/history/days", ipCapacityH.ListHistoryDays)
+		capacityAPI.GET("/history/day", ipCapacityH.GetDayHistory)
 	}
 }

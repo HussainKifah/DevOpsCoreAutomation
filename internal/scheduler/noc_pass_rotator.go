@@ -9,21 +9,23 @@ import (
 	"github.com/Flafl/DevOpsCore/internal/repository"
 )
 
-// NocPassRotator periodically rotates NOC passwords on enabled devices (24h cadence).
+// NocPassRotator periodically applies enabled NOC PASS policies.
 type NocPassRotator struct {
-	repo     repository.NocPassRepository
-	key      []byte
-	stop     chan struct{}
-	wg       sync.WaitGroup
-	ticker   *time.Ticker
-	stopOnce sync.Once
+	repo        repository.NocPassRepository
+	nocDataRepo repository.NocDataRepository
+	key         []byte
+	stop        chan struct{}
+	wg          sync.WaitGroup
+	ticker      *time.Ticker
+	stopOnce    sync.Once
 }
 
-func NewNocPassRotator(repo repository.NocPassRepository, masterKey []byte) *NocPassRotator {
+func NewNocPassRotator(repo repository.NocPassRepository, nocDataRepo repository.NocDataRepository, masterKey []byte) *NocPassRotator {
 	return &NocPassRotator{
-		repo: repo,
-		key:  masterKey,
-		stop: make(chan struct{}),
+		repo:        repo,
+		nocDataRepo: nocDataRepo,
+		key:         masterKey,
+		stop:        make(chan struct{}),
 	}
 }
 
@@ -42,7 +44,7 @@ func (r *NocPassRotator) Start() {
 			}
 		}
 	}()
-	log.Println("[noc-pass-rotator] started (check every 15m, rotate after 24h)")
+	log.Println("[noc-pass-rotator] started (check every 15m, apply due enabled policies)")
 }
 
 func (r *NocPassRotator) Stop() {
@@ -56,18 +58,19 @@ func (r *NocPassRotator) Stop() {
 }
 
 func (r *NocPassRotator) runDue() {
-	list, err := r.repo.ListEnabled()
+	policies, err := r.repo.ListPolicies()
 	if err != nil {
-		log.Printf("[noc-pass-rotator] list devices: %v", err)
+		log.Printf("[noc-pass-rotator] list policies: %v", err)
 		return
 	}
-	for i := range list {
-		d := &list[i]
-		if !nocpass.ShouldRotate(d) {
+	now := time.Now()
+	for i := range policies {
+		policy := &policies[i]
+		if !nocpass.ShouldRunPolicy(policy, now) {
 			continue
 		}
-		if err := nocpass.RotateAndApply(r.repo, r.key, d.ID); err != nil {
-			log.Printf("[noc-pass-rotator] device id=%d host=%s: %v", d.ID, d.Host, err)
+		if _, err := nocpass.RunPolicy(r.repo, r.nocDataRepo, r.key, policy.ID, now); err != nil {
+			log.Printf("[noc-pass-rotator] run policy id=%d: %v", policy.ID, err)
 		}
 	}
 }

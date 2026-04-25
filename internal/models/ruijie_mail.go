@@ -34,7 +34,9 @@ type RuijieSlackIncident struct {
 	DedupFingerprint string `gorm:"size:64;index"`
 
 	ResolvedAt *time.Time
-	ResolvedBy string `gorm:"size:256"`
+	ResolvedBy string     `gorm:"size:256"`
+	SnoozedAt  *time.Time `gorm:"index"`
+	SnoozedBy  string     `gorm:"size:256"`
 
 	NextReminderAt time.Time `gorm:"index"`
 }

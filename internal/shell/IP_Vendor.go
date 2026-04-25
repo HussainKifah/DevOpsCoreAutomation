@@ -521,7 +521,7 @@ func huaweiWorkflowSSH(host, user, pass string, cmds ...string) (string, error) 
 	}
 	outBuf.Reset()
 
-	// Disable paging
+	// Disable paging completely for long Huawei outputs such as elabel/current-configuration.
 	log.Printf("[hw-bng] %s: >>> screen-length 0 temporary", host)
 	stdinPipe.Write([]byte("screen-length 0 temporary\r\n"))
 	time.Sleep(500 * time.Millisecond)

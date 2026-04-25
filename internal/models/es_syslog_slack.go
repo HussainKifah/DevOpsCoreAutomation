@@ -8,12 +8,14 @@ type EsSyslogSlackIncident struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
-	DeviceKey         string `gorm:"size:512;index"`
-	DedupFingerprint  string `gorm:"size:64;index"`
-	ChannelID         string `gorm:"size:32;uniqueIndex:ux_slack_incident_ch_ts,priority:1"`
-	MessageTS         string `gorm:"size:32;uniqueIndex:ux_slack_incident_ch_ts,priority:2"`
-	ResolvedAt *time.Time
-	ResolvedBy string `gorm:"size:256"` // Slack @display or user id
+	DeviceKey        string `gorm:"size:512;index"`
+	DedupFingerprint string `gorm:"size:64;index"`
+	ChannelID        string `gorm:"size:32;uniqueIndex:ux_slack_incident_ch_ts,priority:1"`
+	MessageTS        string `gorm:"size:32;uniqueIndex:ux_slack_incident_ch_ts,priority:2"`
+	ResolvedAt       *time.Time
+	ResolvedBy       string     `gorm:"size:256"` // Slack @display or user id
+	SnoozedAt        *time.Time `gorm:"index"`
+	SnoozedBy        string     `gorm:"size:256"`
 
 	// NextReminderAt is when to post the next thread reminder (open incidents only).
 	NextReminderAt time.Time `gorm:"index"`

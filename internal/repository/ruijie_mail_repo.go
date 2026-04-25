@@ -52,7 +52,7 @@ func (r *RuijieMailRepository) FindOpenSlackIncidentByChannelFingerprint(channel
 
 func (r *RuijieMailRepository) ListOpenSlackIncidentsDueReminder(until time.Time) ([]models.RuijieSlackIncident, error) {
 	var list []models.RuijieSlackIncident
-	err := r.db.Where("resolved_at IS NULL AND next_reminder_at <= ?", until).
+	err := r.db.Where("resolved_at IS NULL AND snoozed_at IS NULL AND next_reminder_at <= ?", until).
 		Order("next_reminder_at ASC").Limit(50).Find(&list).Error
 	return list, err
 }
@@ -70,6 +70,27 @@ func (r *RuijieMailRepository) MarkSlackIncidentResolved(id uint, resolvedBy str
 func (r *RuijieMailRepository) BumpSlackIncidentReminder(id uint, next time.Time) error {
 	return r.db.Model(&models.RuijieSlackIncident{}).Where("id = ?", id).
 		Update("next_reminder_at", next).Error
+}
+
+func (r *RuijieMailRepository) SnoozeSlackIncident(id uint, snoozedBy string, at time.Time) error {
+	far := at.AddDate(50, 0, 0)
+	return r.db.Model(&models.RuijieSlackIncident{}).
+		Where("id = ? AND resolved_at IS NULL", id).
+		Updates(map[string]interface{}{
+			"snoozed_at":       at,
+			"snoozed_by":       snoozedBy,
+			"next_reminder_at": far,
+		}).Error
+}
+
+func (r *RuijieMailRepository) UnsnoozeSlackIncident(id uint, nextReminderAt time.Time) error {
+	return r.db.Model(&models.RuijieSlackIncident{}).
+		Where("id = ? AND resolved_at IS NULL", id).
+		Updates(map[string]interface{}{
+			"snoozed_at":       nil,
+			"snoozed_by":       "",
+			"next_reminder_at": nextReminderAt,
+		}).Error
 }
 
 func (r *RuijieMailRepository) LinkAlertToSlackIncident(alertID uint, incidentID uint) error {

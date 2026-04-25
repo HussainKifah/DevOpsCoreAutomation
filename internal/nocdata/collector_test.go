@@ -45,6 +45,7 @@ GNU General Public License (GPL) version 3.0  or the GNU
 Software
   BIOS: version 07.68
  NXOS: version 9.3(3)
+  NXOS image file is: bootflash:///nxos.9.3.3.new.bin
 
 Hardware
   cisco Nexus9000 C9396PX Chassis
@@ -54,7 +55,7 @@ Hardware
 Kernel uptime is 82 day(s), 3 hour(s), 44 minute(s), 29 second(s)`,
 	})
 
-	if host != "HILQSIM-REP" || model != "Nexus9000 C9396PX" || version != "9.3(3)" || serial != "SAL1820SDQY" || uptime != "82 day(s), 3 hour(s), 44 minute(s), 29 second(s)" {
+	if host != "HILQSIM-REP" || model != "Nexus9000 C9396PX" || version != "bootflash:///nxos.9.3.3.new.bin" || serial != "SAL1820SDQY" || uptime != "82 day(s), 3 hour(s), 44 minute(s), 29 second(s)" {
 		t.Fatalf("unexpected nexus parsed fields host=%q model=%q version=%q serial=%q uptime=%q", host, model, version, serial, uptime)
 	}
 }
@@ -246,6 +247,9 @@ XGE0/0/3                      up      up       B`,
 		"display ip routing-table": `Route Flags: R - relay, D - download to fib, T - to vpn-instance
 Destination/Mask    Proto   Pre  Cost      Flags NextHop         Interface
 0.0.0.0/0   ISIS-L2 15   100         D   10.90.20.49     XGigabitEthernet0/0/25`,
+		"display tcp status": `TCPCB    Tid/Soid Local Add:port        Foreign Add:port      VPNID  State
+a02ab8c0 156/1    0.0.0.0:22            0.0.0.0:0             -1     Listening
+a02aca30 68 /1    10.7.7.2:443          0.0.0.0:0             0      Listening`,
 		"display current-configuration": `stelnet server enable
 telnet server enable
 snmp-agent
@@ -268,17 +272,44 @@ user-interface vty 0 4
 	if s.Model != "S6730-H48X6C" || s.Serial != "6R24C0010836" {
 		t.Fatalf("unexpected Huawei identity fields: %+v", s)
 	}
-	if s.Version != "4.0" || s.Uptime != "18 weeks, 3 days, 23 hours, 33 minutes" {
+	if s.Version != "Version 5.170 (S6730 V200R024C00SPC500)" || s.Uptime != "18 weeks, 3 days, 23 hours, 33 minutes" {
 		t.Fatalf("unexpected Huawei version/uptime fields: %+v", s)
 	}
 	if s.IFUp != 2 || s.IFDown != 1 || !s.DefaultRouter || s.LayerMode != "3" {
 		t.Fatalf("unexpected Huawei interface/layer data: %+v", s)
 	}
-	if !s.SSHEnabled || !s.TelnetEnabled || !s.SNMPEnabled || !s.NTPEnabled || !s.AAAEnabled || !s.SyslogEnabled {
+	if !s.SSHEnabled || s.TelnetEnabled || !s.SNMPEnabled || !s.NTPEnabled || !s.AAAEnabled || !s.SyslogEnabled {
 		t.Fatalf("unexpected Huawei service flags: %+v", s)
 	}
 	if s.UserCount != 2 {
 		t.Fatalf("unexpected Huawei users: %+v", s)
+	}
+}
+
+func TestParseHuaweiDisplayVersionRealSwitchOutput(t *testing.T) {
+	host, version, uptime := parseHuaweiDisplayVersion(`<BAB-ALZUBAIR-AGG>dis ver
+Huawei Versatile Routing Platform Software
+VRP (R) software, Version 5.170 (S6730 V200R024C00SPC500)
+Copyright (C) 2000-2024 HUAWEI TECH Co., Ltd.
+HUAWEI S6730-H48X6C Routing Switch uptime is 42 weeks, 4 days, 3 hours, 34 minutes
+
+ES6D2S54S003 0(Master)  : uptime is 42 weeks, 4 days, 3 hours, 31 minutes
+Software      Version   : VRP (R) Software, Version 5.170 (V200R024C00SPC500)`)
+
+	if host != "BAB-ALZUBAIR-AGG" || version != "Version 5.170 (V200R024C00SPC500)" || uptime != "42 weeks, 4 days, 3 hours, 34 minutes" {
+		t.Fatalf("unexpected Huawei display version fields host=%q version=%q uptime=%q", host, version, uptime)
+	}
+}
+
+func TestParseHuaweiServicesFromTCPStatus(t *testing.T) {
+	ssh, telnet := parseHuaweiServices(`TCPCB    Tid/Soid Local Add:port        Foreign Add:port      VPNID  State
+a02ab8c0 156/1    0.0.0.0:22            0.0.0.0:0             -1     Listening
+a0609d44 341/1    0.0.0.0:64443         0.0.0.0:0             -1     Listening
+a02aca30 68 /1    10.7.7.2:443          0.0.0.0:0             0      Listening
+a060a02c 156/200  10.90.30.3:22         188.72.40.218:42656   0      Established`, `telnet server enable`)
+
+	if !ssh || telnet {
+		t.Fatalf("expected TCP status to report ssh=true telnet=false, got ssh=%v telnet=%v", ssh, telnet)
 	}
 }
 
@@ -292,6 +323,15 @@ func TestCommandsForVendorHuaweiUsesElabelAndDisablesPaging(t *testing.T) {
 	}
 	if len(cmds) == 0 || cmds[0] != "screen-length 0 temporary" {
 		t.Fatalf("expected first Huawei command to disable paging, got %v", cmds)
+	}
+	countCurrentConfig := 0
+	for _, cmd := range cmds {
+		if cmd == "display current-configuration" {
+			countCurrentConfig++
+		}
+	}
+	if countCurrentConfig != 1 {
+		t.Fatalf("expected one display current-configuration command, got %d in %v", countCurrentConfig, cmds)
 	}
 }
 

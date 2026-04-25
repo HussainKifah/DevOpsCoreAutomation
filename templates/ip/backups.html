@@ -35,7 +35,7 @@
         </div>
       </template>
 
-      <template x-if="runs.length > 0">
+      <template x-if="runs.length > 0 && !isNocMode">
         <div>
           <!-- Breadcrumb nav -->
           <div class="flex items-center gap-2 mb-5 text-sm flex-wrap">
@@ -175,6 +175,277 @@
           </div>
         </div>
       </template>
+
+      <template x-if="runs.length > 0 && isNocMode">
+        <div class="space-y-5">
+          <div class="flex flex-wrap gap-2">
+            <button type="button" @click="backupView = 'browse'"
+              class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+              :class="backupView === 'browse' ? 'bg-[#3b82f6] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">
+              Browse
+            </button>
+            <button type="button" @click="backupView = 'compare'"
+              class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+              :class="backupView === 'compare' ? 'bg-[#3b82f6] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">
+              Compare
+            </button>
+          </div>
+
+          <div x-show="backupView === 'browse'" class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+            <div>
+              <p class="text-sm text-[#94a3b8]">Browse backup files by network type, province, vendor, model, and IP.</p>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+              <select
+                x-model="selectedBackupDate"
+                class="w-full sm:w-44 rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] px-4 py-3 text-sm text-[#e2e8f0] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/40"
+              >
+                <option value="">All dates</option>
+                <template x-for="date in availableBackupDates" :key="'backup-date-' + date">
+                  <option :value="date" x-text="date"></option>
+                </template>
+              </select>
+              <input
+                type="text"
+                x-model.debounce.200ms="searchQuery"
+                placeholder="Search model, vendor, or IP"
+                class="w-full sm:w-80 rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] px-4 py-3 text-sm text-[#e2e8f0] placeholder-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/40"
+              >
+            </div>
+          </div>
+
+          <div x-show="backupView === 'compare'" class="space-y-5">
+            <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-5">
+              <div class="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+                <div>
+                  <label class="block text-xs text-[#94a3b8] mb-1">Base Date</label>
+                  <select x-model="compareBaseDate" class="w-full rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-4 py-3 text-sm text-[#e2e8f0]">
+                    <option value="">Select date</option>
+                    <template x-for="date in availableBackupDates" :key="'base-date-' + date">
+                      <option :value="date" x-text="date"></option>
+                    </template>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs text-[#94a3b8] mb-1">Compare Date</label>
+                  <select x-model="compareTargetDate" class="w-full rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-4 py-3 text-sm text-[#e2e8f0]">
+                    <option value="">Select date</option>
+                    <template x-for="date in availableBackupDates" :key="'compare-date-' + date">
+                      <option :value="date" x-text="date"></option>
+                    </template>
+                  </select>
+                </div>
+                <button type="button" @click="compareBackups()" :disabled="compareLoading || !compareBaseDate || !compareTargetDate"
+                  class="px-5 py-3 rounded-xl bg-[#3b82f6] text-white text-sm font-semibold disabled:opacity-50"
+                  x-text="compareLoading ? 'Comparing...' : 'Compare'"></button>
+              </div>
+            </div>
+
+            <template x-if="compareError">
+              <div class="rounded-xl border border-[#ef4444]/30 bg-[#ef4444]/10 px-4 py-3 text-sm text-[#fca5a5]" x-text="compareError"></div>
+            </template>
+
+            <template x-if="compareResult">
+              <div class="space-y-5">
+                <div class="grid gap-3 md:grid-cols-4">
+                  <div class="rounded-xl bg-[#111827] border border-[rgba(255,255,255,0.08)] p-4">
+                    <p class="text-xs text-[#94a3b8]">Changed</p>
+                    <p class="text-2xl font-bold text-[#f8fafc]" x-text="compareResult.changed.length"></p>
+                  </div>
+                  <div class="rounded-xl bg-[#111827] border border-[rgba(255,255,255,0.08)] p-4">
+                    <p class="text-xs text-[#94a3b8]">New</p>
+                    <p class="text-2xl font-bold text-[#10b981]" x-text="compareResult.added.length"></p>
+                  </div>
+                  <div class="rounded-xl bg-[#111827] border border-[rgba(255,255,255,0.08)] p-4">
+                    <p class="text-xs text-[#94a3b8]">Missing</p>
+                    <p class="text-2xl font-bold text-[#ef4444]" x-text="compareResult.missing.length"></p>
+                  </div>
+                  <div class="rounded-xl bg-[#111827] border border-[rgba(255,255,255,0.08)] p-4">
+                    <p class="text-xs text-[#94a3b8]">Unchanged</p>
+                    <p class="text-2xl font-bold text-[#94a3b8]" x-text="compareResult.unchanged"></p>
+                  </div>
+                </div>
+
+                <div class="space-y-3">
+                  <h3 class="text-sm font-semibold text-[#f1f5f9]">Changed Backups</h3>
+                  <template x-if="compareResult.changed.length === 0">
+                    <p class="text-sm text-[#94a3b8]">No changed backups between these dates.</p>
+                  </template>
+                  <template x-for="item in compareResult.changed" :key="'changed-' + item.host">
+                    <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-4">
+                      <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p class="text-sm font-semibold text-[#f8fafc]" x-text="item.device_name || item.host"></p>
+                          <p class="text-xs font-mono text-[#94a3b8]" x-text="item.host"></p>
+                        </div>
+                        <div class="flex gap-2 text-[11px]">
+                          <span class="px-2 py-1 rounded-lg bg-[#10b981]/15 text-[#10b981]" x-text="'+' + item.added_lines.length + ' lines'"></span>
+                          <span class="px-2 py-1 rounded-lg bg-[#ef4444]/15 text-[#ef4444]" x-text="'-' + item.removed_lines.length + ' lines'"></span>
+                        </div>
+                      </div>
+                      <div class="grid gap-3 lg:grid-cols-2 mt-4">
+                        <div>
+                          <p class="text-xs font-semibold text-[#10b981] mb-2">Added in compare date</p>
+                          <pre class="max-h-56 overflow-auto rounded-lg bg-[#0f172a] p-3 text-xs text-[#bbf7d0] whitespace-pre-wrap" x-text="formatCompareLines(item.added_lines)"></pre>
+                        </div>
+                        <div>
+                          <p class="text-xs font-semibold text-[#ef4444] mb-2">Removed from base date</p>
+                          <pre class="max-h-56 overflow-auto rounded-lg bg-[#0f172a] p-3 text-xs text-[#fecaca] whitespace-pre-wrap" x-text="formatCompareLines(item.removed_lines)"></pre>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+
+                <div class="grid gap-5 lg:grid-cols-2">
+                  <div class="space-y-3">
+                    <h3 class="text-sm font-semibold text-[#10b981]">New Backups</h3>
+                    <template x-for="item in compareResult.added" :key="'added-' + item.host">
+                      <div class="rounded-xl border border-[#10b981]/20 bg-[#111827] p-4">
+                        <p class="text-sm font-semibold text-[#f8fafc]" x-text="item.device_name || item.host"></p>
+                        <p class="text-xs font-mono text-[#94a3b8]" x-text="item.host"></p>
+                      </div>
+                    </template>
+                  </div>
+                  <div class="space-y-3">
+                    <h3 class="text-sm font-semibold text-[#ef4444]">Missing Backups</h3>
+                    <template x-for="item in compareResult.missing" :key="'missing-' + item.host">
+                      <div class="rounded-xl border border-[#ef4444]/20 bg-[#111827] p-4">
+                        <p class="text-sm font-semibold text-[#f8fafc]" x-text="item.device_name || item.host"></p>
+                        <p class="text-xs font-mono text-[#94a3b8]" x-text="item.host"></p>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <template x-if="backupView === 'browse' && nocTree.length === 0">
+            <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] px-6 py-10 text-center text-sm text-[#94a3b8]">
+              No backup-matched devices found for the current search.
+            </div>
+          </template>
+
+          <div class="space-y-4" x-show="backupView === 'browse' && nocTree.length > 0">
+            <template x-for="networkNode in nocTree" :key="networkNode.label">
+              <div class="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#111827] overflow-hidden">
+                <button
+                  type="button"
+                  class="w-full flex items-center justify-between gap-4 px-5 py-4 text-left hover:bg-white/[0.02] transition-colors"
+                  @click="toggleTree('network-' + networkNode.label)"
+                >
+                  <div class="flex items-center gap-3 min-w-0">
+                    <span class="text-[#94a3b8] text-sm" x-text="isTreeOpen('network-' + networkNode.label, true) ? '▾' : '▸'"></span>
+                    <div>
+                      <p class="text-base font-semibold text-[#f1f5f9]" x-text="networkNode.label"></p>
+                      <p class="text-xs text-[#64748b]" x-text="networkNode.count + ' device backups'"></p>
+                    </div>
+                  </div>
+                </button>
+
+                <div x-show="isTreeOpen('network-' + networkNode.label, true)" class="border-t border-[rgba(255,255,255,0.06)] divide-y divide-[rgba(255,255,255,0.06)]">
+                  <template x-for="provinceNode in networkNode.provinces" :key="networkNode.label + '-' + provinceNode.label">
+                    <div class="px-4 py-3">
+                      <button
+                        type="button"
+                        class="w-full flex items-center justify-between gap-4 px-3 py-2 rounded-xl text-left hover:bg-white/[0.03] transition-colors"
+                        @click="toggleTree('province-' + networkNode.label + '-' + provinceNode.label)"
+                      >
+                        <div class="flex items-center gap-3 min-w-0">
+                          <span class="text-[#94a3b8] text-sm" x-text="isTreeOpen('province-' + networkNode.label + '-' + provinceNode.label, false) ? '▾' : '▸'"></span>
+                          <div>
+                            <p class="text-sm font-semibold text-[#e2e8f0]" x-text="provinceNode.label"></p>
+                            <p class="text-[11px] text-[#64748b]" x-text="provinceNode.count + ' devices'"></p>
+                          </div>
+                        </div>
+                      </button>
+
+                      <div x-show="isTreeOpen('province-' + networkNode.label + '-' + provinceNode.label, false)" class="mt-3 pl-5 space-y-3 border-l border-[rgba(255,255,255,0.06)]">
+                        <template x-for="vendorNode in provinceNode.vendors" :key="networkNode.label + '-' + provinceNode.label + '-' + vendorNode.key">
+                          <div>
+                            <button
+                              type="button"
+                              class="w-full flex items-center justify-between gap-4 px-3 py-2 rounded-xl text-left hover:bg-white/[0.03] transition-colors"
+                              @click="toggleTree('vendor-' + networkNode.label + '-' + provinceNode.label + '-' + vendorNode.key)"
+                            >
+                              <div class="flex items-center gap-3 min-w-0">
+                                <span class="text-[#94a3b8] text-sm" x-text="isTreeOpen('vendor-' + networkNode.label + '-' + provinceNode.label + '-' + vendorNode.key, false) ? '▾' : '▸'"></span>
+                                <div>
+                                  <p class="text-sm font-medium text-[#f8fafc]" x-text="vendorNode.label"></p>
+                                  <p class="text-[11px] text-[#64748b]" x-text="vendorNode.count + ' devices'"></p>
+                                </div>
+                              </div>
+                            </button>
+
+                            <div x-show="isTreeOpen('vendor-' + networkNode.label + '-' + provinceNode.label + '-' + vendorNode.key, false)" class="mt-3 pl-5 space-y-3 border-l border-[rgba(255,255,255,0.06)]">
+                              <template x-for="modelNode in vendorNode.models" :key="networkNode.label + '-' + provinceNode.label + '-' + vendorNode.key + '-' + modelNode.label">
+                                <div class="rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0f172a]">
+                                  <button
+                                    type="button"
+                                    class="w-full flex items-center justify-between gap-4 px-4 py-3 text-left hover:bg-white/[0.02] transition-colors rounded-xl"
+                                    @click="toggleTree('model-' + networkNode.label + '-' + provinceNode.label + '-' + vendorNode.key + '-' + modelNode.label)"
+                                  >
+                                    <div class="flex items-center gap-3 min-w-0">
+                                      <span class="text-[#94a3b8] text-sm" x-text="isTreeOpen('model-' + networkNode.label + '-' + provinceNode.label + '-' + vendorNode.key + '-' + modelNode.label, false) ? '▾' : '▸'"></span>
+                                      <div>
+                                        <p class="text-sm font-medium text-[#f1f5f9]" x-text="modelNode.label"></p>
+                                        <p class="text-[11px] text-[#64748b]" x-text="modelNode.count + ' IPs'"></p>
+                                      </div>
+                                    </div>
+                                  </button>
+
+                                  <div x-show="isTreeOpen('model-' + networkNode.label + '-' + provinceNode.label + '-' + vendorNode.key + '-' + modelNode.label, false)" class="px-4 pb-4 space-y-3">
+                                    <template x-for="entry in modelNode.devices" :key="entry.hostKey">
+                                      <div class="rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#111827] p-4">
+                                        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                                          <div class="min-w-0">
+                                            <p class="text-sm font-semibold text-[#f8fafc]" x-text="entry.deviceName"></p>
+                                            <p class="text-xs font-mono text-[#94a3b8]" x-text="entry.host"></p>
+                                          </div>
+                                          <div class="flex items-center gap-2 text-[11px] text-[#64748b]">
+                                            <span class="px-2 py-1 rounded-lg bg-white/[0.04]" x-text="entry.vendorLabel"></span>
+                                            <span class="px-2 py-1 rounded-lg bg-white/[0.04]" x-text="entry.model"></span>
+                                          </div>
+                                        </div>
+
+                                        <div class="mt-3 flex flex-wrap items-center gap-3 text-xs text-[#94a3b8]">
+                                          <span x-text="entry.run?.started_at ? new Date(entry.run.started_at).toLocaleString() : ''"></span>
+                                          <span x-text="formatBytes(entry.run?.output_size || 0)"></span>
+                                          <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full"
+                                            :class="entry.run?.status === 'ok' ? 'bg-[#10b981]/20 text-[#10b981]' : 'bg-[#ef4444]/20 text-[#ef4444]'">
+                                            <span class="w-1.5 h-1.5 rounded-full" :class="entry.run?.status === 'ok' ? 'bg-[#10b981]' : 'bg-[#ef4444]'"></span>
+                                            <span x-text="entry.run?.status === 'ok' ? 'OK' : 'Failed'"></span>
+                                          </span>
+                                        </div>
+
+                                        <div class="mt-4 flex items-center gap-2">
+                                          <button @click="previewRun(entry.run)" class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border border-[rgba(255,255,255,0.08)] text-[#94a3b8] hover:text-[#f1f5f9] hover:bg-white/5 transition-colors">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                            View
+                                          </button>
+                                          <button @click="downloadRun(entry.run)" class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg bg-[#3b82f6]/20 text-[#3b82f6] hover:bg-[#3b82f6]/30 transition-colors">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                                            Download
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </template>
+                                  </div>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
     </div>
   </template>
 
@@ -207,10 +478,21 @@
 
 <script>
 const backupWorkflowApiBase = '{{.WorkflowAPIBase}}';
+const backupTreeMode = '{{or .BackupTreeMode "standard"}}';
 function ipBackupsPage() {
   return {
     loading: true,
     runs: [],
+    devices: [],
+    treeState: {},
+    searchQuery: '',
+    selectedBackupDate: '',
+    backupView: 'browse',
+    compareBaseDate: '',
+    compareTargetDate: '',
+    compareResult: null,
+    compareLoading: false,
+    compareError: '',
     drillVendor: '',
     drillDate: '',
     drillDevice: '',
@@ -220,8 +502,15 @@ function ipBackupsPage() {
     copied: false,
 
     async init() {
-      await this.fetchRuns();
+      await Promise.all([
+        this.fetchRuns(),
+        this.isNocMode ? this.fetchDevices() : Promise.resolve()
+      ]);
       this.loading = false;
+    },
+
+    get isNocMode() {
+      return backupTreeMode === 'noc';
     },
 
     async fetchRuns() {
@@ -229,10 +518,177 @@ function ipBackupsPage() {
       const res = await fetch(backupWorkflowApiBase + '/runs?type=backup');
       const data = await res.json();
       this.runs = data || [];
+      if (this.isNocMode && !this.selectedBackupDate && this.availableBackupDates.length > 0) {
+        this.selectedBackupDate = this.availableBackupDates[0];
+      }
+      if (this.isNocMode && this.availableBackupDates.length > 0) {
+        if (!this.compareTargetDate) this.compareTargetDate = this.availableBackupDates[0];
+        if (!this.compareBaseDate) this.compareBaseDate = this.availableBackupDates[1] || this.availableBackupDates[0];
+      }
+    },
+
+    async fetchDevices() {
+      const res = await fetch(backupWorkflowApiBase + '/devices');
+      const data = await res.json();
+      this.devices = Array.isArray(data) ? data : [];
     },
 
     get totalFiles() {
-      return this.runs.length;
+      return this.filteredRuns.length;
+    },
+
+    get availableBackupDates() {
+      return Array.from(new Set((this.runs || [])
+        .map(run => run.started_at ? run.started_at.slice(0, 10) : '')
+        .filter(Boolean)))
+        .sort((a, b) => b.localeCompare(a));
+    },
+
+    get filteredRuns() {
+      if (!this.selectedBackupDate) return this.runs || [];
+      return (this.runs || []).filter(run => run.started_at?.slice(0, 10) === this.selectedBackupDate);
+    },
+
+    async compareBackups() {
+      this.compareError = '';
+      this.compareResult = null;
+      if (!this.compareBaseDate || !this.compareTargetDate) return;
+      this.compareLoading = true;
+      try {
+        const params = new URLSearchParams({ base: this.compareBaseDate, compare: this.compareTargetDate });
+        const res = await fetch(backupWorkflowApiBase + '/backups/compare?' + params.toString());
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Compare failed');
+        this.compareResult = data;
+      } catch (e) {
+        this.compareError = e.message || 'Compare failed';
+      } finally {
+        this.compareLoading = false;
+      }
+    },
+
+    formatCompareLines(lines) {
+      if (!Array.isArray(lines) || lines.length === 0) return 'No line-level changes.';
+      return lines.map(line => (line.count > 1 ? '[' + line.count + 'x] ' : '') + line.text).join('\n');
+    },
+
+    displayVendor(vendor) {
+      const raw = String(vendor || '').trim().toLowerCase();
+      if (raw === 'mikrotik') return 'Microtik';
+      if (raw === 'cisco_nexus') return 'Cisco Nexus';
+      if (raw === 'cisco_ios') return 'Cisco';
+      if (!raw) return 'Unknown';
+      return raw.split('_').map(part => part ? part.charAt(0).toUpperCase() + part.slice(1) : '').join(' ');
+    },
+
+    toggleTree(key) {
+      this.treeState = {
+        ...this.treeState,
+        [key]: !this.treeState[key]
+      };
+    },
+
+    isTreeOpen(key, defaultOpen = false) {
+      return Object.prototype.hasOwnProperty.call(this.treeState, key) ? !!this.treeState[key] : defaultOpen;
+    },
+
+    normalizeSearch(value) {
+      return String(value || '').trim().toLowerCase();
+    },
+
+    matchesNocSearch(entry) {
+      const q = this.normalizeSearch(this.searchQuery);
+      if (!q) return true;
+      const haystack = [
+        entry.host,
+        entry.model,
+        entry.vendorLabel,
+        entry.vendor,
+        entry.deviceName
+      ].map(item => this.normalizeSearch(item)).join(' ');
+      return haystack.includes(q);
+    },
+
+    get nocTree() {
+      if (!this.isNocMode) return [];
+
+      const latestRunByHost = new Map();
+      for (const run of this.filteredRuns || []) {
+        const host = String(run.host || '').trim().toLowerCase();
+        if (!host) continue;
+        const current = latestRunByHost.get(host);
+        if (!current || new Date(run.started_at || 0) > new Date(current.started_at || 0)) {
+          latestRunByHost.set(host, run);
+        }
+      }
+
+      const networkMap = new Map();
+      for (const device of this.devices || []) {
+        const host = String(device.host || '').trim();
+        const hostKey = host.toLowerCase();
+        if (!host || !latestRunByHost.has(hostKey)) continue;
+
+        const entry = {
+          host,
+          hostKey,
+          deviceName: String(device.name || host).trim(),
+          networkType: String(device.network_type || 'wifi').trim().toLowerCase() === 'ftth' ? 'FTTH' : 'Wi-Fi',
+          province: String(device.province || 'Unknown').trim() || 'Unknown',
+          vendor: String(device.source_vendor || device.vendor || 'unknown').trim().toLowerCase(),
+          vendorLabel: this.displayVendor(device.source_vendor || device.vendor || 'unknown'),
+          model: String(device.model || 'Unknown').trim() || 'Unknown',
+          run: latestRunByHost.get(hostKey)
+        };
+
+        if (!this.matchesNocSearch(entry)) continue;
+
+        if (!networkMap.has(entry.networkType)) {
+          networkMap.set(entry.networkType, { label: entry.networkType, provinces: new Map(), count: 0 });
+        }
+        const networkNode = networkMap.get(entry.networkType);
+        networkNode.count += 1;
+
+        if (!networkNode.provinces.has(entry.province)) {
+          networkNode.provinces.set(entry.province, { label: entry.province, vendors: new Map(), count: 0 });
+        }
+        const provinceNode = networkNode.provinces.get(entry.province);
+        provinceNode.count += 1;
+
+        if (!provinceNode.vendors.has(entry.vendor)) {
+          provinceNode.vendors.set(entry.vendor, { key: entry.vendor, label: entry.vendorLabel, models: new Map(), count: 0 });
+        }
+        const vendorNode = provinceNode.vendors.get(entry.vendor);
+        vendorNode.count += 1;
+
+        if (!vendorNode.models.has(entry.model)) {
+          vendorNode.models.set(entry.model, { label: entry.model, devices: [], count: 0 });
+        }
+        const modelNode = vendorNode.models.get(entry.model);
+        modelNode.count += 1;
+        modelNode.devices.push(entry);
+      }
+
+      return Array.from(networkMap.values())
+        .sort((a, b) => a.label.localeCompare(b.label))
+        .map(networkNode => ({
+          ...networkNode,
+          provinces: Array.from(networkNode.provinces.values())
+            .sort((a, b) => a.label.localeCompare(b.label))
+            .map(provinceNode => ({
+              ...provinceNode,
+              vendors: Array.from(provinceNode.vendors.values())
+                .sort((a, b) => a.label.localeCompare(b.label))
+                .map(vendorNode => ({
+                  ...vendorNode,
+                  models: Array.from(vendorNode.models.values())
+                    .sort((a, b) => a.label.localeCompare(b.label))
+                    .map(modelNode => ({
+                      ...modelNode,
+                      devices: [...modelNode.devices].sort((a, b) => a.host.localeCompare(b.host))
+                    }))
+                }))
+            }))
+        }));
     },
 
     formatBytes(n) {

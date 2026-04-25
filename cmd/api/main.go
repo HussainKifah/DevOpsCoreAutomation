@@ -46,6 +46,7 @@ func main() {
 	nocDataRepo := repository.NewNocDataRepository(database)
 	slackTicketRepo := repository.NewSlackTicketReminderRepository(database)
 	ruijieMailRepo := repository.NewRuijieMailRepository(database)
+	ipCapacityRepo := repository.NewIPCapacityRepository(database)
 
 	jwtManager := auth.NewJWTManager(auth.JWTconfig{
 		SecretKey:            []byte(cfg.JWTSecret),
@@ -74,7 +75,7 @@ func main() {
 	}
 	nocWfSched.Start()
 
-	nocPassRotator := scheduler.NewNocPassRotator(nocPassRepo, cryptoKey)
+	nocPassRotator := scheduler.NewNocPassRotator(nocPassRepo, nocDataRepo, cryptoKey)
 	nocPassRotator.Start()
 	nocDataCollector := scheduler.NewNocDataCollector(nocDataRepo, cryptoKey, cfg)
 	nocDataCollector.Start()
@@ -107,10 +108,11 @@ func main() {
 	scanH := handlers.NewScanHandler(sched)
 	workflowH := handlers.NewWorkflowHandler(workflowRepo, wfSched, cryptoKey)
 	nocWorkflowH := handlers.NewNocWorkflowHandler(nocWorkflowRepo, nocWfSched, cryptoKey, nocDataRepo)
-	nocPassH := handlers.NewNocPassHandler(nocPassRepo, cryptoKey)
+	nocPassH := handlers.NewNocPassHandler(nocPassRepo, nocDataRepo, cryptoKey)
 	nocDataH := handlers.NewNocDataHandler(nocDataRepo, cryptoKey, nocDataCollector, cfg)
 	esSyslogRepo := repository.NewEsSyslogRepository(database)
 	esSyslogH := handlers.NewEsSyslogHandler(esSyslogRepo)
+	ipCapacityH := handlers.NewIPCapacityHandler(ipCapacityRepo)
 
 	var slackAPI *slack.Client
 	var slackBatcher *syslog.SlackSyslogBatcher
@@ -154,7 +156,7 @@ func main() {
 
 	pageH := handlers.NewPageHandler(filepath.Join(projectRoot, "templates"), userRepo, jwtManager)
 
-	router.Setup(server, jwtManager, hub, powerH, descH, healthH, healthHistoryH, portH, portHistoryH, calendarH, backupH, userH, authH, pageH, inventoryH, scanH, workflowH, nocWorkflowH, nocPassH, nocDataH, esSyslogH, slackEventsH)
+	router.Setup(server, jwtManager, hub, powerH, descH, healthH, healthHistoryH, portH, portHistoryH, calendarH, backupH, userH, authH, pageH, inventoryH, scanH, workflowH, nocWorkflowH, nocPassH, nocDataH, esSyslogH, ipCapacityH, slackEventsH)
 
 	esSyslogPoller := scheduler.NewEsSyslogPoller(cfg, esSyslogRepo, slackBatcher)
 	esSyslogPoller.Start()

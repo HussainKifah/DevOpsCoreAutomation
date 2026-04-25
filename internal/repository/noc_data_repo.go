@@ -26,6 +26,9 @@ type NocDataRepository interface {
 	Delete(id uint) error
 	HardDelete(id uint) error
 	UpdateSnapshot(id uint, updates map[string]interface{}) error
+	CreateHistorySnapshot(runAt time.Time, devices []models.NocDataDevice) error
+	ListHistoryDates(limit int) ([]time.Time, error)
+	ListHistoryByDate(day time.Time) ([]models.NocDataHistory, error)
 }
 
 type nocDataRepo struct {
@@ -138,6 +141,96 @@ func (r *nocDataRepo) UpdateSnapshot(id uint, updates map[string]interface{}) er
 	sanitizeNocDataSnapshotUpdates(updates)
 	updates["last_collected_at"] = time.Now()
 	return r.db.Model(&models.NocDataDevice{}).Where("id = ?", id).Updates(updates).Error
+}
+
+func (r *nocDataRepo) CreateHistorySnapshot(runAt time.Time, devices []models.NocDataDevice) error {
+	if len(devices) == 0 {
+		return nil
+	}
+	rows := make([]models.NocDataHistory, 0, len(devices))
+	for i := range devices {
+		d := devices[i]
+		rows = append(rows, models.NocDataHistory{
+			RunAt:           runAt,
+			DeviceID:        d.ID,
+			DisplayName:     d.DisplayName,
+			Site:            d.Site,
+			Subnet:          d.Subnet,
+			DeviceRange:     d.DeviceRange,
+			Host:            d.Host,
+			Vendor:          d.Vendor,
+			AccessMethod:    d.AccessMethod,
+			LastStatus:      d.LastStatus,
+			LastError:       d.LastError,
+			Hostname:        d.Hostname,
+			DeviceModel:     d.DeviceModel,
+			Version:         d.Version,
+			Serial:          d.Serial,
+			Uptime:          d.Uptime,
+			IFUp:            d.IFUp,
+			IFDown:          d.IFDown,
+			DefaultRouter:   d.DefaultRouter,
+			LayerMode:       d.LayerMode,
+			UserCount:       d.UserCount,
+			Users:           d.Users,
+			SSHEnabled:      d.SSHEnabled,
+			TelnetEnabled:   d.TelnetEnabled,
+			SNMPEnabled:     d.SNMPEnabled,
+			NTPEnabled:      d.NTPEnabled,
+			AAAEnabled:      d.AAAEnabled,
+			SyslogEnabled:   d.SyslogEnabled,
+			LastCollectedAt: d.LastCollectedAt,
+		})
+	}
+	return r.db.CreateInBatches(rows, 500).Error
+}
+
+func (r *nocDataRepo) ListHistoryDates(limit int) ([]time.Time, error) {
+	if limit <= 0 || limit > 365 {
+		limit = 60
+	}
+	var rows []struct {
+		Day time.Time
+	}
+	err := r.db.Model(&models.NocDataHistory{}).
+		Select("DATE(run_at) AS day").
+		Group("DATE(run_at)").
+		Order("day DESC").
+		Limit(limit).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]time.Time, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, row.Day)
+	}
+	return out, nil
+}
+
+func (r *nocDataRepo) ListHistoryByDate(day time.Time) ([]models.NocDataHistory, error) {
+	start := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC)
+	end := start.Add(24 * time.Hour)
+	var run struct {
+		RunAt time.Time
+	}
+	if err := r.db.Model(&models.NocDataHistory{}).
+		Select("run_at").
+		Where("run_at >= ? AND run_at < ?", start, end).
+		Group("run_at").
+		Order("run_at DESC").
+		Limit(1).
+		Scan(&run).Error; err != nil {
+		return nil, err
+	}
+	if run.RunAt.IsZero() {
+		return []models.NocDataHistory{}, nil
+	}
+	var out []models.NocDataHistory
+	err := r.db.Where("run_at = ?", run.RunAt).
+		Order("site ASC, subnet ASC, device_range ASC, host ASC").
+		Find(&out).Error
+	return out, err
 }
 
 const nocDataLastErrorMaxLen = 1024

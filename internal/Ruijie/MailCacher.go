@@ -271,6 +271,13 @@ func (p *MailPoller) postSlack(alert *models.RuijieMailAlert) {
 			return
 		}
 		if open != nil {
+			if open.SnoozedAt != nil {
+				if err := p.repo.LinkAlertToSlackIncident(alert.ID, open.ID); err != nil {
+					log.Printf("[ruijie-mail] link alert suppressed: %v", err)
+				}
+				log.Printf("[ruijie-mail] suppressed follow-up incident=%d graph_id=%s fp=%s", open.ID, alert.GraphMessageID, fp)
+				return
+			}
 			att := BuildRuijieSlackThreadAppendAttachment([]models.RuijieMailAlert{*alert}, p.cfg.RuijieSlackDisplayOffset)
 			_, _, err := p.api.PostMessage(
 				p.cfg.RuijieSlackChannelID,

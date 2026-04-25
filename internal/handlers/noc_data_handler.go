@@ -129,6 +129,44 @@ func toNocDataDTO(d *models.NocDataDevice, key []byte) nocDataDeviceDTO {
 	}
 }
 
+func toNocDataHistoryDTO(d *models.NocDataHistory) nocDataDeviceDTO {
+	var last *string
+	if d.LastCollectedAt != nil {
+		s := d.LastCollectedAt.Format(timeJSONLayout)
+		last = &s
+	}
+	return nocDataDeviceDTO{
+		ID:              d.DeviceID,
+		DisplayName:     d.DisplayName,
+		Site:            d.Site,
+		Subnet:          d.Subnet,
+		DeviceRange:     formatNocDataRange(d.Subnet, d.DeviceRange),
+		Host:            d.Host,
+		Vendor:          normalizeNocDataDeviceVendor(d.Vendor, d.DeviceModel),
+		Method:          d.AccessMethod,
+		Status:          d.LastStatus,
+		Hostname:        d.Hostname,
+		Model:           d.DeviceModel,
+		Version:         d.Version,
+		Serial:          d.Serial,
+		Uptime:          d.Uptime,
+		IFUp:            d.IFUp,
+		IFDown:          d.IFDown,
+		DefaultRouter:   d.DefaultRouter,
+		LayerMode:       d.LayerMode,
+		UserCount:       d.UserCount,
+		Users:           d.Users,
+		SSHEnabled:      d.SSHEnabled,
+		TelnetEnabled:   d.TelnetEnabled,
+		SNMPEnabled:     d.SNMPEnabled,
+		NTPEnabled:      d.NTPEnabled,
+		AAAEnabled:      d.AAAEnabled,
+		SyslogEnabled:   d.SyslogEnabled,
+		LastError:       d.LastError,
+		LastCollectedAt: last,
+	}
+}
+
 func normalizeNocDataDeviceVendor(vendor, model string) string {
 	normalizedVendor := strings.ToLower(strings.TrimSpace(vendor))
 	normalizedModel := strings.ToLower(strings.TrimSpace(model))
@@ -152,6 +190,46 @@ func (h *NocDataHandler) ListDevices(c *gin.Context) {
 		out = append(out, toNocDataDTO(&list[i], h.key))
 	}
 	c.JSON(http.StatusOK, gin.H{"devices": out})
+}
+
+func (h *NocDataHandler) ListHistoryDates(c *gin.Context) {
+	dates, err := h.repo.ListHistoryDates(90)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	out := make([]string, 0, len(dates))
+	for _, d := range dates {
+		out = append(out, d.Format("2006-01-02"))
+	}
+	c.JSON(http.StatusOK, gin.H{"dates": out})
+}
+
+func (h *NocDataHandler) ListHistory(c *gin.Context) {
+	rawDate := strings.TrimSpace(c.Query("date"))
+	if rawDate == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "date is required"})
+		return
+	}
+	day, err := time.Parse("2006-01-02", rawDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date"})
+		return
+	}
+	list, err := h.repo.ListHistoryByDate(day)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	out := make([]nocDataDeviceDTO, 0, len(list))
+	runAt := ""
+	for i := range list {
+		if runAt == "" {
+			runAt = list[i].RunAt.Format(timeJSONLayout)
+		}
+		out = append(out, toNocDataHistoryDTO(&list[i]))
+	}
+	c.JSON(http.StatusOK, gin.H{"date": rawDate, "run_at": runAt, "devices": out})
 }
 
 func (h *NocDataHandler) CreateDevice(c *gin.Context) {
@@ -203,7 +281,7 @@ func (h *NocDataHandler) discoverAndCreateDevices(site, subnet, deviceRange stri
 	}
 
 	const pingWorkers = 1000
-	const collectWorkers = 64
+	const collectWorkers = 3
 
 	hostJobs := make(chan string, pingWorkers*2)
 	collectJobs := make(chan uint, collectWorkers*2)
@@ -211,6 +289,8 @@ func (h *NocDataHandler) discoverAndCreateDevices(site, subnet, deviceRange stri
 	var scanned uint64
 	var eligible uint64
 	var reachable uint64
+	var discoveredMu sync.Mutex
+	discoveredIDs := make([]uint, 0)
 
 	var collectWG sync.WaitGroup
 	if h.runner != nil {
@@ -253,6 +333,9 @@ func (h *NocDataHandler) discoverAndCreateDevices(site, subnet, deviceRange stri
 					log.Printf("[noc-data] upsert device host=%s site=%s: %v", host, site, err)
 					continue
 				}
+				discoveredMu.Lock()
+				discoveredIDs = append(discoveredIDs, id)
+				discoveredMu.Unlock()
 				if h.runner != nil {
 					collectJobs <- id
 				}
@@ -278,6 +361,13 @@ func (h *NocDataHandler) discoverAndCreateDevices(site, subnet, deviceRange stri
 		return
 	}
 
+	if h.runner != nil {
+		discoveredMu.Lock()
+		retryIDs := append([]uint(nil), discoveredIDs...)
+		discoveredMu.Unlock()
+		h.recoverFailedRangeDevicesOneByOne(site, subnet, deviceRange, retryIDs)
+	}
+
 	log.Printf(
 		"[noc-data] range discovery completed for site=%s subnet=%s range=%s reachable=%d scanned=%d eligible=%d",
 		site,
@@ -287,6 +377,54 @@ func (h *NocDataHandler) discoverAndCreateDevices(site, subnet, deviceRange stri
 		atomic.LoadUint64(&scanned),
 		atomic.LoadUint64(&eligible),
 	)
+}
+
+func (h *NocDataHandler) recoverFailedRangeDevicesOneByOne(site, subnet, deviceRange string, ids []uint) {
+	if h.runner == nil || len(ids) == 0 {
+		return
+	}
+	targets := make([]uint, 0)
+	seen := make(map[uint]struct{}, len(ids))
+	for _, id := range ids {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		device, err := h.repo.GetByID(id)
+		if err != nil {
+			log.Printf("[noc-data] auto failed recovery get id=%d site=%s subnet=%s range=%s: %v", id, site, subnet, deviceRange, err)
+			continue
+		}
+		if strings.ToLower(strings.TrimSpace(device.LastStatus)) != "fail" {
+			continue
+		}
+		targets = append(targets, id)
+	}
+	if len(targets) == 0 {
+		log.Printf("[noc-data] auto failed recovery skipped for site=%s subnet=%s range=%s: no failed devices after first pass", site, subnet, deviceRange)
+		return
+	}
+
+	encUser, err := crypto.Encrypt(h.key, "")
+	if err != nil {
+		log.Printf("[noc-data] auto failed recovery encrypt username site=%s subnet=%s range=%s: %v", site, subnet, deviceRange, err)
+		return
+	}
+	encPass, err := crypto.Encrypt(h.key, "")
+	if err != nil {
+		log.Printf("[noc-data] auto failed recovery encrypt password site=%s subnet=%s range=%s: %v", site, subnet, deviceRange, err)
+		return
+	}
+
+	log.Printf("[noc-data] auto failed recovery started for site=%s subnet=%s range=%s failed_count=%d", site, subnet, deviceRange, len(targets))
+	for _, id := range targets {
+		if err := h.resetNocDataDeviceForRecovery(id, encUser, encPass); err != nil {
+			log.Printf("[noc-data] auto failed recovery reset id=%d site=%s subnet=%s range=%s: %v", id, site, subnet, deviceRange, err)
+			continue
+		}
+		h.runner.RecoverFailedDeviceNow(id)
+	}
+	log.Printf("[noc-data] auto failed recovery completed for site=%s subnet=%s range=%s failed_count=%d", site, subnet, deviceRange, len(targets))
 }
 
 func (h *NocDataHandler) upsertDiscoveredDevice(site, subnet, deviceRange, host string, encUser, encPass []byte) (uint, error) {

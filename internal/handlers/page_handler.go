@@ -31,6 +31,7 @@ func NewPageHandler(templateDir string, userRepo repository.UserRepository, jwtM
 		"ip-cmd-output":    filepath.Join(templateDir, "ip", "cmd_output.html"),
 		"ip-activity-log":  filepath.Join(templateDir, "ip", "activity_log.html"),
 		"ip-syslog-alerts": filepath.Join(templateDir, "ip", "syslog_alerts.html"),
+		"ip-capacities":    filepath.Join(templateDir, "ip", "capacities.html"),
 		"noc-setup":        filepath.Join(templateDir, "noc", "noc_data.html"),
 		"noc-pass":         filepath.Join(templateDir, "noc", "noc_pass.html"),
 		"noc-data":         filepath.Join(templateDir, "noc", "noc_data.html"),
@@ -133,6 +134,7 @@ func (h *PageHandler) IPBackups(c *gin.Context) {
 		"BackupTitle":        "IP Team Backups",
 		"BackupDescription":  "Configuration backups collected from BNG devices",
 		"BackupEmptyMessage": "Run a backup job from the Workflows page to see files here.",
+		"BackupTreeMode":     "standard",
 	})
 }
 func (h *PageHandler) IPCmdOutput(c *gin.Context) {
@@ -150,6 +152,7 @@ func (h *PageHandler) IPActivityLog(c *gin.Context) {
 	})
 }
 func (h *PageHandler) IPSyslogAlerts(c *gin.Context) { h.render(c, "ip-syslog-alerts", nil) }
+func (h *PageHandler) IPCapacities(c *gin.Context)   { h.render(c, "ip-capacities", nil) }
 func (h *PageHandler) NocPass(c *gin.Context)        { h.render(c, "noc-pass", nil) }
 func (h *PageHandler) NocData(c *gin.Context) {
 	h.render(c, "noc-data", gin.H{
@@ -172,6 +175,7 @@ func (h *PageHandler) NocBackups(c *gin.Context) {
 		"BackupTitle":        "NOC Backups",
 		"BackupDescription":  "Configuration backups collected from NOC devices",
 		"BackupEmptyMessage": "Run a backup job from the NOC Workflows page to see files here.",
+		"BackupTreeMode":     "noc",
 	})
 }
 func (h *PageHandler) NocCmdOutput(c *gin.Context) {

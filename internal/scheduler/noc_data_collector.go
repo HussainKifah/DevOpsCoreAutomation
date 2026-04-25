@@ -114,6 +114,9 @@ func (c *NocDataCollector) RunAllNow() {
 	}
 	close(jobs)
 	wg.Wait()
+
+	c.recoverFailedAfterFullRun()
+	c.saveHistorySnapshot(time.Now())
 }
 
 func (c *NocDataCollector) CollectDeviceNow(id uint) {
@@ -140,6 +143,92 @@ func (c *NocDataCollector) RecoverFailedDeviceNow(id uint) {
 
 func (c *NocDataCollector) collectOne(d *models.NocDataDevice) error {
 	return c.collectOneWithSender(d, c.standardCommandSender)
+}
+
+func (c *NocDataCollector) recoverFailedAfterFullRun() {
+	list, err := c.repo.ListAll()
+	if err != nil {
+		noclog.NocDataLogf("[noc-data] list failed devices for post-run recovery: %v", err)
+		return
+	}
+
+	failedIDs := make([]uint, 0)
+	for i := range list {
+		if strings.ToLower(strings.TrimSpace(list[i].LastStatus)) == "fail" {
+			failedIDs = append(failedIDs, list[i].ID)
+		}
+	}
+	if len(failedIDs) == 0 {
+		noclog.NocDataLogf("[noc-data] post-run failed recovery skipped: no failed devices")
+		return
+	}
+
+	encUser, err := crypto.Encrypt(c.key, "")
+	if err != nil {
+		noclog.NocDataLogf("[noc-data] post-run failed recovery encrypt username: %v", err)
+		return
+	}
+	encPass, err := crypto.Encrypt(c.key, "")
+	if err != nil {
+		noclog.NocDataLogf("[noc-data] post-run failed recovery encrypt password: %v", err)
+		return
+	}
+
+	noclog.NocDataLogf("[noc-data] post-run failed recovery started failed_count=%d", len(failedIDs))
+	for _, id := range failedIDs {
+		if err := c.resetDeviceForRecovery(id, encUser, encPass); err != nil {
+			noclog.NocDataLogf("[noc-data] post-run failed recovery reset id=%d: %v", id, err)
+			continue
+		}
+		c.RecoverFailedDeviceNow(id)
+	}
+	noclog.NocDataLogf("[noc-data] post-run failed recovery completed failed_count=%d", len(failedIDs))
+}
+
+func (c *NocDataCollector) resetDeviceForRecovery(id uint, encUser, encPass []byte) error {
+	return c.repo.UpdateDevice(id, map[string]interface{}{
+		"vendor":            "pending",
+		"access_method":     "pending",
+		"enc_username":      encUser,
+		"enc_password":      encPass,
+		"last_status":       "pending",
+		"last_error":        "",
+		"hostname":          "",
+		"device_model":      "",
+		"version":           "",
+		"serial":            "",
+		"uptime":            "",
+		"if_up":             0,
+		"if_down":           0,
+		"default_router":    false,
+		"layer_mode":        "",
+		"user_count":        0,
+		"users":             "",
+		"ssh_enabled":       false,
+		"telnet_enabled":    false,
+		"snmp_enabled":      false,
+		"ntp_enabled":       false,
+		"aaa_enabled":       false,
+		"syslog_enabled":    false,
+		"last_collected_at": nil,
+	})
+}
+
+func (c *NocDataCollector) saveHistorySnapshot(runAt time.Time) {
+	list, err := c.repo.ListAll()
+	if err != nil {
+		noclog.NocDataLogf("[noc-data] history snapshot list devices: %v", err)
+		return
+	}
+	if len(list) == 0 {
+		noclog.NocDataLogf("[noc-data] history snapshot skipped: no devices")
+		return
+	}
+	if err := c.repo.CreateHistorySnapshot(runAt.UTC(), list); err != nil {
+		noclog.NocDataLogf("[noc-data] history snapshot save failed: %v", err)
+		return
+	}
+	noclog.NocDataLogf("[noc-data] history snapshot saved run_at=%s rows=%d", runAt.UTC().Format(time.RFC3339), len(list))
 }
 
 func (c *NocDataCollector) collectOneWithSender(d *models.NocDataDevice, sender nocDataCommandSender) error {
@@ -273,7 +362,9 @@ func (c *NocDataCollector) collectOneWithSender(d *models.NocDataDevice, sender 
 			time.Sleep(gap)
 		}
 	}
-	snapshot := nocdata.CollectSnapshot(d, sections)
+	deviceForSnapshot := *d
+	deviceForSnapshot.Vendor = appVendor
+	snapshot := nocdata.CollectSnapshot(&deviceForSnapshot, sections)
 	appVendor = normalizeNocDataVendor(appVendor, snapshot.Model)
 	d.Vendor = appVendor
 	snapshot.Method = method
@@ -482,17 +573,18 @@ func nocDataCommandAttemptTimeout(appVendor, cmd string) time.Duration {
 	case "huawei":
 		switch command {
 		case "display elabel":
-			return 3 * time.Minute
+			return 75 * time.Second
 		case "display current-configuration":
-			return 90 * time.Second
+			return 60 * time.Second
 		case "display version",
 			"display interface description | include GE",
-			"display ip routing-table":
-			return 45 * time.Second
-		case "screen-length 0 temporary":
-			return 20 * time.Second
-		default:
+			"display ip routing-table",
+			"display tcp status":
 			return 30 * time.Second
+		case "screen-length 0 temporary":
+			return 15 * time.Second
+		default:
+			return 20 * time.Second
 		}
 	default:
 		return 15 * time.Second
@@ -503,7 +595,7 @@ func (c *NocDataCollector) nocDataWorkers() int {
 	if c != nil && c.cfg != nil && c.cfg.NocDataWorkers >= 1 {
 		return c.cfg.NocDataWorkers
 	}
-	return 2
+	return 3
 }
 
 func (c *NocDataCollector) nocDataHeavyCommandGap() time.Duration {

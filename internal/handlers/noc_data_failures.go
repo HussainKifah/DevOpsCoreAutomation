@@ -77,32 +77,7 @@ func (h *NocDataHandler) runFailedDevicesOneByOneWithID(c *gin.Context, forcedID
 	}
 
 	for _, id := range targets {
-		if err := h.repo.UpdateDevice(id, map[string]interface{}{
-			"vendor":            "pending",
-			"access_method":     "pending",
-			"enc_username":      encUser,
-			"enc_password":      encPass,
-			"last_status":       "pending",
-			"last_error":        "",
-			"hostname":          "",
-			"device_model":      "",
-			"version":           "",
-			"serial":            "",
-			"uptime":            "",
-			"if_up":             0,
-			"if_down":           0,
-			"default_router":    false,
-			"layer_mode":        "",
-			"user_count":        0,
-			"users":             "",
-			"ssh_enabled":       false,
-			"telnet_enabled":    false,
-			"snmp_enabled":      false,
-			"ntp_enabled":       false,
-			"aaa_enabled":       false,
-			"syslog_enabled":    false,
-			"last_collected_at": nil,
-		}); err != nil {
+		if err := h.resetNocDataDeviceForRecovery(id, encUser, encPass); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -124,5 +99,34 @@ func (h *NocDataHandler) runFailedDevicesOneByOneWithID(c *gin.Context, forcedID
 		"queued":       true,
 		"device_count": len(targets),
 		"message":      message,
+	})
+}
+
+func (h *NocDataHandler) resetNocDataDeviceForRecovery(id uint, encUser, encPass []byte) error {
+	return h.repo.UpdateDevice(id, map[string]interface{}{
+		"vendor":            "pending",
+		"access_method":     "pending",
+		"enc_username":      encUser,
+		"enc_password":      encPass,
+		"last_status":       "pending",
+		"last_error":        "",
+		"hostname":          "",
+		"device_model":      "",
+		"version":           "",
+		"serial":            "",
+		"uptime":            "",
+		"if_up":             0,
+		"if_down":           0,
+		"default_router":    false,
+		"layer_mode":        "",
+		"user_count":        0,
+		"users":             "",
+		"ssh_enabled":       false,
+		"telnet_enabled":    false,
+		"snmp_enabled":      false,
+		"ntp_enabled":       false,
+		"aaa_enabled":       false,
+		"syslog_enabled":    false,
+		"last_collected_at": nil,
 	})
 }

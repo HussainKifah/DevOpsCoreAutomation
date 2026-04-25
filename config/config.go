@@ -119,7 +119,7 @@ func Load() *Config {
 		NocDataCiscoPass:    getEnv("NOC_DATA_CISCO_PASS", ""),
 		NocDataMikrotikUser: strings.TrimSpace(getEnv("NOC_DATA_MIKROTIK_USER", "")),
 		NocDataMikrotikPass: getEnv("NOC_DATA_MIKROTIK_PASS", ""),
-		NocDataWorkers:      parseBoundedInt("NOC_DATA_WORKERS", 2, 1, 32),
+		NocDataWorkers:      parseBoundedInt("NOC_DATA_WORKERS", 3, 1, 32),
 		NocDataCommandGap:   parseDurationBounded(getEnv("NOC_DATA_CMD_GAP", "250ms"), 250*time.Millisecond, 0, 30*time.Second),
 		NocDataHeavyCmdGap:  parseDurationBounded(getEnv("NOC_DATA_HEAVY_CMD_GAP", "750ms"), 750*time.Millisecond, 0, 30*time.Second),
 

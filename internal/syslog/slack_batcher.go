@@ -129,6 +129,19 @@ func (b *SlackSyslogBatcher) flush(batchKey string) {
 	}
 
 	if open != nil {
+		if open.SnoozedAt != nil {
+			ids := make([]uint, 0, len(full))
+			for i := range full {
+				if full[i].ID != 0 {
+					ids = append(ids, full[i].ID)
+				}
+			}
+			if err := b.repo.LinkAlertsToSlackIncident(ids, open.ID); err != nil {
+				log.Printf("[slack-syslog] link suppressed alerts: %v", err)
+			}
+			log.Printf("[slack-syslog] suppressed follow-up incident=%d device=%q fp=%s alerts=%d", open.ID, deviceKey, fp, len(full))
+			return
+		}
 		att := BuildSyslogSlackThreadAppendAttachment(display, b.cfg.SlackSyslogDisplayOffset, trunc)
 		_, _, err := b.api.PostMessage(
 			b.cfg.SlackChannelID,
@@ -217,4 +230,3 @@ func (b *SlackSyslogBatcher) Stop() {
 func SlackDeviceKey(host, deviceName string) string {
 	return strings.TrimSpace(host) + "|" + strings.TrimSpace(deviceName)
 }
-

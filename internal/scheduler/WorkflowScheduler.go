@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -255,11 +256,11 @@ func (ws *WorkflowScheduler) runJobForDevice(job *models.WorkflowJob, device *mo
 		cmd = job.Command
 	}
 
-	log.Printf("[workflow:%s] job %d: SSH connecting to %s (vendor=%s, transport=%s)...",
+	log.Printf("[workflow:%s] job %d: connecting to %s (vendor=%s, transport=%s)...",
 		ws.scope, job.ID, device.Host, device.Vendor, "auto")
 	log.Printf("[workflow:%s] job %d: sending command: %q", ws.scope, job.ID, cmd)
 
-	output, execErr := shell.IPSendCommand(device.Host, user, pass, device.Vendor, cmd)
+	output, method, execErr := shell.NocDataSendCommandUsingMethodContext(context.Background(), device.Host, user, pass, device.Vendor, "", cmd)
 
 	finishedAt := time.Now()
 	durationMs := finishedAt.Sub(startedAt).Milliseconds()
@@ -290,7 +291,7 @@ func (ws *WorkflowScheduler) runJobForDevice(job *models.WorkflowJob, device *mo
 	}
 
 	ws.writeJobLog(&jobView, &run.ID, "success", "job_success", successMsg, durationMs)
-	log.Printf("[workflow:%s] job %d: OK in %dms (%d bytes)", ws.scope, job.ID, durationMs, len(output))
+	log.Printf("[workflow:%s] job %d: OK in %dms (%d bytes) via %s", ws.scope, job.ID, durationMs, len(output), method)
 	if len(output) > 0 {
 		preview := output
 		if len(preview) > 300 {

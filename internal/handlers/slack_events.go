@@ -111,6 +111,8 @@ func (h *SlackEventsHandler) Handle(c *gin.Context) {
 		h.handleMessage(outer.Event)
 	case "reaction_added":
 		h.handleReactionAdded(outer.Event)
+	case "reaction_removed":
+		h.handleReactionRemoved(outer.Event)
 	default:
 		// Other event types ignored
 	}
@@ -190,44 +192,37 @@ func (h *SlackEventsHandler) handleMessage(raw json.RawMessage) {
 }
 
 func (h *SlackEventsHandler) handleReactionAdded(raw json.RawMessage) {
-	var ev struct {
-		User     string `json:"user"`
-		Reaction string `json:"reaction"`
-		Item     struct {
-			Type     string `json:"type"`
-			Channel  string `json:"channel"`
-			TS       string `json:"ts"`
-			ThreadTS string `json:"thread_ts"`
-		} `json:"item"`
-	}
-	if err := json.Unmarshal(raw, &ev); err != nil {
-		return
-	}
-	if ev.Item.Type != "message" {
-		return
-	}
-	if !slackreminders.IsResolveReaction(ev.Reaction) {
+	ev, ok := h.parseReactionEvent(raw)
+	if !ok {
 		return
 	}
 	if h.botUserID != "" && ev.User == h.botUserID {
 		return
 	}
-	ch := strings.TrimSpace(ev.Item.Channel)
-	if ch == "" {
+	if slackreminders.IsResolveReaction(ev.Reaction) {
+		h.resolveSyslogIncident(ev.Channel, ev.ParentTS, ev.User)
+		h.resolveRuijieIncident(ev.Channel, ev.ParentTS, ev.User)
+		h.resolveTicketReminder(ev.Channel, ev.ParentTS, ev.MessageTS, ev.User)
 		return
 	}
-
-	parentTS := strings.TrimSpace(ev.Item.ThreadTS)
-	if parentTS == "" {
-		parentTS = slackreminders.ResolveThreadParentTS(h.api, ch, strings.TrimSpace(ev.Item.TS))
+	if isPauseReaction(ev.Reaction) {
+		h.setSyslogIncidentSnoozed(ev.Channel, ev.ParentTS, ev.User, true)
+		h.setRuijieIncidentSnoozed(ev.Channel, ev.ParentTS, ev.User, true)
 	}
-	if parentTS == "" {
+}
+
+func (h *SlackEventsHandler) handleReactionRemoved(raw json.RawMessage) {
+	ev, ok := h.parseReactionEvent(raw)
+	if !ok {
 		return
 	}
-
-	h.resolveSyslogIncident(ch, parentTS, ev.User)
-	h.resolveRuijieIncident(ch, parentTS, ev.User)
-	h.resolveTicketReminder(ch, parentTS, strings.TrimSpace(ev.Item.TS), ev.User)
+	if h.botUserID != "" && ev.User == h.botUserID {
+		return
+	}
+	if isPauseReaction(ev.Reaction) {
+		h.setSyslogIncidentSnoozed(ev.Channel, ev.ParentTS, ev.User, false)
+		h.setRuijieIncidentSnoozed(ev.Channel, ev.ParentTS, ev.User, false)
+	}
 }
 
 func (h *SlackEventsHandler) resolveSyslogIncident(ch, parentTS, userID string) {
@@ -275,6 +270,46 @@ func (h *SlackEventsHandler) resolveSyslogIncident(ch, parentTS, userID string) 
 	)
 }
 
+func (h *SlackEventsHandler) setSyslogIncidentSnoozed(ch, parentTS, userID string, snoozed bool) {
+	if h.repo == nil || ch != strings.TrimSpace(h.cfg.SlackChannelID) {
+		return
+	}
+	inc, err := h.repo.GetSlackIncidentByMessage(ch, parentTS)
+	if err != nil || inc == nil || inc.ResolvedAt != nil {
+		return
+	}
+	if snoozed && inc.SnoozedAt != nil {
+		return
+	}
+	if !snoozed && inc.SnoozedAt == nil {
+		return
+	}
+
+	name := h.lookupSlackName(userID)
+	now := time.Now().UTC()
+	if snoozed {
+		if err := h.repo.SnoozeSlackIncident(inc.ID, name, now); err != nil {
+			log.Printf("[slack-events] snooze syslog incident: %v", err)
+			return
+		}
+		_, _, _ = h.api.PostMessage(ch,
+			slack.MsgOptionTS(parentTS),
+			slack.MsgOptionText(":hourglass_flowing_sand: Syslog reminders and repeated thread replies are paused for this alarm fingerprint until this reaction is removed.", false),
+		)
+		return
+	}
+
+	next := now.Add(h.syslogReminderInterval())
+	if err := h.repo.UnsnoozeSlackIncident(inc.ID, next); err != nil {
+		log.Printf("[slack-events] unsnooze syslog incident: %v", err)
+		return
+	}
+	_, _, _ = h.api.PostMessage(ch,
+		slack.MsgOptionTS(parentTS),
+		slack.MsgOptionText(":white_check_mark: Syslog fingerprint pause removed. Reminders and repeated thread replies are active again.", false),
+	)
+}
+
 func (h *SlackEventsHandler) resolveRuijieIncident(ch, parentTS, userID string) {
 	if h.ruijieRepo == nil || ch != strings.TrimSpace(h.cfg.RuijieSlackChannelID) {
 		return
@@ -317,6 +352,46 @@ func (h *SlackEventsHandler) resolveRuijieIncident(ch, parentTS, userID string) 
 	_, _, _ = h.api.PostMessage(ch,
 		slack.MsgOptionTS(parentTS),
 		slack.MsgOptionText(":white_check_mark: Ruijie alarm marked resolved. Reminders stopped.", false),
+	)
+}
+
+func (h *SlackEventsHandler) setRuijieIncidentSnoozed(ch, parentTS, userID string, snoozed bool) {
+	if h.ruijieRepo == nil || ch != strings.TrimSpace(h.cfg.RuijieSlackChannelID) {
+		return
+	}
+	inc, err := h.ruijieRepo.GetSlackIncidentByMessage(ch, parentTS)
+	if err != nil || inc == nil || inc.ResolvedAt != nil {
+		return
+	}
+	if snoozed && inc.SnoozedAt != nil {
+		return
+	}
+	if !snoozed && inc.SnoozedAt == nil {
+		return
+	}
+
+	name := h.lookupSlackName(userID)
+	now := time.Now().UTC()
+	if snoozed {
+		if err := h.ruijieRepo.SnoozeSlackIncident(inc.ID, name, now); err != nil {
+			log.Printf("[ruijie-mail] snooze incident: %v", err)
+			return
+		}
+		_, _, _ = h.api.PostMessage(ch,
+			slack.MsgOptionTS(parentTS),
+			slack.MsgOptionText(":hourglass_flowing_sand: Ruijie reminders and repeated thread replies are paused for this alarm fingerprint until this reaction is removed.", false),
+		)
+		return
+	}
+
+	next := now.Add(ruijieReminderInterval(h.cfg))
+	if err := h.ruijieRepo.UnsnoozeSlackIncident(inc.ID, next); err != nil {
+		log.Printf("[ruijie-mail] unsnooze incident: %v", err)
+		return
+	}
+	_, _, _ = h.api.PostMessage(ch,
+		slack.MsgOptionTS(parentTS),
+		slack.MsgOptionText(":white_check_mark: Ruijie fingerprint pause removed. Reminders and repeated thread replies are active again.", false),
 	)
 }
 
@@ -402,4 +477,85 @@ func (h *SlackEventsHandler) dedupe(eventID string) bool {
 	}
 	h.seen[eventID] = now
 	return false
+}
+
+type slackReactionEvent struct {
+	User      string
+	Reaction  string
+	Channel   string
+	MessageTS string
+	ParentTS  string
+}
+
+func (h *SlackEventsHandler) parseReactionEvent(raw json.RawMessage) (slackReactionEvent, bool) {
+	var ev struct {
+		User     string `json:"user"`
+		Reaction string `json:"reaction"`
+		Item     struct {
+			Type     string `json:"type"`
+			Channel  string `json:"channel"`
+			TS       string `json:"ts"`
+			ThreadTS string `json:"thread_ts"`
+		} `json:"item"`
+	}
+	if err := json.Unmarshal(raw, &ev); err != nil {
+		return slackReactionEvent{}, false
+	}
+	if ev.Item.Type != "message" {
+		return slackReactionEvent{}, false
+	}
+	ch := strings.TrimSpace(ev.Item.Channel)
+	if ch == "" {
+		return slackReactionEvent{}, false
+	}
+	messageTS := strings.TrimSpace(ev.Item.TS)
+	parentTS := strings.TrimSpace(ev.Item.ThreadTS)
+	if parentTS == "" {
+		parentTS = slackreminders.ResolveThreadParentTS(h.api, ch, messageTS)
+	}
+	if parentTS == "" {
+		return slackReactionEvent{}, false
+	}
+	return slackReactionEvent{
+		User:      ev.User,
+		Reaction:  strings.TrimSpace(ev.Reaction),
+		Channel:   ch,
+		MessageTS: messageTS,
+		ParentTS:  parentTS,
+	}, true
+}
+
+func (h *SlackEventsHandler) lookupSlackName(userID string) string {
+	name := userID
+	if u, err := h.api.GetUserInfo(userID); err == nil && u != nil {
+		if u.RealName != "" {
+			name = u.RealName
+		} else if u.Name != "" {
+			name = u.Name
+		}
+	}
+	return name
+}
+
+func (h *SlackEventsHandler) syslogReminderInterval() time.Duration {
+	if h == nil || h.cfg == nil || h.cfg.SlackReminderInterval < time.Hour {
+		return 6 * time.Hour
+	}
+	return h.cfg.SlackReminderInterval
+}
+
+func ruijieReminderInterval(cfg *config.Config) time.Duration {
+	if cfg == nil || cfg.RuijieSlackReminderInterval < time.Hour {
+		return 6 * time.Hour
+	}
+	return cfg.RuijieSlackReminderInterval
+}
+
+func isPauseReaction(reaction string) bool {
+	switch strings.TrimSpace(strings.ToLower(reaction)) {
+	case "hourglass", "hourglass_flowing_sand", "hourglass_done", "sand_clock":
+		return true
+	default:
+		return false
+	}
 }

@@ -6,9 +6,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// NocPassDevice is a network device managed for rotating NOC local-user credentials.
-// Vendor: cisco_ios | cisco_nexus | mikrotik
-// Accounts are always fiberx (priv 15 / full) and readOnly (priv 13 / read-only); one shared password rotates every 24h.
+// NocPassDevice stores per-host NOC PASS execution state keyed by host.
+// Membership and credentials now come from NOC Data at runtime; legacy admin credential fields are kept for compatibility.
 type NocPassDevice struct {
 	gorm.Model
 	DisplayName       string `gorm:"size:128;not null"`

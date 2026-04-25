@@ -1,0 +1,493 @@
+{{define "content"}}
+<div x-data="ipCapacitiesPage()" x-init="init()" class="max-w-7xl mx-auto">
+  <div class="mb-6 flex items-start justify-between gap-4 flex-wrap">
+    <div>
+      <h1 class="text-2xl font-bold text-[#f1f5f9]">Capacities Update</h1>
+    </div>
+    <button type="button" @click="openNodeModal()" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-semibold btn-press">Add Node</button>
+  </div>
+
+  <div class="flex gap-1 p-1 rounded-xl bg-[#1a2236] border border-[rgba(255,255,255,0.08)] w-fit mb-6">
+    <button type="button" @click="setTab('review')" class="px-4 py-2 text-sm font-semibold rounded-lg transition-colors" :class="tab === 'review' ? 'bg-teal-500/20 text-teal-300' : 'text-[#94a3b8] hover:text-[#f1f5f9]'">Review</button>
+    <button type="button" @click="setTab('actions')" class="px-4 py-2 text-sm font-semibold rounded-lg transition-colors" :class="tab === 'actions' ? 'bg-teal-500/20 text-teal-300' : 'text-[#94a3b8] hover:text-[#f1f5f9]'">Actions</button>
+    <button type="button" @click="setTab('history')" class="px-4 py-2 text-sm font-semibold rounded-lg transition-colors" :class="tab === 'history' ? 'bg-teal-500/20 text-teal-300' : 'text-[#94a3b8] hover:text-[#f1f5f9]'">History</button>
+  </div>
+
+  <p class="mb-4 text-sm text-red-400" x-show="error" x-text="error"></p>
+
+  <div x-show="tab === 'review'" x-cloak class="space-y-4">
+    <div class="flex items-center gap-3 flex-wrap">
+      <div class="relative flex-1 min-w-[240px] max-w-md">
+        <input x-model.debounce.350ms="search" @input="loadNodes()" type="search" placeholder="Search node or capacity" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:border-teal-500/50">
+      </div>
+      <button type="button" @click="refreshAll()" class="px-3 py-2 rounded-lg border border-[rgba(255,255,255,0.08)] text-sm text-[#94a3b8] hover:text-[#f1f5f9] hover:border-teal-500/40">Refresh</button>
+    </div>
+
+    <div class="overflow-x-auto rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827]">
+      <table class="min-w-full divide-y divide-[rgba(255,255,255,0.08)]">
+        <thead class="bg-[#1a2236]">
+          <tr class="text-left text-xs uppercase tracking-wide text-[#94a3b8]">
+            <th class="px-4 py-3 font-semibold">Node</th>
+            <th class="px-4 py-3 font-semibold">Total Capacity Now</th>
+            <th class="px-4 py-3 font-semibold">Latest Action</th>
+            <th class="px-4 py-3 font-semibold text-right">Action</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-[rgba(255,255,255,0.06)]">
+          <template x-if="loadingNodes">
+            <tr><td colspan="4" class="px-4 py-10 text-center text-sm text-[#64748b]">Loading...</td></tr>
+          </template>
+          <template x-if="!loadingNodes && nodes.length === 0">
+            <tr><td colspan="4" class="px-4 py-10 text-center text-sm text-[#64748b]">No capacity nodes found.</td></tr>
+          </template>
+          <template x-for="node in nodes" :key="node.id">
+            <tr class="hover:bg-white/[0.03]">
+              <td class="px-4 py-3">
+                <div class="font-semibold text-[#f1f5f9]" x-text="node.name"></div>
+                <button type="button" @click="openNodeModal(node)" class="mt-1 text-xs text-teal-400 hover:underline">Edit node</button>
+              </td>
+              <td class="px-4 py-3 font-mono text-sm text-[#f1f5f9]" x-text="money(node.current_capacity_iqd)"></td>
+              <td class="px-4 py-3">
+                <template x-if="node.latest_action">
+                  <div class="flex flex-col gap-1">
+                    <span class="w-fit text-xs font-semibold px-2 py-0.5 rounded-full" :class="typeClass(node.latest_action.type)" x-text="node.latest_action.type"></span>
+                    <span class="text-xs text-[#94a3b8]">
+                      <span x-text="money(node.latest_action.amount_iqd)"></span>
+                      <span class="text-[#475569]"> at </span>
+                      <span x-text="fmtDateTime(node.latest_action.action_at)"></span>
+                    </span>
+                  </div>
+                </template>
+                <template x-if="!node.latest_action">
+                  <span class="text-sm text-[#64748b]">No actions yet</span>
+                </template>
+              </td>
+              <td class="px-4 py-3 text-right">
+                <button type="button" @click="openActionModal(node)" class="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold">Add Action</button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div x-show="tab === 'actions'" x-cloak class="space-y-4">
+    <div class="flex justify-end">
+      <button type="button" @click="loadActions()" class="px-3 py-2 rounded-lg border border-[rgba(255,255,255,0.08)] text-sm text-[#94a3b8] hover:text-[#f1f5f9] hover:border-teal-500/40">Refresh</button>
+    </div>
+    <div class="overflow-x-auto rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827]">
+      <table class="min-w-full divide-y divide-[rgba(255,255,255,0.08)]">
+        <thead class="bg-[#1a2236]">
+          <tr class="text-left text-xs uppercase tracking-wide text-[#94a3b8]">
+            <th class="px-4 py-3 font-semibold">Time</th>
+            <th class="px-4 py-3 font-semibold">Node</th>
+            <th class="px-4 py-3 font-semibold">Type</th>
+            <th class="px-4 py-3 font-semibold">Amount</th>
+            <th class="px-4 py-3 font-semibold">Before</th>
+            <th class="px-4 py-3 font-semibold">After</th>
+            <th class="px-4 py-3 font-semibold text-right">Edit</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-[rgba(255,255,255,0.06)]">
+          <template x-if="loadingActions">
+            <tr><td colspan="7" class="px-4 py-10 text-center text-sm text-[#64748b]">Loading...</td></tr>
+          </template>
+          <template x-if="!loadingActions && actions.length === 0">
+            <tr><td colspan="7" class="px-4 py-10 text-center text-sm text-[#64748b]">No capacity actions yet.</td></tr>
+          </template>
+          <template x-for="action in actions" :key="action.id">
+            <tr class="hover:bg-white/[0.03]">
+              <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="fmtDateTime(action.action_at)"></td>
+              <td class="px-4 py-3 text-sm font-semibold text-[#f1f5f9]" x-text="action.node_name"></td>
+              <td class="px-4 py-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full" :class="typeClass(action.type)" x-text="action.type"></span></td>
+              <td class="px-4 py-3 font-mono text-sm" :class="action.type === 'upgrade' ? 'text-emerald-300' : 'text-red-300'" x-text="signedMoney(action)"></td>
+              <td class="px-4 py-3 font-mono text-sm text-[#94a3b8]" x-text="money(action.capacity_before_iqd)"></td>
+              <td class="px-4 py-3 font-mono text-sm text-[#f1f5f9]" x-text="money(action.capacity_after_iqd)"></td>
+              <td class="px-4 py-3 text-right">
+                <button type="button" @click="openActionModal(null, action)" class="text-xs text-teal-400 hover:underline">Edit</button>
+                <button type="button" @click="deleteAction(action)" class="ml-3 text-xs text-red-400 hover:underline">Delete</button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div x-show="tab === 'history'" x-cloak class="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-4">
+    <aside class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-3 h-fit">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-[#f1f5f9]">Days</h2>
+        <button type="button" @click="loadHistoryDays()" class="text-xs text-teal-400 hover:underline">Refresh</button>
+      </div>
+      <template x-if="historyDays.length === 0">
+        <p class="text-sm text-[#64748b] py-4">No history yet.</p>
+      </template>
+      <div class="space-y-1">
+        <template x-for="day in historyDays" :key="day">
+          <button type="button" @click="selectDay(day)" class="w-full text-left px-3 py-2 rounded-lg text-sm transition-colors" :class="selectedDay === day ? 'bg-teal-500/20 text-teal-300' : 'text-[#94a3b8] hover:bg-white/5 hover:text-[#f1f5f9]'">
+            <span x-text="day"></span>
+          </button>
+        </template>
+      </div>
+    </aside>
+    <section class="space-y-4 min-w-0">
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <h2 class="text-lg font-semibold text-[#f1f5f9]" x-text="selectedDay ? ('History for ' + selectedDay) : 'History'"></h2>
+        <div class="flex items-center gap-2 flex-wrap">
+          <input type="date" x-model="selectedDay" @change="loadDayHistory()" class="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9]">
+          <button type="button" @click="exportHistoryExcel()" :disabled="!dayHistory.summaries.length && !dayHistory.actions.length" class="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold">Export Excel</button>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827]">
+        <table class="min-w-full divide-y divide-[rgba(255,255,255,0.08)]">
+          <thead class="bg-[#1a2236]">
+            <tr class="text-left text-xs uppercase tracking-wide text-[#94a3b8]">
+              <th class="px-4 py-3 font-semibold">Node</th>
+              <th class="px-4 py-3 font-semibold">Before Update</th>
+              <th class="px-4 py-3 font-semibold">After Update</th>
+              <th class="px-4 py-3 font-semibold">Difference</th>
+              <th class="px-4 py-3 font-semibold">Latest Time</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-[rgba(255,255,255,0.06)]">
+            <template x-if="!dayHistory.summaries.length">
+              <tr><td colspan="5" class="px-4 py-8 text-center text-sm text-[#64748b]">No summary for this day.</td></tr>
+            </template>
+            <template x-for="row in dayHistory.summaries" :key="row.node_id">
+              <tr>
+                <td class="px-4 py-3 text-sm font-semibold text-[#f1f5f9]" x-text="row.node_name"></td>
+                <td class="px-4 py-3 font-mono text-sm text-[#94a3b8]" x-text="money(row.opening_capacity_iqd)"></td>
+                <td class="px-4 py-3 font-mono text-sm text-[#f1f5f9]" x-text="money(row.closing_capacity_iqd)"></td>
+                <td class="px-4 py-3 font-mono text-sm" :class="row.difference_iqd >= 0 ? 'text-emerald-300' : 'text-red-300'" x-text="moneyWithSign(row.difference_iqd)"></td>
+                <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="fmtDateTime(row.latest_action_at)"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="overflow-x-auto rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827]">
+        <table class="min-w-full divide-y divide-[rgba(255,255,255,0.08)]">
+          <thead class="bg-[#1a2236]">
+            <tr class="text-left text-xs uppercase tracking-wide text-[#94a3b8]">
+              <th class="px-4 py-3 font-semibold">Time</th>
+              <th class="px-4 py-3 font-semibold">Node</th>
+              <th class="px-4 py-3 font-semibold">Type</th>
+              <th class="px-4 py-3 font-semibold">Amount</th>
+              <th class="px-4 py-3 font-semibold">Before</th>
+              <th class="px-4 py-3 font-semibold">After</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-[rgba(255,255,255,0.06)]">
+            <template x-if="!dayHistory.actions.length">
+              <tr><td colspan="6" class="px-4 py-8 text-center text-sm text-[#64748b]">No actions for this day.</td></tr>
+            </template>
+            <template x-for="action in dayHistory.actions" :key="action.id">
+              <tr>
+                <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="fmtDateTime(action.action_at)"></td>
+                <td class="px-4 py-3 text-sm font-semibold text-[#f1f5f9]" x-text="action.node_name"></td>
+                <td class="px-4 py-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full" :class="typeClass(action.type)" x-text="action.type"></span></td>
+                <td class="px-4 py-3 font-mono text-sm" :class="action.type === 'upgrade' ? 'text-emerald-300' : 'text-red-300'" x-text="signedMoney(action)"></td>
+                <td class="px-4 py-3 font-mono text-sm text-[#94a3b8]" x-text="money(action.capacity_before_iqd)"></td>
+                <td class="px-4 py-3 font-mono text-sm text-[#f1f5f9]" x-text="money(action.capacity_after_iqd)"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div x-show="nodeModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+    <div @click.away="nodeModal = false" class="w-full max-w-md rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-2xl">
+      <h3 class="text-lg font-semibold text-[#f1f5f9] mb-4" x-text="nodeForm.id ? 'Edit Node' : 'Add Node'"></h3>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">Node</label>
+          <input x-model="nodeForm.name" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+        </div>
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">Initial Capacity IQD</label>
+          <input type="number" min="0" step="1" x-model.number="nodeForm.initial_capacity_iqd" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+        </div>
+        <p class="text-xs text-red-400" x-show="formError" x-text="formError"></p>
+      </div>
+      <div class="flex justify-end gap-2 mt-5">
+        <button type="button" @click="nodeModal = false" class="px-4 py-2 text-sm text-[#94a3b8]">Cancel</button>
+        <button type="button" @click="saveNode()" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-sm font-semibold text-white">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="actionModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+    <div @click.away="actionModal = false" class="w-full max-w-lg rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-2xl">
+      <h3 class="text-lg font-semibold text-[#f1f5f9] mb-4" x-text="actionForm.id ? 'Edit Action' : 'Add Action'"></h3>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">Node</label>
+          <select x-model.number="actionForm.node_id" :disabled="!!actionForm.id" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9] disabled:opacity-60">
+            <option value="0">Select node</option>
+            <template x-for="node in nodes" :key="node.id">
+              <option :value="node.id" x-text="node.name"></option>
+            </template>
+          </select>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs text-[#94a3b8] mb-1">Type</label>
+            <select x-model="actionForm.type" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+              <option value="upgrade">Upgrade</option>
+              <option value="downgrade">Downgrade</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-[#94a3b8] mb-1">Amount IQD</label>
+            <input type="number" min="1" step="1" x-model.number="actionForm.amount_iqd" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">Action Time</label>
+          <input type="datetime-local" x-model="actionForm.action_at" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+        </div>
+        <p class="text-xs text-red-400" x-show="formError" x-text="formError"></p>
+      </div>
+      <div class="flex justify-end gap-2 mt-5">
+        <button type="button" @click="actionModal = false" class="px-4 py-2 text-sm text-[#94a3b8]">Cancel</button>
+        <button type="button" @click="saveAction()" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-sm font-semibold text-white">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function ipCapacitiesPage() {
+  return {
+    timeOffsetMs: -3 * 60 * 60 * 1000,
+    tab: 'review',
+    nodes: [],
+    actions: [],
+    historyDays: [],
+    selectedDay: '',
+    dayHistory: { summaries: [], actions: [] },
+    search: '',
+    error: '',
+    formError: '',
+    loadingNodes: false,
+    loadingActions: false,
+    nodeModal: false,
+    actionModal: false,
+    nodeForm: { id: 0, name: '', initial_capacity_iqd: 0 },
+    actionForm: { id: 0, node_id: 0, type: 'upgrade', amount_iqd: 0, action_at: '' },
+
+    async init() {
+      await this.refreshAll();
+    },
+    setTab(next) {
+      this.tab = next;
+      if (next === 'actions') this.loadActions();
+      if (next === 'history') this.loadHistoryDays();
+    },
+    async refreshAll() {
+      await Promise.all([this.loadNodes(), this.loadActions(), this.loadHistoryDays()]);
+    },
+    async api(path, options) {
+      this.error = '';
+      const res = await fetch('/api/ip/capacities' + path, Object.assign({ credentials: 'same-origin' }, options || {}));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    },
+    async loadNodes() {
+      this.loadingNodes = true;
+      try {
+        const params = this.search ? ('?search=' + encodeURIComponent(this.search)) : '';
+        const data = await this.api('/nodes' + params);
+        this.nodes = data.nodes || [];
+      } catch (e) {
+        this.error = e.message;
+      } finally {
+        this.loadingNodes = false;
+      }
+    },
+    async loadActions() {
+      this.loadingActions = true;
+      try {
+        const data = await this.api('/actions');
+        this.actions = data.actions || [];
+      } catch (e) {
+        this.error = e.message;
+      } finally {
+        this.loadingActions = false;
+      }
+    },
+    async loadHistoryDays() {
+      try {
+        const data = await this.api('/history/days');
+        this.historyDays = data.days || [];
+        if (!this.selectedDay && this.historyDays.length) this.selectedDay = this.historyDays[0];
+        if (this.selectedDay) await this.loadDayHistory();
+      } catch (e) {
+        this.error = e.message;
+      }
+    },
+    async selectDay(day) {
+      this.selectedDay = day;
+      await this.loadDayHistory();
+    },
+    async loadDayHistory() {
+      if (!this.selectedDay) return;
+      try {
+        const data = await this.api('/history/day?date=' + encodeURIComponent(this.selectedDay));
+        this.dayHistory = data.history || { summaries: [], actions: [] };
+      } catch (e) {
+        this.error = e.message;
+      }
+    },
+    openNodeModal(node) {
+      this.formError = '';
+      this.nodeForm = node ? {
+        id: node.id,
+        name: node.name,
+        initial_capacity_iqd: node.initial_capacity_iqd
+      } : { id: 0, name: '', initial_capacity_iqd: 0 };
+      this.nodeModal = true;
+    },
+    async saveNode() {
+      this.formError = '';
+      const payload = {
+        name: (this.nodeForm.name || '').trim(),
+        initial_capacity_iqd: Number(this.nodeForm.initial_capacity_iqd || 0)
+      };
+      if (!payload.name) { this.formError = 'Node is required'; return; }
+      if (payload.initial_capacity_iqd < 0) { this.formError = 'Initial capacity cannot be negative'; return; }
+      try {
+        const path = this.nodeForm.id ? '/nodes/' + this.nodeForm.id : '/nodes';
+        const method = this.nodeForm.id ? 'PUT' : 'POST';
+        await this.api(path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        this.nodeModal = false;
+        await this.refreshAll();
+      } catch (e) {
+        this.formError = e.message;
+      }
+    },
+    openActionModal(node, action) {
+      this.formError = '';
+      if (action) {
+        this.actionForm = {
+          id: action.id,
+          node_id: action.node_id,
+          type: action.type,
+          amount_iqd: action.amount_iqd,
+          action_at: this.datetimeLocal(action.action_at, true)
+        };
+      } else {
+        this.actionForm = {
+          id: 0,
+          node_id: node ? node.id : 0,
+          type: 'upgrade',
+          amount_iqd: 0,
+          action_at: this.datetimeLocal(new Date().toISOString(), true)
+        };
+      }
+      this.actionModal = true;
+    },
+    async saveAction() {
+      this.formError = '';
+      const payload = {
+        node_id: Number(this.actionForm.node_id || 0),
+        type: this.actionForm.type,
+        amount_iqd: Number(this.actionForm.amount_iqd || 0),
+        action_at: this.rawActionTime(this.actionForm.action_at)
+      };
+      if (!payload.node_id) { this.formError = 'Node is required'; return; }
+      if (!['upgrade', 'downgrade'].includes(payload.type)) { this.formError = 'Type is required'; return; }
+      if (payload.amount_iqd <= 0) { this.formError = 'Amount must be greater than 0'; return; }
+      try {
+        const path = this.actionForm.id ? '/actions/' + this.actionForm.id : '/actions';
+        const method = this.actionForm.id ? 'PUT' : 'POST';
+        await this.api(path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        this.actionModal = false;
+        await this.refreshAll();
+        if (this.selectedDay) await this.loadDayHistory();
+      } catch (e) {
+        this.formError = e.message;
+      }
+    },
+    async deleteAction(action) {
+      if (!confirm('Delete this capacity action?')) return;
+      try {
+        await this.api('/actions/' + action.id, { method: 'DELETE' });
+        await this.refreshAll();
+        if (this.selectedDay) await this.loadDayHistory();
+      } catch (e) {
+        this.error = e.message;
+      }
+    },
+    typeClass(type) {
+      return type === 'upgrade'
+        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/25'
+        : 'bg-red-500/20 text-red-300 border border-red-500/25';
+    },
+    money(value) {
+      return new Intl.NumberFormat('en-US').format(Number(value || 0)) + ' IQD';
+    },
+    moneyWithSign(value) {
+      const n = Number(value || 0);
+      return (n >= 0 ? '+' : '-') + this.money(Math.abs(n));
+    },
+    signedMoney(action) {
+      const sign = action.type === 'upgrade' ? '+' : '-';
+      return sign + this.money(action.amount_iqd);
+    },
+    exportHistoryExcel() {
+      if (typeof XLSX === 'undefined') {
+        this.error = 'Excel export library is not loaded';
+        return;
+      }
+      const summaryRows = (this.dayHistory.summaries || []).map((row) => ({
+        Node: row.node_name,
+        'Before Update': Number(row.opening_capacity_iqd || 0),
+        'After Update': Number(row.closing_capacity_iqd || 0),
+        Difference: Number(row.difference_iqd || 0),
+        'Latest Time': this.fmtDateTime(row.latest_action_at)
+      }));
+      const actionRows = (this.dayHistory.actions || []).map((action) => ({
+        Time: this.fmtDateTime(action.action_at),
+        Node: action.node_name,
+        Type: action.type,
+        Amount: Number(action.amount_iqd || 0),
+        Difference: action.type === 'upgrade' ? Number(action.amount_iqd || 0) : -Number(action.amount_iqd || 0),
+        Before: Number(action.capacity_before_iqd || 0),
+        After: Number(action.capacity_after_iqd || 0)
+      }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), 'Nodes Summary');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(actionRows), 'Transactions');
+      XLSX.writeFile(wb, 'ip-capacities-' + (this.selectedDay || 'history') + '.xlsx');
+    },
+    adjustedDate(value) {
+      if (!value) return null;
+      return new Date(new Date(value).getTime() + this.timeOffsetMs);
+    },
+    fmtDateTime(value) {
+      if (!value) return '-';
+      const d = this.adjustedDate(value);
+      return d ? d.toLocaleString() : '-';
+    },
+    datetimeLocal(value, applyOffset) {
+      const d = applyOffset ? this.adjustedDate(value) : new Date(value);
+      const pad = (n) => String(n).padStart(2, '0');
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    },
+    rawActionTime(value) {
+      if (!value) return '';
+      const raw = new Date(new Date(value).getTime() - this.timeOffsetMs);
+      return this.datetimeLocal(raw.toISOString(), false);
+    }
+  };
+}
+</script>
+{{end}}

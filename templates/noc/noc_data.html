@@ -17,6 +17,11 @@
       :class="tab === 'table' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">
       Data Table
     </button>
+    <button x-show="mode === 'data'" type="button" @click="switchTab('history')"
+      class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+      :class="tab === 'history' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">
+      History
+    </button>
     <button x-show="mode === 'setup'" type="button" @click="tab = 'ranges'"
       class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
       :class="tab === 'ranges' ? 'bg-[#f97316] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">
@@ -87,6 +92,18 @@
     </template>
 
     <div x-show="summaryDataset().length > 0" class="grid gap-5 xl:grid-cols-3">
+      <div x-show="summaryScope === 'all'" class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-5 shadow-xl xl:col-span-3">
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 class="text-base font-semibold text-[#f1f5f9]">Province Status</h3>
+            <p class="text-xs text-[#94a3b8]">Device count for every province.</p>
+          </div>
+        </div>
+        <div class="h-80">
+          <canvas x-ref="provinceChart"></canvas>
+        </div>
+      </div>
+
       <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-5 shadow-xl">
         <div class="flex items-center justify-between gap-3 mb-4">
           <div>
@@ -486,6 +503,73 @@
       </table>
     </div>
   </div>
+
+  <div x-show="mode === 'data' && tab === 'history'" class="space-y-4">
+    <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-4 shadow-xl">
+      <div class="flex flex-wrap items-end gap-3">
+        <div class="min-w-[14rem]">
+          <label class="block text-xs text-[#94a3b8] mb-1">Snapshot Date</label>
+          <select x-model="selectedHistoryDate" @change="fetchHistory()"
+            class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+            <option value="">Select date</option>
+            <template x-for="date in historyDates" :key="'history-date-' + date">
+              <option :value="date" x-text="date"></option>
+            </template>
+          </select>
+        </div>
+        <div class="min-w-[14rem] flex-1">
+          <label class="block text-xs text-[#94a3b8] mb-1">Search History</label>
+          <input type="search" x-model.debounce.300ms="historyQ" placeholder="Search site, subnet, range, or IP..."
+            class="w-full max-w-md rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] text-[#f1f5f9] placeholder-[#475569] px-3 py-2 text-sm focus:ring-2 focus:ring-[#f97316] focus:border-[#f97316]">
+        </div>
+        <button type="button" @click="fetchHistoryDates(); fetchHistory()" class="px-4 py-2 rounded-lg bg-[#1a2236] text-[#cbd5e1] text-sm font-semibold border border-[rgba(255,255,255,0.08)]">Refresh</button>
+      </div>
+      <p class="text-xs text-[#64748b] mt-3" x-text="historyRunAt ? 'Showing snapshot from ' + new Date(historyRunAt).toLocaleString() : 'Snapshots are saved after each full NOC Data run.'"></p>
+    </div>
+
+    <div class="flex flex-wrap items-center justify-between gap-3 text-xs text-[#94a3b8]">
+      <p x-text="displayedHistoryDevices().length + ' rows shown from ' + historyDevices.length + ' snapshot rows'"></p>
+      <p x-text="sortSummary()"></p>
+    </div>
+
+    <div class="overflow-x-auto rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827]">
+      <table class="min-w-[1600px] w-full text-xs">
+        <thead class="bg-[#1a2236] text-[#94a3b8] uppercase tracking-wide">
+          <tr>
+            <template x-for="column in tableColumns" :key="'history-head-' + column.key">
+              <th class="px-3 py-3 text-left">
+                <button type="button" @click="toggleSort(column.key)" class="flex items-center gap-2 text-left hover:text-[#f1f5f9] transition-colors">
+                  <span x-text="column.label"></span>
+                  <span class="text-[10px]" x-text="sortIndicator(column.key)"></span>
+                </button>
+              </th>
+            </template>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-[rgba(255,255,255,0.06)]">
+          <template x-if="!historyLoading && displayedHistoryDevices().length === 0">
+            <tr><td colspan="26" class="px-4 py-8 text-center text-sm text-[#94a3b8]">No history rows found for this date.</td></tr>
+          </template>
+          <template x-for="d in displayedHistoryDevices()" :key="'history-row-' + d.id + '-' + d.ip">
+            <tr class="text-[#e2e8f0]">
+              <template x-for="column in tableColumns" :key="'history-cell-' + d.id + '-' + column.key">
+                <td class="px-3 py-3" :class="cellClass(column, d)">
+                  <template x-if="column.key === 'status'">
+                    <span class="px-2 py-1 rounded text-[10px] font-bold uppercase"
+                      :class="d.status === 'ok' ? 'bg-emerald-500/20 text-emerald-400' : d.status === 'fail' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'"
+                      x-text="formatCell(column, d)"></span>
+                  </template>
+                  <template x-if="column.key !== 'status'">
+                    <span :title="cellTitle(column, d)" x-text="formatCell(column, d)"></span>
+                  </template>
+                </td>
+              </template>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -499,10 +583,15 @@ function nocDataPage() {
     summaryScope: 'all',
     selectedSummarySite: '',
     q: '',
+    historyQ: '',
     devices: [],
+    historyDevices: [],
+    historyDates: [],
+    selectedHistoryDate: '',
+    historyRunAt: '',
     ranges: [],
     tableColumns: [
-      { key: 'site', label: 'Site', filterType: 'text' },
+      { key: 'site', label: 'Site', filterType: 'select' },
       { key: 'subnet', label: 'Subnet', filterType: 'text', mono: true },
       { key: 'range', label: 'Range', filterType: 'text' },
       { key: 'ip', label: 'IP', filterType: 'text', mono: true },
@@ -535,6 +624,7 @@ function nocDataPage() {
     credentials: { cisco: [], huawei: [], mikrotik: [] },
     exclusions: [],
     loading: true,
+    historyLoading: false,
     saving: false,
     savingCredential: false,
     savingExclusion: false,
@@ -549,7 +639,9 @@ function nocDataPage() {
     credentialError: '',
     exclusionError: '',
     refreshTimer: null,
+    summaryRenderFrame: null,
     charts: {
+      province: null,
       status: null,
       vendor: null,
       layer: null
@@ -573,6 +665,7 @@ function nocDataPage() {
       window.__nocDataPage = this;
       this.initColumnFilters();
       await this.fetchDevices();
+      await this.fetchHistoryDates();
       await this.fetchCredentials();
       await this.fetchExclusions();
       this.$nextTick(() => this.renderSummaryCharts());
@@ -605,6 +698,44 @@ function nocDataPage() {
         this.$nextTick(() => this.renderSummaryCharts());
       }
       this.loading = false;
+    },
+
+    async fetchHistoryDates() {
+      try {
+        const res = await fetch('/api/noc-data/history/dates');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load history dates');
+        this.historyDates = data.dates || [];
+        if (!this.selectedHistoryDate && this.historyDates.length > 0) {
+          this.selectedHistoryDate = this.historyDates[0];
+          await this.fetchHistory();
+        }
+      } catch (e) {
+        console.error(e);
+        this.historyDates = [];
+      }
+    },
+
+    async fetchHistory() {
+      if (!this.selectedHistoryDate) {
+        this.historyDevices = [];
+        this.historyRunAt = '';
+        return;
+      }
+      this.historyLoading = true;
+      try {
+        const res = await fetch('/api/noc-data/history?date=' + encodeURIComponent(this.selectedHistoryDate));
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load history');
+        this.historyDevices = data.devices || [];
+        this.historyRunAt = data.run_at || '';
+      } catch (e) {
+        console.error(e);
+        this.historyDevices = [];
+        this.historyRunAt = '';
+      } finally {
+        this.historyLoading = false;
+      }
     },
 
     async fetchCredentials() {
@@ -897,8 +1028,16 @@ function nocDataPage() {
     },
 
     displayedDevices() {
-      let rows = Array.isArray(this.devices) ? [...this.devices] : [];
-      const search = this.q.trim().toLowerCase();
+      return this.displayedRows(this.devices, this.q);
+    },
+
+    displayedHistoryDevices() {
+      return this.displayedRows(this.historyDevices, this.historyQ);
+    },
+
+    displayedRows(sourceRows, query) {
+      let rows = Array.isArray(sourceRows) ? [...sourceRows] : [];
+      const search = String(query || '').trim().toLowerCase();
       if (search) {
         rows = rows.filter(device => this.deviceMatchesSearch(device, search));
       }
@@ -1020,6 +1159,9 @@ function nocDataPage() {
       if (nextTab === 'summary') {
         this.$nextTick(() => this.renderSummaryCharts());
       }
+      if (nextTab === 'history' && this.selectedHistoryDate && this.historyDevices.length === 0) {
+        this.fetchHistory();
+      }
     },
 
     summarySites() {
@@ -1049,11 +1191,15 @@ function nocDataPage() {
       const data = this.summaryDataset();
       const counts = {
         status: { ok: 0, fail: 0 },
+        province: {},
         vendor: {},
         layer: { 'Layer 2': 0, 'Layer 3': 0, Unknown: 0 }
       };
 
       for (const device of data) {
+        const province = String(device.site || '').trim() || 'Unknown';
+        counts.province[province] = (counts.province[province] || 0) + 1;
+
         const status = String(device.status || '').toLowerCase();
         if (status === 'ok') counts.status.ok += 1;
         if (status === 'fail') counts.status.fail += 1;
@@ -1127,16 +1273,55 @@ function nocDataPage() {
     },
 
     renderSummaryCharts() {
+      this.$nextTick(() => {
+        const raf = window.requestAnimationFrame || ((fn) => setTimeout(fn, 16));
+        const caf = window.cancelAnimationFrame || clearTimeout;
+        if (this.summaryRenderFrame) {
+          caf(this.summaryRenderFrame);
+        }
+        this.summaryRenderFrame = raf(() => {
+          this.summaryRenderFrame = null;
+          this.renderSummaryChartsNow();
+        });
+      });
+    },
+
+    renderSummaryChartsNow() {
       if (typeof Chart === 'undefined') return;
       const data = this.summaryDataset();
       if (!this.$refs.statusChart || !this.$refs.vendorChart || !this.$refs.layerChart) return;
       if (this.summaryScope === 'site' && !this.selectedSummarySite) {
-        this.destroySummaryCharts();
+        this.destroyChart('province');
         return;
       }
 
       const counts = this.summaryCounts();
       const vendorEntries = this.summaryVendorEntries(counts.vendor);
+      const provinceEntries = Object.entries(counts.province || {})
+        .sort((a, b) => {
+          if (b[1] !== a[1]) return b[1] - a[1];
+          return a[0].localeCompare(b[0]);
+        });
+
+      if (this.summaryScope === 'all' && this.$refs.provinceChart) {
+        this.renderChart('province', this.$refs.provinceChart, {
+          type: 'bar',
+          indexAxis: 'y',
+          data: {
+            labels: provinceEntries.map(item => item[0]),
+            datasets: [{
+              label: 'Devices',
+              data: provinceEntries.map(item => item[1]),
+              backgroundColor: '#f97316',
+              borderRadius: 8
+            }]
+          },
+          options: this.summaryBarOptions('Devices by province')
+        });
+      } else if (this.charts.province) {
+        this.destroyChart('province');
+      }
+
       this.renderChart('status', this.$refs.statusChart, {
         type: 'doughnut',
         data: {
@@ -1162,7 +1347,7 @@ function nocDataPage() {
             borderRadius: 10
           }]
         },
-        options: this.summaryBarOptions()
+        options: this.summaryBarOptions('Vendor distribution')
       });
 
       this.renderChart('layer', this.$refs.layerChart, {
@@ -1181,18 +1366,29 @@ function nocDataPage() {
 
     renderChart(key, canvas, config) {
       if (!canvas) return;
-      if (this.charts[key]) {
+      if (this.charts[key] && this.charts[key].config?.type !== config.type) {
         this.charts[key].destroy();
+        this.charts[key] = null;
+      }
+      if (this.charts[key]) {
+        this.charts[key].data = config.data;
+        this.charts[key].options = config.options;
+        this.charts[key].update('none');
+        return;
       }
       this.charts[key] = new Chart(canvas, config);
     },
 
     destroySummaryCharts() {
       for (const key of Object.keys(this.charts)) {
-        if (this.charts[key]) {
-          this.charts[key].destroy();
-          this.charts[key] = null;
-        }
+        this.destroyChart(key);
+      }
+    },
+
+    destroyChart(key) {
+      if (this.charts[key]) {
+        this.charts[key].destroy();
+        this.charts[key] = null;
       }
     },
 
@@ -1214,7 +1410,7 @@ function nocDataPage() {
       };
     },
 
-    summaryBarOptions() {
+    summaryBarOptions(title = 'Distribution') {
       return {
         responsive: true,
         maintainAspectRatio: false,
@@ -1222,7 +1418,7 @@ function nocDataPage() {
           legend: { display: false },
           title: {
             display: true,
-            text: 'Vendor distribution',
+            text: title,
             color: '#94a3b8',
             font: { size: 12, weight: '600' }
           }
