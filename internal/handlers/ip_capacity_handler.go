@@ -23,6 +23,8 @@ func NewIPCapacityHandler(repo repository.IPCapacityRepository) *IPCapacityHandl
 
 type ipCapacityNodeRequest struct {
 	Name               string `json:"name"`
+	Type               string `json:"type"`
+	Province           string `json:"province"`
 	InitialCapacityIQD int64  `json:"initial_capacity_iqd"`
 }
 
@@ -50,10 +52,20 @@ func (h *IPCapacityHandler) CreateNode(c *gin.Context) {
 	}
 	node := &models.IPCapacityNode{
 		Name:               strings.TrimSpace(req.Name),
+		Type:               strings.TrimSpace(req.Type),
+		Province:           strings.TrimSpace(req.Province),
 		InitialCapacityIQD: req.InitialCapacityIQD,
 	}
 	if node.Name == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name required"})
+		return
+	}
+	if node.Type == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "type required"})
+		return
+	}
+	if node.Province == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "province required"})
 		return
 	}
 	if node.InitialCapacityIQD < 0 {
@@ -80,10 +92,20 @@ func (h *IPCapacityHandler) UpdateNode(c *gin.Context) {
 	node := &models.IPCapacityNode{
 		ID:                 id,
 		Name:               strings.TrimSpace(req.Name),
+		Type:               strings.TrimSpace(req.Type),
+		Province:           strings.TrimSpace(req.Province),
 		InitialCapacityIQD: req.InitialCapacityIQD,
 	}
 	if node.Name == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name required"})
+		return
+	}
+	if node.Type == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "type required"})
+		return
+	}
+	if node.Province == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "province required"})
 		return
 	}
 	if node.InitialCapacityIQD < 0 {
@@ -100,6 +122,18 @@ func (h *IPCapacityHandler) UpdateNode(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"node": updated})
+}
+
+func (h *IPCapacityHandler) DeleteNode(c *gin.Context) {
+	id, ok := parseUintParam(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.repo.DeleteNode(id); err != nil {
+		c.JSON(statusForCapacityError(err), gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 func (h *IPCapacityHandler) ListActions(c *gin.Context) {

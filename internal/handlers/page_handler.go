@@ -28,6 +28,7 @@ func NewPageHandler(templateDir string, userRepo repository.UserRepository, jwtM
 		"admin-users":      filepath.Join(templateDir, "admin", "users.html"),
 		"workflows":        filepath.Join(templateDir, "ip", "workflows.html"),
 		"ip-backups":       filepath.Join(templateDir, "ip", "backups.html"),
+		"bng-sync-checker": filepath.Join(templateDir, "ip", "bng_sync_checker.html"),
 		"ip-cmd-output":    filepath.Join(templateDir, "ip", "cmd_output.html"),
 		"ip-activity-log":  filepath.Join(templateDir, "ip", "activity_log.html"),
 		"ip-syslog-alerts": filepath.Join(templateDir, "ip", "syslog_alerts.html"),
@@ -135,6 +136,11 @@ func (h *PageHandler) IPBackups(c *gin.Context) {
 		"BackupDescription":  "Configuration backups collected from BNG devices",
 		"BackupEmptyMessage": "Run a backup job from the Workflows page to see files here.",
 		"BackupTreeMode":     "standard",
+	})
+}
+func (h *PageHandler) BNGSyncChecker(c *gin.Context) {
+	h.render(c, "bng-sync-checker", gin.H{
+		"WorkflowAPIBase": "/api/workflows",
 	})
 }
 func (h *PageHandler) IPCmdOutput(c *gin.Context) {

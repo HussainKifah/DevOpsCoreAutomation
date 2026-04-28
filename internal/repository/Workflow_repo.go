@@ -37,6 +37,7 @@ type WorkflowRepository interface {
 	//Logs
 	WriteLog(entry *models.WorkflowLog) error
 	ListLogs(filter LogFilter) ([]models.WorkflowLog, int64, error)
+	ListLogsBetween(start, end time.Time) ([]models.WorkflowLog, error)
 	DeleteLogsOlderThan(cutoff time.Time) (int64, error)
 }
 
@@ -200,6 +201,15 @@ func (r *workflowRepository) ListLogs(f LogFilter) ([]models.WorkflowLog, int64,
 	err := q.Order("created_at desc").Offset((page - 1) * perPage).Limit(perPage).Find(&out).Error
 
 	return out, total, err
+}
+
+func (r *workflowRepository) ListLogsBetween(start, end time.Time) ([]models.WorkflowLog, error) {
+	var out []models.WorkflowLog
+	err := r.scoped(r.db).
+		Where("created_at >= ? AND created_at < ?", start, end).
+		Order("created_at asc").
+		Find(&out).Error
+	return out, err
 }
 
 func (r *workflowRepository) DeleteLogsOlderThan(cutoff time.Time) (int64, error) {

@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -12,6 +14,7 @@ import (
 	"github.com/Flafl/DevOpsCore/internal/crypto"
 	"github.com/Flafl/DevOpsCore/internal/models"
 	"github.com/Flafl/DevOpsCore/internal/repository"
+	"github.com/Flafl/DevOpsCore/internal/shell"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -26,6 +29,7 @@ const (
 	workflowTargetDevice      = "device"
 	workflowTargetAllNetworks = "all_networks"
 	workflowTargetNetworkType = "network_type"
+	workflowTargetDeviceType  = "device_type"
 	workflowTargetProvince    = "province"
 	workflowTargetVendor      = "vendor"
 	workflowTargetModel       = "model"
@@ -83,11 +87,12 @@ func (h *WorkflowHandler) ListDevices(c *gin.Context) {
 		Name         string `json:"name"`
 		Host         string `json:"host"`
 		Vendor       string `json:"vendor"`
+		NetworkType  string `json:"network_type,omitempty"`
+		Province     string `json:"province,omitempty"`
+		DeviceType   string `json:"device_type,omitempty"`
 		SourceVendor string `json:"source_vendor,omitempty"`
 		Site         string `json:"site,omitempty"`
 		Model        string `json:"model,omitempty"`
-		Province     string `json:"province,omitempty"`
-		NetworkType  string `json:"network_type,omitempty"`
 	}
 	out := make([]safeDevice, len(devices))
 	for i, d := range devices {
@@ -100,16 +105,21 @@ func (h *WorkflowHandler) ListDevices(c *gin.Context) {
 			site = strings.TrimSpace(match.Site)
 			model = strings.TrimSpace(match.DeviceModel)
 		}
+		networkType := firstNonEmpty(normalizeWorkflowNetworkType(d.NetworkType), "wifi")
+		if h.autoSyncNocData {
+			networkType = networkTypeFromSite(site)
+		}
 		out[i] = safeDevice{
 			ID:           d.ID,
 			Name:         d.Name,
 			Host:         d.Host,
 			Vendor:       d.Vendor,
+			Province:     firstNonEmpty(strings.TrimSpace(d.Province), provinceFromSite(site)),
+			DeviceType:   strings.TrimSpace(d.DeviceType),
 			SourceVendor: sourceVendor,
 			Site:         site,
 			Model:        model,
-			Province:     provinceFromSite(site),
-			NetworkType:  networkTypeFromSite(site),
+			NetworkType:  networkType,
 		}
 	}
 	c.JSON(http.StatusOK, out)
@@ -117,11 +127,14 @@ func (h *WorkflowHandler) ListDevices(c *gin.Context) {
 
 func (h *WorkflowHandler) CreateDevice(c *gin.Context) {
 	var req struct {
-		Name     string `json:"name"     binding:"required"`
-		Host     string `json:"host"     binding:"required"`
-		Vendor   string `json:"vendor"   binding:"required,oneof=nokia cisco mikrotik huawei"`
-		Username string `json:"username" binding:"required"`
-		Password string `json:"password" binding:"required"`
+		Name        string `json:"name"     binding:"required"`
+		Host        string `json:"host"     binding:"required"`
+		Vendor      string `json:"vendor"   binding:"required,oneof=nokia cisco mikrotik huawei"`
+		NetworkType string `json:"network_type"`
+		Province    string `json:"province"`
+		DeviceType  string `json:"device_type"`
+		Username    string `json:"username" binding:"required"`
+		Password    string `json:"password" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -143,6 +156,9 @@ func (h *WorkflowHandler) CreateDevice(c *gin.Context) {
 		Name:        req.Name,
 		Host:        req.Host,
 		Vendor:      req.Vendor,
+		NetworkType: defaultWorkflowNetworkType(req.NetworkType),
+		Province:    strings.TrimSpace(req.Province),
+		DeviceType:  strings.TrimSpace(req.DeviceType),
 		EncUsername: encUser,
 		EncPassword: encPass,
 		CreatedByID: callerID(c),
@@ -152,10 +168,13 @@ func (h *WorkflowHandler) CreateDevice(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{
-		"ID":     dev.ID,
-		"name":   dev.Name,
-		"host":   dev.Host,
-		"vendor": dev.Vendor,
+		"ID":           dev.ID,
+		"name":         dev.Name,
+		"host":         dev.Host,
+		"vendor":       dev.Vendor,
+		"network_type": dev.NetworkType,
+		"province":     dev.Province,
+		"device_type":  dev.DeviceType,
 	})
 }
 
@@ -172,11 +191,14 @@ func (h *WorkflowHandler) UpdateDevice(c *gin.Context) {
 	}
 
 	var req struct {
-		Name     string `json:"name"`
-		Host     string `json:"host"`
-		Vendor   string `json:"vendor"`
-		Username string `json:"username"`
-		Password string `json:"password"`
+		Name        string `json:"name"`
+		Host        string `json:"host"`
+		Vendor      string `json:"vendor"`
+		NetworkType string `json:"network_type"`
+		Province    string `json:"province"`
+		DeviceType  string `json:"device_type"`
+		Username    string `json:"username"`
+		Password    string `json:"password"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -197,6 +219,9 @@ func (h *WorkflowHandler) UpdateDevice(c *gin.Context) {
 		}
 		dev.Vendor = req.Vendor
 	}
+	dev.NetworkType = defaultWorkflowNetworkType(req.NetworkType)
+	dev.Province = strings.TrimSpace(req.Province)
+	dev.DeviceType = strings.TrimSpace(req.DeviceType)
 	// Only re-encrypt credentials if new values were provided.
 	if req.Username != "" {
 		enc, encErr := crypto.Encrypt(h.cryptoKey, req.Username)
@@ -364,6 +389,24 @@ func networkTypeFromSite(site string) string {
 	return "wifi"
 }
 
+func normalizeWorkflowNetworkType(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "ftth":
+		return "ftth"
+	case "wifi":
+		return "wifi"
+	default:
+		return ""
+	}
+}
+
+func defaultWorkflowNetworkType(value string) string {
+	if normalized := normalizeWorkflowNetworkType(value); normalized != "" {
+		return normalized
+	}
+	return "wifi"
+}
+
 func workflowVendorDisplayLabel(vendor string) string {
 	switch strings.ToLower(strings.TrimSpace(vendor)) {
 	case "cisco_nexus":
@@ -403,6 +446,11 @@ func (h *WorkflowHandler) defaultTargetLabel(targetType, targetValue string, dev
 			return "FTTH"
 		}
 		return "WiFi"
+	case workflowTargetDeviceType:
+		if strings.TrimSpace(targetValue) == "" {
+			return "Unknown Type"
+		}
+		return strings.TrimSpace(targetValue)
 	case workflowTargetProvince:
 		return provinceFromSite(targetValue)
 	case workflowTargetVendor:
@@ -431,6 +479,11 @@ func normalizeNocWorkflowGroupTarget(targetType, targetValue string) (string, st
 			return "", "", errors.New("invalid province")
 		}
 		return normalizedType, provinceFromSite(normalizedValue), nil
+	case workflowTargetDeviceType:
+		if normalizedValue == "" {
+			return "", "", errors.New("invalid device type")
+		}
+		return normalizedType, normalizedValue, nil
 	case workflowTargetVendor:
 		value := normalizeNocWorkflowSourceVendor(normalizedValue, "")
 		switch value {
@@ -530,18 +583,43 @@ func (h *WorkflowHandler) CreateJob(c *gin.Context) {
 			return
 		}
 	} else {
-		if req.DeviceID == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "device_id is required"})
+		switch targetType {
+		case "", workflowTargetDevice:
+			if req.DeviceID == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "device_id is required"})
+				return
+			}
+			var err error
+			device, err = h.repo.GetDevice(req.DeviceID)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "device not found"})
+				return
+			}
+			targetType = workflowTargetDevice
+			targetLabel = h.defaultTargetLabel(targetType, targetValue, device)
+		case workflowTargetAllNetworks:
+			targetValue = "all"
+			if targetLabel == "" {
+				targetLabel = "All Devices"
+			}
+		case workflowTargetNetworkType:
+			targetValue = defaultWorkflowNetworkType(targetValue)
+			if targetLabel == "" {
+				targetLabel = h.defaultTargetLabel(targetType, targetValue, nil)
+			}
+		case workflowTargetDeviceType, workflowTargetProvince, workflowTargetVendor:
+			targetValue = strings.TrimSpace(targetValue)
+			if targetValue == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "target_value is required"})
+				return
+			}
+			if targetLabel == "" {
+				targetLabel = h.defaultTargetLabel(targetType, targetValue, nil)
+			}
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid target_type"})
 			return
 		}
-		var err error
-		device, err = h.repo.GetDevice(req.DeviceID)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "device not found"})
-			return
-		}
-		targetType = workflowTargetDevice
-		targetLabel = h.defaultTargetLabel(targetType, targetValue, device)
 	}
 
 	var deviceID *uint
@@ -788,6 +866,26 @@ type BackupCompareResponse struct {
 	Unchanged   int                   `json:"unchanged"`
 }
 
+type BNGSyncBackupInfo struct {
+	RunID      uint    `json:"run_id"`
+	StartedAt  *string `json:"started_at,omitempty"`
+	DeviceID   uint    `json:"device_id"`
+	DeviceName string  `json:"device_name"`
+	Host       string  `json:"host"`
+	Vendor     string  `json:"vendor"`
+	OutputSize int     `json:"output_size"`
+	CreatedNow bool    `json:"created_now"`
+}
+
+type BNGSyncResponse struct {
+	InSync       bool                `json:"in_sync"`
+	Message      string              `json:"message"`
+	Left         BNGSyncBackupInfo   `json:"left"`
+	Right        BNGSyncBackupInfo   `json:"right"`
+	AddedLines   []BackupCompareLine `json:"added_lines"`
+	MissingLines []BackupCompareLine `json:"missing_lines"`
+}
+
 // CompareBackups compares latest successful backup output per device between two dates.
 func (h *WorkflowHandler) CompareBackups(c *gin.Context) {
 	baseRaw := strings.TrimSpace(c.Query("base"))
@@ -848,6 +946,208 @@ func (h *WorkflowHandler) CompareBackups(c *gin.Context) {
 	sort.Slice(resp.Added, func(i, j int) bool { return resp.Added[i].Host < resp.Added[j].Host })
 	sort.Slice(resp.Missing, func(i, j int) bool { return resp.Missing[i].Host < resp.Missing[j].Host })
 	c.JSON(http.StatusOK, resp)
+}
+
+func (h *WorkflowHandler) CheckBNGSync(c *gin.Context) {
+	var req struct {
+		LeftDeviceID  uint `json:"left_device_id" binding:"required"`
+		RightDeviceID uint `json:"right_device_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.LeftDeviceID == req.RightDeviceID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "select two different BNG devices"})
+		return
+	}
+
+	leftDevice, err := h.repo.GetDevice(req.LeftDeviceID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "left device not found"})
+		return
+	}
+	rightDevice, err := h.repo.GetDevice(req.RightDeviceID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "right device not found"})
+		return
+	}
+	if !isBNGWorkflowDevice(leftDevice) || !isBNGWorkflowDevice(rightDevice) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "BNG Sync Checker only supports devices with type BNG"})
+		return
+	}
+
+	leftRun, leftCreated, err := h.latestOrCreateDeviceBackup(leftDevice)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("%s backup failed: %v", leftDevice.Name, err)})
+		return
+	}
+	rightRun, rightCreated, err := h.latestOrCreateDeviceBackup(rightDevice)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("%s backup failed: %v", rightDevice.Name, err)})
+		return
+	}
+
+	added, missing := compareBackupLines(leftRun.Output, rightRun.Output)
+	inSync := len(added) == 0 && len(missing) == 0
+	message := "BNG devices have the same configuration."
+	if !inSync {
+		message = "BNG devices do not have the same configuration."
+	}
+
+	c.JSON(http.StatusOK, BNGSyncResponse{
+		InSync:       inSync,
+		Message:      message,
+		Left:         bngSyncBackupInfo(leftDevice, leftRun, leftCreated),
+		Right:        bngSyncBackupInfo(rightDevice, rightRun, rightCreated),
+		AddedLines:   added,
+		MissingLines: missing,
+	})
+}
+
+func (h *WorkflowHandler) latestOrCreateDeviceBackup(device *models.WorkflowDevice) (*models.WorkflowRun, bool, error) {
+	run, err := h.latestSuccessfulBackupForDevice(device)
+	if err != nil {
+		return nil, false, err
+	}
+	if run != nil {
+		return run, false, nil
+	}
+	run, err = h.runDeviceBackupNow(device)
+	return run, true, err
+}
+
+func isBNGWorkflowDevice(device *models.WorkflowDevice) bool {
+	return strings.EqualFold(strings.TrimSpace(device.DeviceType), "BNG")
+}
+
+func (h *WorkflowHandler) latestSuccessfulBackupForDevice(device *models.WorkflowDevice) (*models.WorkflowRun, error) {
+	hostKey := strings.ToLower(strings.TrimSpace(device.Host))
+	if hostKey == "" {
+		return nil, fmt.Errorf("device has no host")
+	}
+	jobs, err := h.repo.ListJobs()
+	if err != nil {
+		return nil, err
+	}
+	var latest *models.WorkflowRun
+	for i := range jobs {
+		j := jobs[i]
+		if j.JobType != "backup" {
+			continue
+		}
+		if j.DeviceID != nil && *j.DeviceID != device.ID {
+			continue
+		}
+		if j.DeviceID == nil {
+			targetHost := strings.ToLower(strings.TrimSpace(j.Device.Host))
+			if targetHost != "" && targetHost != hostKey {
+				continue
+			}
+		}
+		runs, err := h.repo.ListRunsForJob(j.ID, 500)
+		if err != nil {
+			continue
+		}
+		for idx := range runs {
+			r := runs[idx]
+			if r.Status != "ok" {
+				continue
+			}
+			runHost := strings.ToLower(strings.TrimSpace(firstNonEmpty(r.Host, j.Device.Host)))
+			if runHost != hostKey {
+				continue
+			}
+			if strings.TrimSpace(r.Host) == "" {
+				r.Host = device.Host
+			}
+			if strings.TrimSpace(r.DeviceName) == "" {
+				r.DeviceName = device.Name
+			}
+			if strings.TrimSpace(r.Vendor) == "" {
+				r.Vendor = device.Vendor
+			}
+			if latest == nil || r.StartedAt.After(latest.StartedAt) {
+				runCopy := r
+				latest = &runCopy
+			}
+		}
+	}
+	return latest, nil
+}
+
+func (h *WorkflowHandler) runDeviceBackupNow(device *models.WorkflowDevice) (*models.WorkflowRun, error) {
+	cmd, err := shell.IPBackupCommand(device.Vendor)
+	if err != nil {
+		return nil, err
+	}
+	user, err := crypto.Decrypt(h.cryptoKey, device.EncUsername)
+	if err != nil {
+		return nil, fmt.Errorf("credential decrypt failed: %w", err)
+	}
+	pass, err := crypto.Decrypt(h.cryptoKey, device.EncPassword)
+	if err != nil {
+		return nil, fmt.Errorf("credential decrypt failed: %w", err)
+	}
+
+	deviceID := device.ID
+	job := &models.WorkflowJob{
+		DeviceID:    &deviceID,
+		TargetType:  workflowTargetDevice,
+		TargetValue: device.Host,
+		TargetLabel: firstNonEmpty(device.Name, device.Host),
+		JobType:     "backup",
+		Schedule:    "once",
+		Enabled:     false,
+		LastStatus:  "pending",
+	}
+	if err := h.repo.CreateJob(job); err != nil {
+		return nil, err
+	}
+
+	startedAt := time.Now()
+	run := &models.WorkflowRun{
+		JobID:      job.ID,
+		DeviceName: device.Name,
+		Host:       device.Host,
+		Vendor:     device.Vendor,
+		StartedAt:  startedAt,
+		Status:     "pending",
+	}
+	if err := h.repo.CreateRun(run); err != nil {
+		return nil, err
+	}
+
+	output, _, execErr := shell.NocDataSendCommandUsingMethodContext(context.Background(), device.Host, user, pass, device.Vendor, "", cmd)
+	finishedAt := time.Now()
+	if execErr != nil {
+		errMsg := execErr.Error()
+		_ = h.repo.FinishRun(run.ID, "error", output, errMsg, finishedAt)
+		_ = h.repo.UpdateJobStatus(job.ID, "error", errMsg, finishedAt)
+		return nil, execErr
+	}
+	if err := h.repo.FinishRun(run.ID, "ok", output, "", finishedAt); err != nil {
+		return nil, err
+	}
+	_ = h.repo.UpdateJobStatus(job.ID, "ok", fmt.Sprintf("completed on demand for BNG sync checker - %d bytes collected", len(output)), finishedAt)
+	run.Status = "ok"
+	run.Output = output
+	run.FinishedAt = &finishedAt
+	return run, nil
+}
+
+func bngSyncBackupInfo(device *models.WorkflowDevice, run *models.WorkflowRun, createdNow bool) BNGSyncBackupInfo {
+	started := run.StartedAt.UTC().Format("2006-01-02T15:04:05Z")
+	return BNGSyncBackupInfo{
+		RunID:      run.ID,
+		StartedAt:  &started,
+		DeviceID:   device.ID,
+		DeviceName: firstNonEmpty(run.DeviceName, device.Name, device.Host),
+		Host:       firstNonEmpty(run.Host, device.Host),
+		Vendor:     firstNonEmpty(run.Vendor, device.Vendor),
+		OutputSize: len(run.Output),
+		CreatedNow: createdNow,
+	}
 }
 
 func (h *WorkflowHandler) latestBackupRunsByHost(day time.Time) (map[string]*models.WorkflowRun, error) {

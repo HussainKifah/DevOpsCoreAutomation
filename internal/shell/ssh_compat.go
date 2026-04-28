@@ -2,8 +2,10 @@ package shell
 
 import (
 	"net"
+	"os"
 	"slices"
 	"strings"
+	"sync"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -67,4 +69,27 @@ func init() {
 	s := ssh.SupportedAlgorithms()
 	i := ssh.InsecureAlgorithms()
 	wideSSHHostKeys = dedupeStrs(append(slices.Clone(s.HostKeys), i.HostKeys...))
+}
+
+var weakRSAHostKeyMu sync.Mutex
+
+func withWeakRSAHostKeySupport(fn func() error) error {
+	weakRSAHostKeyMu.Lock()
+	defer weakRSAHostKeyMu.Unlock()
+
+	old, hadOld := os.LookupEnv("GODEBUG")
+	if old == "" {
+		_ = os.Setenv("GODEBUG", "rsa1024min=0")
+	} else {
+		_ = os.Setenv("GODEBUG", old+",rsa1024min=0")
+	}
+	defer func() {
+		if hadOld {
+			_ = os.Setenv("GODEBUG", old)
+			return
+		}
+		_ = os.Unsetenv("GODEBUG")
+	}()
+
+	return fn()
 }

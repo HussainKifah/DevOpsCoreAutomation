@@ -4,7 +4,10 @@
     <div>
       <h1 class="text-2xl font-bold text-[#f1f5f9]">Capacities Update</h1>
     </div>
-    <button type="button" @click="openNodeModal()" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-semibold btn-press">Add Node</button>
+    <div class="flex items-center gap-2">
+      <button type="button" @click="openNodeModal()" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-semibold btn-press">Add Capacity</button>
+      <button type="button" @click="openActionModal()" class="px-4 py-2 rounded-lg bg-[#334155] hover:bg-[#475569] text-white text-sm font-semibold btn-press">Add Action</button>
+    </div>
   </div>
 
   <div class="flex gap-1 p-1 rounded-xl bg-[#1a2236] border border-[rgba(255,255,255,0.08)] w-fit mb-6">
@@ -17,8 +20,17 @@
 
   <div x-show="tab === 'review'" x-cloak class="space-y-4">
     <div class="flex items-center gap-3 flex-wrap">
+      <div class="flex items-center gap-2 flex-wrap">
+        <select x-model.number="selectedNodeDeleteId" class="min-w-[240px] rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9] focus:outline-none focus:border-red-500/50">
+          <option value="0">Select row to delete</option>
+          <template x-for="node in nodes" :key="'delete-node-' + node.id">
+            <option :value="node.id" x-text="nodeLabel(node)"></option>
+          </template>
+        </select>
+        <button type="button" @click="deleteSelectedNode()" :disabled="!selectedNodeDeleteId" class="px-3 py-2 rounded-lg border border-red-500/30 bg-red-500/10 text-sm font-semibold text-red-300 hover:bg-red-500/20 disabled:opacity-40 disabled:cursor-not-allowed">Delete Row</button>
+      </div>
       <div class="relative flex-1 min-w-[240px] max-w-md">
-        <input x-model.debounce.350ms="search" @input="loadNodes()" type="search" placeholder="Search node or capacity" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:border-teal-500/50">
+        <input x-model.debounce.350ms="search" @input="loadNodes()" type="search" placeholder="Search province, node, type, or capacity" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:border-teal-500/50">
       </div>
       <button type="button" @click="refreshAll()" class="px-3 py-2 rounded-lg border border-[rgba(255,255,255,0.08)] text-sm text-[#94a3b8] hover:text-[#f1f5f9] hover:border-teal-500/40">Refresh</button>
     </div>
@@ -27,44 +39,29 @@
       <table class="min-w-full divide-y divide-[rgba(255,255,255,0.08)]">
         <thead class="bg-[#1a2236]">
           <tr class="text-left text-xs uppercase tracking-wide text-[#94a3b8]">
-            <th class="px-4 py-3 font-semibold">Node</th>
-            <th class="px-4 py-3 font-semibold">Total Capacity Now</th>
-            <th class="px-4 py-3 font-semibold">Latest Action</th>
-            <th class="px-4 py-3 font-semibold text-right">Action</th>
+            <th class="px-4 py-3 font-semibold">Province</th>
+            <th class="px-4 py-3 font-semibold">Name</th>
+            <th class="px-4 py-3 font-semibold">Type</th>
+            <th class="px-4 py-3 font-semibold">Before Update</th>
+            <th class="px-4 py-3 font-semibold">After Update</th>
+            <th class="px-4 py-3 font-semibold">Difference</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-[rgba(255,255,255,0.06)]">
           <template x-if="loadingNodes">
-            <tr><td colspan="4" class="px-4 py-10 text-center text-sm text-[#64748b]">Loading...</td></tr>
+            <tr><td colspan="6" class="px-4 py-10 text-center text-sm text-[#64748b]">Loading...</td></tr>
           </template>
-          <template x-if="!loadingNodes && nodes.length === 0">
-            <tr><td colspan="4" class="px-4 py-10 text-center text-sm text-[#64748b]">No capacity nodes found.</td></tr>
+          <template x-if="!loadingNodes && reviewRows().length === 0">
+            <tr><td colspan="6" class="px-4 py-10 text-center text-sm text-[#64748b]">No capacity updates found.</td></tr>
           </template>
-          <template x-for="node in nodes" :key="node.id">
+          <template x-for="action in reviewRows()" :key="'review-action-' + action.id">
             <tr class="hover:bg-white/[0.03]">
-              <td class="px-4 py-3">
-                <div class="font-semibold text-[#f1f5f9]" x-text="node.name"></div>
-                <button type="button" @click="openNodeModal(node)" class="mt-1 text-xs text-teal-400 hover:underline">Edit node</button>
-              </td>
-              <td class="px-4 py-3 font-mono text-sm text-[#f1f5f9]" x-text="money(node.current_capacity_iqd)"></td>
-              <td class="px-4 py-3">
-                <template x-if="node.latest_action">
-                  <div class="flex flex-col gap-1">
-                    <span class="w-fit text-xs font-semibold px-2 py-0.5 rounded-full" :class="typeClass(node.latest_action.type)" x-text="node.latest_action.type"></span>
-                    <span class="text-xs text-[#94a3b8]">
-                      <span x-text="money(node.latest_action.amount_iqd)"></span>
-                      <span class="text-[#475569]"> at </span>
-                      <span x-text="fmtDateTime(node.latest_action.action_at)"></span>
-                    </span>
-                  </div>
-                </template>
-                <template x-if="!node.latest_action">
-                  <span class="text-sm text-[#64748b]">No actions yet</span>
-                </template>
-              </td>
-              <td class="px-4 py-3 text-right">
-                <button type="button" @click="openActionModal(node)" class="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold">Add Action</button>
-              </td>
+              <td class="px-4 py-3 text-sm text-[#f1f5f9]" x-text="action.node_province"></td>
+              <td class="px-4 py-3 text-sm font-semibold text-[#f1f5f9]" x-text="action.node_name"></td>
+              <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="action.node_type"></td>
+              <td class="px-4 py-3 font-mono text-sm text-[#94a3b8]" x-text="capacity(action.capacity_before_iqd)"></td>
+              <td class="px-4 py-3 font-mono text-sm text-[#f1f5f9]" x-text="capacity(action.capacity_after_iqd)"></td>
+              <td class="px-4 py-3 font-mono text-sm" :class="action.type === 'upgrade' ? 'text-emerald-300' : 'text-red-300'" x-text="signedCapacity(action)"></td>
             </tr>
           </template>
         </tbody>
@@ -80,9 +77,11 @@
       <table class="min-w-full divide-y divide-[rgba(255,255,255,0.08)]">
         <thead class="bg-[#1a2236]">
           <tr class="text-left text-xs uppercase tracking-wide text-[#94a3b8]">
+            <th class="px-4 py-3 font-semibold">Province</th>
+            <th class="px-4 py-3 font-semibold">Name</th>
+            <th class="px-4 py-3 font-semibold">Node Type</th>
             <th class="px-4 py-3 font-semibold">Time</th>
-            <th class="px-4 py-3 font-semibold">Node</th>
-            <th class="px-4 py-3 font-semibold">Type</th>
+            <th class="px-4 py-3 font-semibold">Action</th>
             <th class="px-4 py-3 font-semibold">Amount</th>
             <th class="px-4 py-3 font-semibold">Before</th>
             <th class="px-4 py-3 font-semibold">After</th>
@@ -91,19 +90,21 @@
         </thead>
         <tbody class="divide-y divide-[rgba(255,255,255,0.06)]">
           <template x-if="loadingActions">
-            <tr><td colspan="7" class="px-4 py-10 text-center text-sm text-[#64748b]">Loading...</td></tr>
+            <tr><td colspan="9" class="px-4 py-10 text-center text-sm text-[#64748b]">Loading...</td></tr>
           </template>
           <template x-if="!loadingActions && actions.length === 0">
-            <tr><td colspan="7" class="px-4 py-10 text-center text-sm text-[#64748b]">No capacity actions yet.</td></tr>
+            <tr><td colspan="9" class="px-4 py-10 text-center text-sm text-[#64748b]">No capacity actions yet.</td></tr>
           </template>
           <template x-for="action in actions" :key="action.id">
             <tr class="hover:bg-white/[0.03]">
-              <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="fmtDateTime(action.action_at)"></td>
+              <td class="px-4 py-3 text-sm text-[#f1f5f9]" x-text="action.node_province"></td>
               <td class="px-4 py-3 text-sm font-semibold text-[#f1f5f9]" x-text="action.node_name"></td>
+              <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="action.node_type"></td>
+              <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="fmtDateTime(action.action_at)"></td>
               <td class="px-4 py-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full" :class="typeClass(action.type)" x-text="action.type"></span></td>
-              <td class="px-4 py-3 font-mono text-sm" :class="action.type === 'upgrade' ? 'text-emerald-300' : 'text-red-300'" x-text="signedMoney(action)"></td>
-              <td class="px-4 py-3 font-mono text-sm text-[#94a3b8]" x-text="money(action.capacity_before_iqd)"></td>
-              <td class="px-4 py-3 font-mono text-sm text-[#f1f5f9]" x-text="money(action.capacity_after_iqd)"></td>
+              <td class="px-4 py-3 font-mono text-sm" :class="action.type === 'upgrade' ? 'text-emerald-300' : 'text-red-300'" x-text="signedCapacity(action)"></td>
+              <td class="px-4 py-3 font-mono text-sm text-[#94a3b8]" x-text="capacity(action.capacity_before_iqd)"></td>
+              <td class="px-4 py-3 font-mono text-sm text-[#f1f5f9]" x-text="capacity(action.capacity_after_iqd)"></td>
               <td class="px-4 py-3 text-right">
                 <button type="button" @click="openActionModal(null, action)" class="text-xs text-teal-400 hover:underline">Edit</button>
                 <button type="button" @click="deleteAction(action)" class="ml-3 text-xs text-red-400 hover:underline">Delete</button>
@@ -137,7 +138,8 @@
         <h2 class="text-lg font-semibold text-[#f1f5f9]" x-text="selectedDay ? ('History for ' + selectedDay) : 'History'"></h2>
         <div class="flex items-center gap-2 flex-wrap">
           <input type="date" x-model="selectedDay" @change="loadDayHistory()" class="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9]">
-          <button type="button" @click="exportHistoryExcel()" :disabled="!dayHistory.summaries.length && !dayHistory.actions.length" class="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold">Export Excel</button>
+          <button type="button" @click="exportHistoryExcel()" :disabled="!historyRows().length" class="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold">Export Excel</button>
+          <button type="button" @click="loadHistoryDays()" class="px-3 py-2 rounded-lg border border-[rgba(255,255,255,0.08)] text-sm text-[#94a3b8] hover:text-[#f1f5f9] hover:border-teal-500/40">Refresh</button>
         </div>
       </div>
 
@@ -145,54 +147,29 @@
         <table class="min-w-full divide-y divide-[rgba(255,255,255,0.08)]">
           <thead class="bg-[#1a2236]">
             <tr class="text-left text-xs uppercase tracking-wide text-[#94a3b8]">
-              <th class="px-4 py-3 font-semibold">Node</th>
-              <th class="px-4 py-3 font-semibold">Before Update</th>
-              <th class="px-4 py-3 font-semibold">After Update</th>
-              <th class="px-4 py-3 font-semibold">Difference</th>
+              <th class="px-4 py-3 font-semibold">Province</th>
+              <th class="px-4 py-3 font-semibold">Name</th>
+              <th class="px-4 py-3 font-semibold">Type</th>
+              <th class="px-4 py-3 font-semibold">Capacity Now</th>
+              <th class="px-4 py-3 font-semibold">Action</th>
               <th class="px-4 py-3 font-semibold">Latest Time</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-[rgba(255,255,255,0.06)]">
-            <template x-if="!dayHistory.summaries.length">
-              <tr><td colspan="5" class="px-4 py-8 text-center text-sm text-[#64748b]">No summary for this day.</td></tr>
+            <template x-if="loadingHistory">
+              <tr><td colspan="6" class="px-4 py-8 text-center text-sm text-[#64748b]">Loading...</td></tr>
             </template>
-            <template x-for="row in dayHistory.summaries" :key="row.node_id">
+            <template x-if="!loadingHistory && historyRows().length === 0">
+              <tr><td colspan="6" class="px-4 py-8 text-center text-sm text-[#64748b]">No capacity actions for this date.</td></tr>
+            </template>
+            <template x-for="row in historyRows()" :key="'history-node-' + row.node_id">
               <tr>
+                <td class="px-4 py-3 text-sm text-[#f1f5f9]" x-text="row.node_province"></td>
                 <td class="px-4 py-3 text-sm font-semibold text-[#f1f5f9]" x-text="row.node_name"></td>
-                <td class="px-4 py-3 font-mono text-sm text-[#94a3b8]" x-text="money(row.opening_capacity_iqd)"></td>
-                <td class="px-4 py-3 font-mono text-sm text-[#f1f5f9]" x-text="money(row.closing_capacity_iqd)"></td>
-                <td class="px-4 py-3 font-mono text-sm" :class="row.difference_iqd >= 0 ? 'text-emerald-300' : 'text-red-300'" x-text="moneyWithSign(row.difference_iqd)"></td>
+                <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="row.node_type"></td>
+                <td class="px-4 py-3 font-mono text-sm text-[#f1f5f9]" x-text="capacity(row.closing_capacity_iqd)"></td>
+                <td class="px-4 py-3 font-mono text-sm" :class="Number(row.difference_iqd || 0) >= 0 ? 'text-emerald-300' : 'text-red-300'" x-text="capacityWithSign(row.difference_iqd)"></td>
                 <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="fmtDateTime(row.latest_action_at)"></td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="overflow-x-auto rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827]">
-        <table class="min-w-full divide-y divide-[rgba(255,255,255,0.08)]">
-          <thead class="bg-[#1a2236]">
-            <tr class="text-left text-xs uppercase tracking-wide text-[#94a3b8]">
-              <th class="px-4 py-3 font-semibold">Time</th>
-              <th class="px-4 py-3 font-semibold">Node</th>
-              <th class="px-4 py-3 font-semibold">Type</th>
-              <th class="px-4 py-3 font-semibold">Amount</th>
-              <th class="px-4 py-3 font-semibold">Before</th>
-              <th class="px-4 py-3 font-semibold">After</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-[rgba(255,255,255,0.06)]">
-            <template x-if="!dayHistory.actions.length">
-              <tr><td colspan="6" class="px-4 py-8 text-center text-sm text-[#64748b]">No actions for this day.</td></tr>
-            </template>
-            <template x-for="action in dayHistory.actions" :key="action.id">
-              <tr>
-                <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="fmtDateTime(action.action_at)"></td>
-                <td class="px-4 py-3 text-sm font-semibold text-[#f1f5f9]" x-text="action.node_name"></td>
-                <td class="px-4 py-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full" :class="typeClass(action.type)" x-text="action.type"></span></td>
-                <td class="px-4 py-3 font-mono text-sm" :class="action.type === 'upgrade' ? 'text-emerald-300' : 'text-red-300'" x-text="signedMoney(action)"></td>
-                <td class="px-4 py-3 font-mono text-sm text-[#94a3b8]" x-text="money(action.capacity_before_iqd)"></td>
-                <td class="px-4 py-3 font-mono text-sm text-[#f1f5f9]" x-text="money(action.capacity_after_iqd)"></td>
               </tr>
             </template>
           </tbody>
@@ -206,11 +183,19 @@
       <h3 class="text-lg font-semibold text-[#f1f5f9] mb-4" x-text="nodeForm.id ? 'Edit Node' : 'Add Node'"></h3>
       <div class="space-y-3">
         <div>
-          <label class="block text-xs text-[#94a3b8] mb-1">Node</label>
+          <label class="block text-xs text-[#94a3b8] mb-1">Province</label>
+          <input x-model="nodeForm.province" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+        </div>
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">Name</label>
           <input x-model="nodeForm.name" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
         </div>
         <div>
-          <label class="block text-xs text-[#94a3b8] mb-1">Initial Capacity IQD</label>
+          <label class="block text-xs text-[#94a3b8] mb-1">Type</label>
+          <input x-model="nodeForm.type" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+        </div>
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">Initial Capacity Gb/s</label>
           <input type="number" min="0" step="1" x-model.number="nodeForm.initial_capacity_iqd" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
         </div>
         <p class="text-xs text-red-400" x-show="formError" x-text="formError"></p>
@@ -231,7 +216,7 @@
           <select x-model.number="actionForm.node_id" :disabled="!!actionForm.id" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9] disabled:opacity-60">
             <option value="0">Select node</option>
             <template x-for="node in nodes" :key="node.id">
-              <option :value="node.id" x-text="node.name"></option>
+              <option :value="node.id" x-text="nodeLabel(node)"></option>
             </template>
           </select>
         </div>
@@ -244,7 +229,7 @@
             </select>
           </div>
           <div>
-            <label class="block text-xs text-[#94a3b8] mb-1">Amount IQD</label>
+            <label class="block text-xs text-[#94a3b8] mb-1">Amount Gb/s</label>
             <input type="number" min="1" step="1" x-model.number="actionForm.amount_iqd" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
           </div>
         </div>
@@ -277,9 +262,11 @@ function ipCapacitiesPage() {
     formError: '',
     loadingNodes: false,
     loadingActions: false,
+    loadingHistory: false,
     nodeModal: false,
     actionModal: false,
-    nodeForm: { id: 0, name: '', initial_capacity_iqd: 0 },
+    selectedNodeDeleteId: 0,
+    nodeForm: { id: 0, province: '', name: '', type: '', initial_capacity_iqd: 0 },
     actionForm: { id: 0, node_id: 0, type: 'upgrade', amount_iqd: 0, action_at: '' },
 
     async init() {
@@ -287,6 +274,7 @@ function ipCapacitiesPage() {
     },
     setTab(next) {
       this.tab = next;
+      if (next === 'review') this.loadActions();
       if (next === 'actions') this.loadActions();
       if (next === 'history') this.loadHistoryDays();
     },
@@ -306,6 +294,9 @@ function ipCapacitiesPage() {
         const params = this.search ? ('?search=' + encodeURIComponent(this.search)) : '';
         const data = await this.api('/nodes' + params);
         this.nodes = data.nodes || [];
+        if (this.selectedNodeDeleteId && !this.nodes.some(node => Number(node.id) === Number(this.selectedNodeDeleteId))) {
+          this.selectedNodeDeleteId = 0;
+        }
       } catch (e) {
         this.error = e.message;
       } finally {
@@ -327,8 +318,11 @@ function ipCapacitiesPage() {
       try {
         const data = await this.api('/history/days');
         this.historyDays = data.days || [];
+        if (this.selectedDay && !this.historyDays.includes(this.selectedDay)) this.selectedDay = '';
         if (!this.selectedDay && this.historyDays.length) this.selectedDay = this.historyDays[0];
+        if (!this.selectedDay) this.selectedDay = this.todayDate();
         if (this.selectedDay) await this.loadDayHistory();
+        else this.dayHistory = { summaries: [], actions: [] };
       } catch (e) {
         this.error = e.message;
       }
@@ -338,30 +332,42 @@ function ipCapacitiesPage() {
       await this.loadDayHistory();
     },
     async loadDayHistory() {
-      if (!this.selectedDay) return;
+      if (!this.selectedDay) {
+        this.dayHistory = { summaries: [], actions: [] };
+        return;
+      }
+      this.loadingHistory = true;
       try {
         const data = await this.api('/history/day?date=' + encodeURIComponent(this.selectedDay));
         this.dayHistory = data.history || { summaries: [], actions: [] };
       } catch (e) {
         this.error = e.message;
+      } finally {
+        this.loadingHistory = false;
       }
     },
     openNodeModal(node) {
       this.formError = '';
       this.nodeForm = node ? {
         id: node.id,
+        province: node.province || '',
         name: node.name,
+        type: node.type || '',
         initial_capacity_iqd: node.initial_capacity_iqd
-      } : { id: 0, name: '', initial_capacity_iqd: 0 };
+      } : { id: 0, province: '', name: '', type: '', initial_capacity_iqd: 0 };
       this.nodeModal = true;
     },
     async saveNode() {
       this.formError = '';
       const payload = {
+        province: (this.nodeForm.province || '').trim(),
         name: (this.nodeForm.name || '').trim(),
+        type: (this.nodeForm.type || '').trim(),
         initial_capacity_iqd: Number(this.nodeForm.initial_capacity_iqd || 0)
       };
+      if (!payload.province) { this.formError = 'Province is required'; return; }
       if (!payload.name) { this.formError = 'Node is required'; return; }
+      if (!payload.type) { this.formError = 'Type is required'; return; }
       if (payload.initial_capacity_iqd < 0) { this.formError = 'Initial capacity cannot be negative'; return; }
       try {
         const path = this.nodeForm.id ? '/nodes/' + this.nodeForm.id : '/nodes';
@@ -373,8 +379,24 @@ function ipCapacitiesPage() {
         this.formError = e.message;
       }
     },
-    openActionModal(node, action) {
+    async deleteSelectedNode() {
+      const node = this.nodes.find(item => Number(item.id) === Number(this.selectedNodeDeleteId));
+      if (!node) return;
+      if (!confirm('Delete ' + this.nodeLabel(node) + ' and all capacity actions for this row?')) return;
+      try {
+        await this.api('/nodes/' + node.id, { method: 'DELETE' });
+        this.selectedNodeDeleteId = 0;
+        await this.refreshAll();
+      } catch (e) {
+        this.error = e.message;
+      }
+    },
+    async openActionModal(node, action) {
       this.formError = '';
+      if (!node && !action && this.search) {
+        this.search = '';
+        await this.loadNodes();
+      }
       if (action) {
         this.actionForm = {
           id: action.id,
@@ -411,7 +433,6 @@ function ipCapacitiesPage() {
         await this.api(path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         this.actionModal = false;
         await this.refreshAll();
-        if (this.selectedDay) await this.loadDayHistory();
       } catch (e) {
         this.formError = e.message;
       }
@@ -421,7 +442,6 @@ function ipCapacitiesPage() {
       try {
         await this.api('/actions/' + action.id, { method: 'DELETE' });
         await this.refreshAll();
-        if (this.selectedDay) await this.loadDayHistory();
       } catch (e) {
         this.error = e.message;
       }
@@ -431,49 +451,79 @@ function ipCapacitiesPage() {
         ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/25'
         : 'bg-red-500/20 text-red-300 border border-red-500/25';
     },
-    money(value) {
-      return new Intl.NumberFormat('en-US').format(Number(value || 0)) + ' IQD';
+    nodeLabel(node) {
+      return [node.province, node.name, node.type].filter(Boolean).join(' / ');
     },
-    moneyWithSign(value) {
+    reviewRows() {
+      const q = String(this.search || '').trim().toLowerCase();
+      const rows = (Array.isArray(this.nodes) ? this.nodes : [])
+        .filter((node) => node.latest_action)
+        .map((node) => ({
+          id: node.latest_action.id,
+          node_id: node.id,
+          node_province: node.province,
+          node_name: node.name,
+          node_type: node.type,
+          type: node.latest_action.type,
+          amount_iqd: node.latest_action.amount_iqd,
+          capacity_before_iqd: node.latest_action.capacity_before_iqd,
+          capacity_after_iqd: node.latest_action.capacity_after_iqd,
+          action_at: node.latest_action.action_at
+        }));
+      if (!q) return rows;
+      return rows.filter((action) => [
+        action.node_province,
+        action.node_name,
+        action.node_type,
+        action.type,
+        action.amount_iqd,
+        action.capacity_before_iqd,
+        action.capacity_after_iqd,
+        action.action_at
+      ].some((value) => String(value || '').toLowerCase().includes(q)));
+    },
+    historyRows() {
+      return Array.isArray(this.dayHistory.summaries) ? this.dayHistory.summaries : [];
+    },
+    todayDate() {
+      const d = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    },
+    capacity(value) {
+      return new Intl.NumberFormat('en-US').format(Number(value || 0)) + ' Gb/s';
+    },
+    capacityWithSign(value) {
       const n = Number(value || 0);
-      return (n >= 0 ? '+' : '-') + this.money(Math.abs(n));
+      return (n >= 0 ? '+' : '-') + this.capacity(Math.abs(n));
     },
-    signedMoney(action) {
+    signedCapacity(action) {
       const sign = action.type === 'upgrade' ? '+' : '-';
-      return sign + this.money(action.amount_iqd);
+      return sign + this.capacity(action.amount_iqd);
     },
     exportHistoryExcel() {
       if (typeof XLSX === 'undefined') {
         this.error = 'Excel export library is not loaded';
         return;
       }
-      const summaryRows = (this.dayHistory.summaries || []).map((row) => ({
-        Node: row.node_name,
-        'Before Update': Number(row.opening_capacity_iqd || 0),
-        'After Update': Number(row.closing_capacity_iqd || 0),
-        Difference: Number(row.difference_iqd || 0),
+      const rows = this.historyRows().map((row) => ({
+        Province: row.node_province || '',
+        Name: row.node_name || '',
+        Type: row.node_type || '',
+        'Capacity Now Gb/s': Number(row.closing_capacity_iqd || 0),
+        'Action Gb/s': Number(row.difference_iqd || 0),
         'Latest Time': this.fmtDateTime(row.latest_action_at)
       }));
-      const actionRows = (this.dayHistory.actions || []).map((action) => ({
-        Time: this.fmtDateTime(action.action_at),
-        Node: action.node_name,
-        Type: action.type,
-        Amount: Number(action.amount_iqd || 0),
-        Difference: action.type === 'upgrade' ? Number(action.amount_iqd || 0) : -Number(action.amount_iqd || 0),
-        Before: Number(action.capacity_before_iqd || 0),
-        After: Number(action.capacity_after_iqd || 0)
-      }));
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), 'Nodes Summary');
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(actionRows), 'Transactions');
-      XLSX.writeFile(wb, 'ip-capacities-' + (this.selectedDay || 'history') + '.xlsx');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length ? rows : [{}]), 'History');
+      XLSX.writeFile(wb, 'ip-capacities-history-' + (this.selectedDay || 'latest') + '.xlsx');
     },
     adjustedDate(value) {
       if (!value) return null;
       return new Date(new Date(value).getTime() + this.timeOffsetMs);
     },
     fmtDateTime(value) {
-      if (!value) return '-';
+      if (!value || String(value).startsWith('0001-01-01')) return '-';
       const d = this.adjustedDate(value);
       return d ? d.toLocaleString() : '-';
     },

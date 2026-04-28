@@ -13,7 +13,9 @@ type IPCapacityNode struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
-	Name               string `gorm:"size:200;not null;uniqueIndex" json:"name"`
+	Name               string `gorm:"size:200;not null;uniqueIndex:idx_ip_capacity_nodes_identity" json:"name"`
+	Type               string `gorm:"size:80;not null;default:'';index;uniqueIndex:idx_ip_capacity_nodes_identity" json:"type"`
+	Province           string `gorm:"size:120;not null;default:'';index;uniqueIndex:idx_ip_capacity_nodes_identity" json:"province"`
 	InitialCapacityIQD int64  `gorm:"not null;default:0" json:"initial_capacity_iqd"`
 	CurrentCapacityIQD int64  `gorm:"not null;default:0" json:"current_capacity_iqd"`
 }

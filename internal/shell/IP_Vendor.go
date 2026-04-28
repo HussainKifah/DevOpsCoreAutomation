@@ -98,7 +98,14 @@ func mikrotikSSH(host, user, pass string, timeout time.Duration, cmds ...string)
 		return "", fmt.Errorf("tcp dial: %w", err)
 	}
 
-	sshConn, chans, reqs, err := ssh.NewClientConn(conn, addr, cfg)
+	var sshConn ssh.Conn
+	var chans <-chan ssh.NewChannel
+	var reqs <-chan *ssh.Request
+	err = withWeakRSAHostKeySupport(func() error {
+		var handshakeErr error
+		sshConn, chans, reqs, handshakeErr = ssh.NewClientConn(conn, addr, cfg)
+		return handshakeErr
+	})
 	if err != nil {
 		conn.Close()
 		log.Printf("[ip-ssh] %s (mikrotik): ✘ SSH handshake failed: %v", host, err)
@@ -232,7 +239,14 @@ func MikrotikNocPassSSHContext(ctx context.Context, host, user, pass string, cmd
 	}
 	handshakeCh := make(chan handshakeResult, 1)
 	go func() {
-		sshConn, chans, reqs, err := ssh.NewClientConn(conn, addr, cfg)
+		var sshConn ssh.Conn
+		var chans <-chan ssh.NewChannel
+		var reqs <-chan *ssh.Request
+		err := withWeakRSAHostKeySupport(func() error {
+			var handshakeErr error
+			sshConn, chans, reqs, handshakeErr = ssh.NewClientConn(conn, addr, cfg)
+			return handshakeErr
+		})
 		handshakeCh <- handshakeResult{conn: sshConn, chans: chans, reqs: reqs, err: err}
 	}()
 
@@ -366,7 +380,14 @@ func huaweiWorkflowSSH(host, user, pass string, cmds ...string) (string, error) 
 	log.Printf("[hw-bng] %s: ✔ TCP connected", host)
 
 	log.Printf("[hw-bng] %s: SSH handshake starting...", host)
-	sshConn, chans, reqs, err := ssh.NewClientConn(tcpConn, addr, cfg)
+	var sshConn ssh.Conn
+	var chans <-chan ssh.NewChannel
+	var reqs <-chan *ssh.Request
+	err = withWeakRSAHostKeySupport(func() error {
+		var handshakeErr error
+		sshConn, chans, reqs, handshakeErr = ssh.NewClientConn(tcpConn, addr, cfg)
+		return handshakeErr
+	})
 	if err != nil {
 		tcpConn.Close()
 		log.Printf("[hw-bng] %s: ✘ SSH handshake FAILED: %v", host, err)

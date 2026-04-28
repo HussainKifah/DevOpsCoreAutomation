@@ -1,0 +1,208 @@
+{{define "content"}}
+<div x-data="bngSyncChecker()" x-init="init()" class="space-y-6">
+  <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-[#f1f5f9]">BNG Sync Checker</h1>
+      <p class="text-sm text-[#94a3b8] mt-1">Compare the latest IP backup from two registered BNG devices.</p>
+    </div>
+    <button type="button" @click="checkSync()" :disabled="loading || checking || !leftDeviceID || !rightDeviceID || leftDeviceID === rightDeviceID"
+      class="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-500 px-5 py-3 text-sm font-semibold text-[#06211c] transition-colors hover:bg-teal-400 disabled:cursor-not-allowed disabled:bg-[#1a2236] disabled:text-[#64748b]">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M21.015 4.356v4.992m0 0h-4.992m4.992 0-3.181-3.183a8.25 8.25 0 0 0-13.803 3.7"/></svg>
+      <span x-text="checking ? 'Checking...' : 'Check Sync'"></span>
+    </button>
+  </div>
+
+  <template x-if="error">
+    <div class="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200" x-text="error"></div>
+  </template>
+
+  <div class="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-5 lg:p-6">
+    <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(140px,220px)_minmax(0,1fr)] gap-5 items-center">
+      <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0f172a] p-4">
+        <label class="block text-xs font-semibold uppercase text-[#64748b] mb-2">Left BNG</label>
+        <select x-model="leftDeviceID" class="w-full rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-4 py-3 text-sm text-[#e2e8f0] focus:outline-none focus:ring-2 focus:ring-teal-400/40">
+          <option value="">Select BNG</option>
+          <template x-for="device in devices" :key="'left-' + device.ID">
+            <option :value="String(device.ID)" x-text="deviceLabel(device)"></option>
+          </template>
+        </select>
+        <div class="mt-5 flex items-center gap-4">
+          <div class="grid h-16 w-16 place-items-center rounded-2xl border border-teal-400/25 bg-teal-400/10 text-teal-300">
+            <svg class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="1.4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 6.75h13.5v10.5H5.25zM8.25 9.75h7.5m-7.5 3h7.5M8.25 15.75h3"/></svg>
+          </div>
+          <div class="min-w-0">
+            <p class="truncate text-sm font-semibold text-[#f8fafc]" x-text="selectedDeviceName(leftDeviceID)"></p>
+            <p class="truncate text-xs font-mono text-[#94a3b8]" x-text="selectedDeviceHost(leftDeviceID)"></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex lg:flex-col items-center justify-center gap-3">
+        <div class="h-2 w-full lg:h-24 lg:w-2 rounded-full transition-colors"
+          :class="result ? (result.in_sync ? 'bg-emerald-400 shadow-[0_0_22px_rgba(52,211,153,0.45)]' : 'bg-red-500 shadow-[0_0_22px_rgba(239,68,68,0.45)]') : 'bg-[#334155]'"></div>
+        <div class="rounded-full border px-3 py-1 text-xs font-semibold"
+          :class="result ? (result.in_sync ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300' : 'border-red-500/40 bg-red-500/10 text-red-200') : 'border-[rgba(255,255,255,0.08)] bg-[#1a2236] text-[#94a3b8]'"
+          x-text="result ? (result.in_sync ? 'SYNCED' : 'DIFF') : 'READY'"></div>
+      </div>
+
+      <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0f172a] p-4">
+        <label class="block text-xs font-semibold uppercase text-[#64748b] mb-2">Right BNG</label>
+        <select x-model="rightDeviceID" class="w-full rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-4 py-3 text-sm text-[#e2e8f0] focus:outline-none focus:ring-2 focus:ring-teal-400/40">
+          <option value="">Select BNG</option>
+          <template x-for="device in devices" :key="'right-' + device.ID">
+            <option :value="String(device.ID)" x-text="deviceLabel(device)"></option>
+          </template>
+        </select>
+        <div class="mt-5 flex items-center gap-4">
+          <div class="grid h-16 w-16 place-items-center rounded-2xl border border-sky-400/25 bg-sky-400/10 text-sky-300">
+            <svg class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="1.4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 6.75h13.5v10.5H5.25zM8.25 9.75h7.5m-7.5 3h7.5M8.25 15.75h3"/></svg>
+          </div>
+          <div class="min-w-0">
+            <p class="truncate text-sm font-semibold text-[#f8fafc]" x-text="selectedDeviceName(rightDeviceID)"></p>
+            <p class="truncate text-xs font-mono text-[#94a3b8]" x-text="selectedDeviceHost(rightDeviceID)"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <template x-if="result">
+    <div class="space-y-5">
+      <div class="rounded-2xl border p-5"
+        :class="result.in_sync ? 'border-emerald-400/30 bg-emerald-400/10' : 'border-red-500/30 bg-red-500/10'">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div>
+            <p class="text-lg font-semibold" :class="result.in_sync ? 'text-emerald-200' : 'text-red-100'" x-text="result.message"></p>
+            <p class="mt-1 text-sm text-[#cbd5e1]" x-text="backupSummary()"></p>
+          </div>
+          <div class="grid grid-cols-2 gap-3 text-center">
+            <div class="rounded-xl bg-[#0f172a]/80 px-4 py-3">
+              <p class="text-2xl font-bold text-emerald-300" x-text="lineCount(result.added_lines)"></p>
+              <p class="text-[11px] uppercase text-[#94a3b8]">Added</p>
+            </div>
+            <div class="rounded-xl bg-[#0f172a]/80 px-4 py-3">
+              <p class="text-2xl font-bold text-red-300" x-text="lineCount(result.missing_lines)"></p>
+              <p class="text-[11px] uppercase text-[#94a3b8]">Missing</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div x-show="!result.in_sync" class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div class="rounded-2xl border border-emerald-400/20 bg-[#111827] p-5">
+          <h2 class="text-sm font-semibold text-emerald-300">Lines added on right BNG</h2>
+          <pre class="mt-4 max-h-[28rem] overflow-auto whitespace-pre-wrap rounded-xl bg-[#0a0e1a] p-4 text-xs leading-6 text-[#d1fae5]" x-text="formatLines(result.added_lines, 'No added lines.')"></pre>
+        </div>
+        <div class="rounded-2xl border border-red-500/20 bg-[#111827] p-5">
+          <h2 class="text-sm font-semibold text-red-300">Lines missing from right BNG</h2>
+          <pre class="mt-4 max-h-[28rem] overflow-auto whitespace-pre-wrap rounded-xl bg-[#0a0e1a] p-4 text-xs leading-6 text-[#fee2e2]" x-text="formatLines(result.missing_lines, 'No missing lines.')"></pre>
+        </div>
+      </div>
+    </div>
+  </template>
+</div>
+
+<script>
+const bngSyncApiBase = '{{.WorkflowAPIBase}}';
+function bngSyncChecker() {
+  return {
+    loading: true,
+    checking: false,
+    devices: [],
+    leftDeviceID: '',
+    rightDeviceID: '',
+    result: null,
+    error: '',
+
+    async init() {
+      try {
+        const res = await fetch(bngSyncApiBase + '/devices');
+        const data = await res.json();
+        this.devices = Array.isArray(data) ? data.filter(device => this.isBNGDevice(device)) : [];
+      } catch (e) {
+        this.error = 'Failed to load BNG devices.';
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    async checkSync() {
+      this.error = '';
+      this.result = null;
+      if (!this.leftDeviceID || !this.rightDeviceID || this.leftDeviceID === this.rightDeviceID) return;
+      this.checking = true;
+      try {
+        const res = await fetch(bngSyncApiBase + '/bng-sync-checker', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            left_device_id: Number(this.leftDeviceID),
+            right_device_id: Number(this.rightDeviceID)
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'BNG sync check failed');
+        this.result = data;
+      } catch (e) {
+        this.error = e.message || 'BNG sync check failed';
+      } finally {
+        this.checking = false;
+      }
+    },
+
+    deviceByID(id) {
+      const numericID = Number(id);
+      return (this.devices || []).find(device => Number(device.ID) === numericID) || null;
+    },
+
+    isBNGDevice(device) {
+      return String(device?.device_type || '').trim().toLowerCase() === 'bng';
+    },
+
+    deviceLabel(device) {
+      const name = String(device?.name || device?.host || 'BNG').trim();
+      const host = String(device?.host || '').trim();
+      const vendor = this.displayVendor(device?.vendor || '');
+      return host ? name + ' - ' + host + ' - ' + vendor : name + ' - ' + vendor;
+    },
+
+    selectedDeviceName(id) {
+      const device = this.deviceByID(id);
+      return device ? String(device.name || device.host || 'Selected BNG') : 'No BNG selected';
+    },
+
+    selectedDeviceHost(id) {
+      const device = this.deviceByID(id);
+      return device ? String(device.host || '-') : '-';
+    },
+
+    displayVendor(vendor) {
+      const raw = String(vendor || '').trim().toLowerCase();
+      if (raw === 'mikrotik') return 'Microtik';
+      if (raw === 'cisco_nexus') return 'Cisco Nexus';
+      if (raw === 'cisco_ios') return 'Cisco';
+      if (!raw) return 'Unknown';
+      return raw.split('_').map(part => part ? part.charAt(0).toUpperCase() + part.slice(1) : '').join(' ');
+    },
+
+    lineCount(lines) {
+      return (lines || []).reduce((total, line) => total + (line.count || 1), 0);
+    },
+
+    formatLines(lines, emptyText) {
+      if (!Array.isArray(lines) || lines.length === 0) return emptyText;
+      return lines.map(line => (line.count > 1 ? '[' + line.count + 'x] ' : '') + line.text).join('\n');
+    },
+
+    backupSummary() {
+      if (!this.result) return '';
+      const left = this.result.left || {};
+      const right = this.result.right || {};
+      const leftMode = left.created_now ? 'new backup' : 'latest backup';
+      const rightMode = right.created_now ? 'new backup' : 'latest backup';
+      return left.device_name + ' used ' + leftMode + ' and ' + right.device_name + ' used ' + rightMode + '.';
+    }
+  };
+}
+</script>
+{{end}}

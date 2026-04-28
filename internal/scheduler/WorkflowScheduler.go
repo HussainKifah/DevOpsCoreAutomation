@@ -281,15 +281,29 @@ func (ws *WorkflowScheduler) runJobForDevice(job *models.WorkflowJob, device *mo
 		return execErr
 	}
 
-	_ = ws.repo.FinishRun(run.ID, "ok", output, "", finishedAt)
-
 	successMsg := fmt.Sprintf("Completed in %dms — %d bytes collected", durationMs, len(output))
 	if job.JobType == "backup" {
 		savedPath := ws.saveBackupFile(device, output, startedAt)
 		successMsg = fmt.Sprintf("Backup completed in %dms — %d bytes — saved to %s",
 			durationMs, len(output), savedPath)
+		if saveCmd, ok := ciscoSaveConfigCommand(device.Vendor); ok {
+			log.Printf("[workflow:%s] job %d: saving running config on %s with %q", ws.scope, job.ID, device.Host, saveCmd)
+			_, _, saveErr := shell.NocDataSendCommandUsingMethodContext(context.Background(), device.Host, user, pass, device.Vendor, method, saveCmd)
+			finishedAt = time.Now()
+			durationMs = finishedAt.Sub(startedAt).Milliseconds()
+			if saveErr != nil {
+				errMsg := "backup collected, but save config failed: " + saveErr.Error()
+				_ = ws.repo.FinishRun(run.ID, "error", output, errMsg, finishedAt)
+				ws.writeJobLog(&jobView, &run.ID, "error", "job_failed",
+					fmt.Sprintf("Backup saved to %s, but Cisco save config failed after %dms: %s", savedPath, durationMs, saveErr.Error()), durationMs)
+				return saveErr
+			}
+			successMsg = fmt.Sprintf("Backup completed in %dms — %d bytes — saved to %s — startup config saved",
+				durationMs, len(output), savedPath)
+		}
 	}
 
+	_ = ws.repo.FinishRun(run.ID, "ok", output, "", finishedAt)
 	ws.writeJobLog(&jobView, &run.ID, "success", "job_success", successMsg, durationMs)
 	log.Printf("[workflow:%s] job %d: OK in %dms (%d bytes) via %s", ws.scope, job.ID, durationMs, len(output), method)
 	if len(output) > 0 {
@@ -300,6 +314,15 @@ func (ws *WorkflowScheduler) runJobForDevice(job *models.WorkflowJob, device *mo
 		log.Printf("[workflow:%s] job %d: output preview:\n%s", ws.scope, job.ID, preview)
 	}
 	return nil
+}
+
+func ciscoSaveConfigCommand(vendor string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(vendor)) {
+	case "cisco", "cisco_ios", "cisco_nexus", "nexus":
+		return "write memory", true
+	default:
+		return "", false
+	}
 }
 
 func (ws *WorkflowScheduler) resolveTargetDevices(job *models.WorkflowJob) ([]models.WorkflowDevice, string, error) {
@@ -333,7 +356,17 @@ func (ws *WorkflowScheduler) resolveTargetDevices(job *models.WorkflowJob) ([]mo
 	}
 
 	if ws.nocDataRepo == nil {
-		return nil, targetLabel, fmt.Errorf("group targets are not available for this workflow scope")
+		allDevices, err := ws.repo.ListDevices()
+		if err != nil {
+			return nil, targetLabel, err
+		}
+		devices := make([]models.WorkflowDevice, 0)
+		for i := range allDevices {
+			if ws.workflowDeviceTargetMatches(job, &allDevices[i]) {
+				devices = append(devices, allDevices[i])
+			}
+		}
+		return devices, targetLabel, nil
 	}
 
 	rows, err := ws.nocDataRepo.ListAll()
@@ -364,6 +397,25 @@ func (ws *WorkflowScheduler) resolveTargetDevices(job *models.WorkflowJob) ([]mo
 	}
 
 	return devices, targetLabel, nil
+}
+
+func (ws *WorkflowScheduler) workflowDeviceTargetMatches(job *models.WorkflowJob, device *models.WorkflowDevice) bool {
+	targetType := strings.ToLower(strings.TrimSpace(job.TargetType))
+	targetValue := strings.TrimSpace(job.TargetValue)
+	switch targetType {
+	case "all_networks":
+		return true
+	case "network_type":
+		return strings.EqualFold(strings.TrimSpace(device.NetworkType), targetValue)
+	case "device_type":
+		return strings.EqualFold(strings.TrimSpace(device.DeviceType), targetValue)
+	case "province":
+		return strings.EqualFold(strings.TrimSpace(device.Province), targetValue)
+	case "vendor":
+		return strings.EqualFold(strings.TrimSpace(device.Vendor), targetValue)
+	default:
+		return false
+	}
 }
 
 func (ws *WorkflowScheduler) nocTargetMatches(job *models.WorkflowJob, row *models.NocDataDevice) bool {

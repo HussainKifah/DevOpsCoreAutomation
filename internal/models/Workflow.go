@@ -11,9 +11,12 @@ type WorkflowDevice struct {
 	Scope       string `gorm:"not null;default:ip;size:20;index" json:"scope"`
 	Name        string `gorm:"not null;size:100" json:"name"`
 	Host        string `gorm:"not null;size:64" json:"host"`
-	Vendor      string `gorm:"not null;size:20" json:"vendor"` // nokia | cisco | mikrotik
-	EncUsername []byte `gorm:"not null" json:"-"`              // AES-GCM ciphertext
-	EncPassword []byte `gorm:"not null" json:"-"`              // AES-GCM ciphertext
+	Vendor      string `gorm:"not null;size:20" json:"vendor"`                          // nokia | cisco | mikrotik
+	NetworkType string `gorm:"size:20;not null;default:wifi;index" json:"network_type"` // ftth | wifi
+	Province    string `gorm:"size:120;not null;default:'';index" json:"province"`
+	DeviceType  string `gorm:"size:80;not null;default:'';index" json:"device_type"`
+	EncUsername []byte `gorm:"not null" json:"-"` // AES-GCM ciphertext
+	EncPassword []byte `gorm:"not null" json:"-"` // AES-GCM ciphertext
 	CreatedByID uint   `gorm:"index" json:"created_by_id"`
 }
 

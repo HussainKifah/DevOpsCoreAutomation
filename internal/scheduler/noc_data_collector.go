@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"net/netip"
 	"slices"
 	"strings"
 	"sync"
@@ -459,8 +460,9 @@ func (c *NocDataCollector) removeDuplicateDevices(currentID uint, snapshot nocda
 		return nil
 	}
 
-	keepID := matches[0].ID
-	for _, item := range matches[1:] {
+	keep := selectNocDataDuplicateKeep(matches)
+	keepID := keep.ID
+	for _, item := range matches {
 		if item.ID == keepID {
 			continue
 		}
@@ -491,6 +493,42 @@ func (c *NocDataCollector) removeDuplicateDevices(currentID uint, snapshot nocda
 		)
 	}
 	return nil
+}
+
+func selectNocDataDuplicateKeep(matches []models.NocDataDevice) models.NocDataDevice {
+	if len(matches) == 0 {
+		return models.NocDataDevice{}
+	}
+	keep := matches[0]
+	for _, item := range matches[1:] {
+		if shouldKeepNocDataDuplicate(item, keep) {
+			keep = item
+		}
+	}
+	return keep
+}
+
+func shouldKeepNocDataDuplicate(candidate, current models.NocDataDevice) bool {
+	candidateIP, candidateOK := parseNocDataIPv4(candidate.Host)
+	currentIP, currentOK := parseNocDataIPv4(current.Host)
+	if candidateOK && currentOK {
+		if cmp := candidateIP.Compare(currentIP); cmp != 0 {
+			return cmp > 0
+		}
+		return candidate.ID < current.ID
+	}
+	if candidateOK != currentOK {
+		return candidateOK
+	}
+	return candidate.ID < current.ID
+}
+
+func parseNocDataIPv4(host string) (netip.Addr, bool) {
+	addr, err := netip.ParseAddr(strings.TrimSpace(host))
+	if err != nil || !addr.Is4() {
+		return netip.Addr{}, false
+	}
+	return addr, true
 }
 
 func (c *NocDataCollector) runCommandOnce(host, user, pass, shellVendor, appVendor, preferredMethod, cmd string) (string, string, error) {

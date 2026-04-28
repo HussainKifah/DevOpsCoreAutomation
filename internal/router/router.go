@@ -164,6 +164,7 @@ func Setup(
 	{
 		ipPages.GET("/workflows", pageH.Workflows)
 		ipPages.GET("/ip-backups", pageH.IPBackups)
+		ipPages.GET("/bng-sync-checker", pageH.BNGSyncChecker)
 		ipPages.GET("/ip-cmd-output", pageH.IPCmdOutput)
 		ipPages.GET("/ip-activity-log", pageH.IPActivityLog)
 		ipPages.GET("/ip-syslog-alerts", pageH.IPSyslogAlerts)
@@ -269,6 +270,7 @@ func Setup(
 
 		wfAPI.GET("/runs", workflowH.GetRunsByType)
 		wfAPI.GET("/backups/compare", workflowH.CompareBackups)
+		wfAPI.POST("/bng-sync-checker", workflowH.CheckBNGSync)
 		wfAPI.GET("/runs/:id/output", workflowH.GetRunOutput)
 
 		wfAPI.GET("/logs", workflowH.GetLogs)
@@ -291,6 +293,7 @@ func Setup(
 		capacityAPI.GET("/nodes", ipCapacityH.ListNodes)
 		capacityAPI.POST("/nodes", ipCapacityH.CreateNode)
 		capacityAPI.PUT("/nodes/:id", ipCapacityH.UpdateNode)
+		capacityAPI.DELETE("/nodes/:id", ipCapacityH.DeleteNode)
 		capacityAPI.GET("/actions", ipCapacityH.ListActions)
 		capacityAPI.POST("/actions", ipCapacityH.CreateAction)
 		capacityAPI.PUT("/actions/:id", ipCapacityH.UpdateAction)

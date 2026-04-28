@@ -69,6 +69,11 @@ type Config struct {
 	SlackTicketDisplayOffset      time.Duration
 	SlackTicketSourceBotID        string
 
+	SlackActivityLogEnabled       bool
+	SlackActivityLogChannelID     string
+	SlackActivityLogDailyTime     string
+	SlackActivityLogDisplayOffset time.Duration
+
 	RuijieMailEnabled           bool
 	RuijieMailTenantID          string
 	RuijieMailClientID          string
@@ -150,6 +155,11 @@ func Load() *Config {
 		SlackTicketDisplayOffset:      parseDurationWithFallback(getEnv("SLACK_TICKET_DISPLAY_OFFSET", "3h"), 3*time.Hour),
 		SlackTicketSourceBotID:        strings.TrimSpace(getEnv("SLACK_TICKET_SOURCE_BOT_ID", "")),
 
+		SlackActivityLogEnabled:       getEnv("SLACK_ACTIVITY_LOG_ENABLED", "true") == "1" || getEnv("SLACK_ACTIVITY_LOG_ENABLED", "true") == "true",
+		SlackActivityLogChannelID:     strings.TrimSpace(getEnv("SLACK_ACTIVITY_LOG_CHANNEL_ID", "C0B063ARXPX")),
+		SlackActivityLogDailyTime:     normalizeClockTime(getEnv("SLACK_ACTIVITY_LOG_DAILY_TIME", "09:00"), "09:00"),
+		SlackActivityLogDisplayOffset: parseDurationWithFallback(getEnv("SLACK_ACTIVITY_LOG_DISPLAY_OFFSET", "3h"), 3*time.Hour),
+
 		RuijieMailEnabled:           getEnv("RUIJIE_MAIL_ENABLED", "") == "1" || getEnv("RUIJIE_MAIL_ENABLED", "") == "true",
 		RuijieMailTenantID:          strings.TrimSpace(getEnv("RUIJIE_MAIL_TENANT_ID", "")),
 		RuijieMailClientID:          strings.TrimSpace(getEnv("RUIJIE_MAIL_CLIENT_ID", "")),
@@ -209,6 +219,14 @@ func (c *Config) SlackTicketReminderConfigured() bool {
 		c.SlackTicketChannelID != ""
 }
 
+func (c *Config) SlackActivityLogConfigured() bool {
+	return c != nil &&
+		c.SlackActivityLogEnabled &&
+		c.SlackBotToken != "" &&
+		c.SlackActivityLogChannelID != "" &&
+		c.SlackActivityLogDailyTime != ""
+}
+
 func (c *Config) RuijieMailConfigured() bool {
 	return c != nil &&
 		c.RuijieMailEnabled &&
@@ -218,6 +236,20 @@ func (c *Config) RuijieMailConfigured() bool {
 		c.RuijieMailUserID != "" &&
 		c.SlackBotToken != "" &&
 		c.RuijieSlackChannelID != ""
+}
+
+func normalizeClockTime(value, fallback string) string {
+	raw := strings.TrimSpace(value)
+	if raw == "" {
+		return fallback
+	}
+	if _, err := time.Parse("15:04", raw); err == nil {
+		return raw
+	}
+	if _, err := time.Parse("15", raw); err == nil {
+		return raw + ":00"
+	}
+	return fallback
 }
 
 func parseDurationWithFallback(s string, fallback time.Duration) time.Duration {

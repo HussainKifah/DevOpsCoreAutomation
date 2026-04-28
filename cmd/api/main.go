@@ -118,6 +118,7 @@ func main() {
 	var slackBatcher *syslog.SlackSyslogBatcher
 	var slackReminder *syslog.SlackReminderWorker
 	var slackTicketWorker *slackreminders.Worker
+	var slackActivityLogWorker *scheduler.ActivityLogSlackWorker
 	var ruijieMailPoller *ruijie.MailPoller
 	var ruijieReminder *ruijie.ReminderWorker
 	var slackEventsH *handlers.SlackEventsHandler
@@ -142,6 +143,13 @@ func main() {
 		slackTicketWorker = slackreminders.NewWorker(cfg, slackTicketRepo, slackAPI)
 		slackTicketWorker.Start()
 		log.Printf("[slack-ticket-reminders] enabled channel=%s every=%s", cfg.SlackTicketChannelID, cfg.SlackTicketReminderInterval)
+	}
+	if cfg.SlackActivityLogConfigured() {
+		if slackAPI == nil {
+			slackAPI = slack.New(cfg.SlackBotToken)
+		}
+		slackActivityLogWorker = scheduler.NewActivityLogSlackWorker(cfg, workflowRepo, slackAPI)
+		slackActivityLogWorker.Start()
 	}
 	if cfg.RuijieMailConfigured() {
 		if slackAPI == nil {
@@ -200,6 +208,9 @@ func main() {
 	}
 	if slackTicketWorker != nil {
 		slackTicketWorker.Stop()
+	}
+	if slackActivityLogWorker != nil {
+		slackActivityLogWorker.Stop()
 	}
 	if ruijieMailPoller != nil {
 		ruijieMailPoller.Stop()

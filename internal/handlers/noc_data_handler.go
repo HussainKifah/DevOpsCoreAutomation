@@ -480,10 +480,16 @@ func (h *NocDataHandler) DeleteDevice(c *gin.Context) {
 }
 
 func (h *NocDataHandler) RunAll(c *gin.Context) {
-	if h.runner != nil {
-		go h.runner.RunAllNow()
+	if h.runner == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "collector runner is unavailable"})
+		return
 	}
-	c.JSON(http.StatusAccepted, gin.H{"ok": true})
+	go h.runner.RunAllNow()
+	c.JSON(http.StatusAccepted, gin.H{
+		"ok":      true,
+		"queued":  true,
+		"message": "Full NOC Data run started. Failed devices will be retried one by one after the full run completes.",
+	})
 }
 
 func (h *NocDataHandler) RetryRange(c *gin.Context) {

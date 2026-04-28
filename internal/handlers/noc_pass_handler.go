@@ -659,13 +659,20 @@ func (h *NocPassHandler) CreateSavedUser(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	failures := make([]string, 0)
+	targetRows := make([]models.NocDataDevice, 0)
 	for i := range rows {
 		if !nocpass.SavedUserMatchesRow(item, &rows[i]) {
 			continue
 		}
-		if err := nocpass.ApplySavedUserToDevice(h.repo, h.nocDataRepo, h.key, &rows[i], item); err != nil {
-			failures = append(failures, rows[i].Host+": "+err.Error())
+		targetRows = append(targetRows, rows[i])
+	}
+	failures := make([]string, 0)
+	for i := range targetRows {
+		if err := nocpass.ApplySavedUserToDevice(h.repo, h.nocDataRepo, h.key, &targetRows[i], item); err != nil {
+			failures = append(failures, targetRows[i].Host+": "+err.Error())
+		}
+		if i < len(targetRows)-1 {
+			time.Sleep(nocpass.DeviceApplyGap)
 		}
 	}
 	dto := h.savedUserDTO(item, rows)
@@ -697,13 +704,20 @@ func (h *NocPassHandler) DeleteSavedUser(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	failures := make([]string, 0)
+	targetRows := make([]models.NocDataDevice, 0)
 	for i := range rows {
 		if !nocpass.SavedUserMatchesRow(item, &rows[i]) {
 			continue
 		}
-		if err := nocpass.DeleteSavedUserFromDevice(h.repo, h.nocDataRepo, h.key, &rows[i], item); err != nil {
-			failures = append(failures, rows[i].Host+": "+err.Error())
+		targetRows = append(targetRows, rows[i])
+	}
+	failures := make([]string, 0)
+	for i := range targetRows {
+		if err := nocpass.DeleteSavedUserFromDevice(h.repo, h.nocDataRepo, h.key, &targetRows[i], item); err != nil {
+			failures = append(failures, targetRows[i].Host+": "+err.Error())
+		}
+		if i < len(targetRows)-1 {
+			time.Sleep(nocpass.DeviceApplyGap)
 		}
 	}
 	if len(failures) > 0 {

@@ -28,6 +28,7 @@ func (m *mockIPCapacityRepo) GetNode(uint) (*models.IPCapacityNode, error) {
 	return &models.IPCapacityNode{}, nil
 }
 func (m *mockIPCapacityRepo) UpdateNode(*models.IPCapacityNode) error { return nil }
+func (m *mockIPCapacityRepo) DeleteNode(uint) error                   { return nil }
 func (m *mockIPCapacityRepo) ListActions() ([]repository.IPCapacityActionWithNode, error) {
 	return nil, nil
 }

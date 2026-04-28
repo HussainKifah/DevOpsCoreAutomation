@@ -294,7 +294,7 @@ func (h *SlackEventsHandler) setSyslogIncidentSnoozed(ch, parentTS, userID strin
 		}
 		_, _, _ = h.api.PostMessage(ch,
 			slack.MsgOptionTS(parentTS),
-			slack.MsgOptionText(":hourglass_flowing_sand: Syslog reminders and repeated thread replies are paused for this alarm fingerprint until this reaction is removed.", false),
+			slack.MsgOptionText(":hourglass_flowing_sand: Syslog reminders are paused for this alarm fingerprint until this reaction is removed. Repeated alarm thread replies will continue.", false),
 		)
 		return
 	}
@@ -306,7 +306,7 @@ func (h *SlackEventsHandler) setSyslogIncidentSnoozed(ch, parentTS, userID strin
 	}
 	_, _, _ = h.api.PostMessage(ch,
 		slack.MsgOptionTS(parentTS),
-		slack.MsgOptionText(":white_check_mark: Syslog fingerprint pause removed. Reminders and repeated thread replies are active again.", false),
+		slack.MsgOptionText(":white_check_mark: Syslog fingerprint reminder pause removed. Reminders are active again.", false),
 	)
 }
 

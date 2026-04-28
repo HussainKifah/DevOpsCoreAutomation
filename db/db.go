@@ -126,6 +126,12 @@ func Connect(cfg *config.Config) *gorm.DB {
 	if err := db.Exec("ALTER TABLE ruijie_slack_incidents ADD COLUMN IF NOT EXISTS snoozed_by varchar(256)").Error; err != nil {
 		log.Printf("ruijie_slack_incidents add snoozed_by warning: %v", err)
 	}
+	if err := db.Exec("DROP INDEX IF EXISTS idx_ip_capacity_nodes_name").Error; err != nil {
+		log.Printf("ip_capacity_nodes drop old name-only unique index warning: %v", err)
+	}
+	if err := db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_ip_capacity_nodes_identity ON ip_capacity_nodes (province, name, type)").Error; err != nil {
+		log.Printf("ip_capacity_nodes identity index warning: %v", err)
+	}
 
 	go func() {
 		indexes := []string{

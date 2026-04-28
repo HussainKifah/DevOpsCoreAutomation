@@ -15,7 +15,10 @@ import (
 	"gorm.io/gorm"
 )
 
-const RotateInterval = 24 * time.Hour
+const (
+	RotateInterval = 24 * time.Hour
+	DeviceApplyGap = 500 * time.Millisecond
+)
 
 type RunSummary struct {
 	PolicyID      uint
@@ -252,9 +255,12 @@ func RunPolicy(repo repository.NocPassRepository, nocDataRepo repository.NocData
 		if err := ApplyToNocDataDevice(repo, nocDataRepo, masterKey, &row, passwords); err != nil {
 			summary.FailureCount++
 			summary.Failures = append(summary.Failures, fmt.Sprintf("%s (%s): %v", DeviceLabel(&row), row.Host, err))
-			continue
+		} else {
+			summary.SuccessCount++
 		}
-		summary.SuccessCount++
+		if i < len(targetRows)-1 {
+			time.Sleep(DeviceApplyGap)
+		}
 	}
 
 	policy.LastRunAt = &now

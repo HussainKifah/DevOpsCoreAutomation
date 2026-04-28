@@ -189,7 +189,12 @@ func HwOpenSession(host, user, pass string) (*HwSession, error) {
 		addr = net.JoinHostPort(host, "22")
 	}
 	log.Printf("[%s] SSH connecting...", host)
-	client, err := ssh.Dial("tcp", addr, cfg)
+	var client *ssh.Client
+	err := withWeakRSAHostKeySupport(func() error {
+		var dialErr error
+		client, dialErr = ssh.Dial("tcp", addr, cfg)
+		return dialErr
+	})
 	if err != nil {
 		return nil, fmt.Errorf("ssh dial: %w", err)
 	}
@@ -328,7 +333,12 @@ func HwSendCommandOLT(host, user, pass string, cmds ...string) (string, error) {
 		addr = net.JoinHostPort(host, "22")
 	}
 	log.Printf("[%s] SSH connecting (one-shot)...", host)
-	client, err := ssh.Dial("tcp", addr, cfg)
+	var client *ssh.Client
+	err := withWeakRSAHostKeySupport(func() error {
+		var dialErr error
+		client, dialErr = ssh.Dial("tcp", addr, cfg)
+		return dialErr
+	})
 	if err != nil {
 		return "", fmt.Errorf("ssh dial: %w", err)
 	}

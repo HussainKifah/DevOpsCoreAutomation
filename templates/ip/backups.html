@@ -36,142 +36,129 @@
       </template>
 
       <template x-if="runs.length > 0 && !isNocMode">
-        <div>
-          <!-- Breadcrumb nav -->
-          <div class="flex items-center gap-2 mb-5 text-sm flex-wrap">
-            <button @click="drillVendor = ''; drillDate = ''; drillDevice = ''"
-              :class="!drillVendor ? 'text-[#f1f5f9] font-semibold' : 'text-[#3b82f6] hover:underline'"
-              class="flex items-center gap-1.5">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"/></svg>
-              Backups
-            </button>
-            <template x-if="drillVendor">
-              <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-[#475569]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
-                <button @click="drillDate = ''; drillDevice = ''"
-                  :class="!drillDate ? 'text-[#f1f5f9] font-semibold' : 'text-[#3b82f6] hover:underline'"
-                  class="capitalize" x-text="drillVendor"></button>
-              </div>
-            </template>
-            <template x-if="drillDate">
-              <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-[#475569]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
-                <button @click="drillDevice = ''"
-                  :class="!drillDevice ? 'text-[#f1f5f9] font-semibold' : 'text-[#3b82f6] hover:underline'"
-                  x-text="drillDate"></button>
-              </div>
-            </template>
-            <template x-if="drillDevice">
-              <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-[#475569]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
-                <span class="text-[#f1f5f9] font-semibold" x-text="drillDevice"></span>
-              </div>
-            </template>
+        <div class="space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <p class="text-sm text-[#94a3b8]">Browse backup files by year, month, day, time, network, device type, province, vendor, and device.</p>
+            <input type="search" x-model.debounce.200ms="backupTimeSearch" placeholder="Search month, day, or hour" class="w-full sm:w-80 rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] px-4 py-3 text-sm text-[#e2e8f0] placeholder-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/40">
           </div>
-
-          <!-- LEVEL 0: Vendor folders -->
-          <div x-show="!drillVendor">
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              <template x-for="v in vendorGroups" :key="v.vendor">
-                <button @click="drillVendor = v.vendor"
-                  class="group mission-card relative flex flex-col items-center gap-3 p-5 rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] hover:border-[#3b82f6]/40 transition-all">
-                  <span class="absolute top-2 right-2 min-w-[22px] h-5 px-2 flex items-center justify-center text-[10px] font-mono font-bold rounded-md text-white"
-                    :class="{
-                      'bg-[#3b82f6]': v.vendor === 'nokia',
-                      'bg-[#10b981]': v.vendor === 'cisco',
-                      'bg-[#f59e0b]': v.vendor === 'mikrotik',
-                      'bg-[#ef4444]': v.vendor === 'huawei'
-                    }"
-                    x-text="v.count"></span>
-                  <!-- vendor icon -->
-                  <div class="w-14 h-14 rounded-xl flex items-center justify-center text-2xl font-bold"
-                    :class="{
-                      'bg-[#3b82f6]/15 text-[#3b82f6]': v.vendor === 'nokia',
-                      'bg-[#10b981]/15 text-[#10b981]': v.vendor === 'cisco',
-                      'bg-[#f59e0b]/15 text-[#f59e0b]': v.vendor === 'mikrotik',
-                      'bg-[#ef4444]/15 text-[#ef4444]': v.vendor === 'huawei'
-                    }">
-                    <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3"/></svg>
+          <template x-if="ipBackupTree.length === 0">
+            <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] px-6 py-10 text-center text-sm text-[#94a3b8]">No backups match that time.</div>
+          </template>
+          <div class="space-y-4" x-show="ipBackupTree.length > 0">
+            <template x-for="monthNode in ipBackupTree" :key="monthNode.label">
+              <div class="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#111827] overflow-hidden">
+                <button type="button" class="w-full flex items-center justify-between gap-4 px-5 py-4 text-left hover:bg-white/[0.02] transition-colors" @click="toggleTree('ip-month-' + monthNode.label)">
+                  <div class="flex items-center gap-3 min-w-0">
+                    <span class="text-[#94a3b8] text-sm" x-text="isTreeOpen('ip-month-' + monthNode.label, true) ? '▾' : '▸'"></span>
+                    <div>
+                      <p class="text-base font-semibold text-[#f1f5f9]" x-text="monthNode.label"></p>
+                      <p class="text-xs text-[#64748b]" x-text="monthNode.count + ' backup files'"></p>
+                    </div>
                   </div>
-                  <span class="text-sm font-semibold text-[#f1f5f9] capitalize" x-text="v.vendor"></span>
-                  <span class="text-[10px] text-[#94a3b8]" x-text="v.count + ' files'"></span>
                 </button>
-              </template>
-            </div>
-          </div>
-
-          <!-- LEVEL 1: Date folders for selected vendor -->
-          <div x-show="drillVendor && !drillDate">
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              <template x-for="d in datesForVendor" :key="d.date">
-                <button @click="drillDate = d.date"
-                  class="group mission-card relative flex flex-col items-center gap-2 p-5 rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] hover:border-[#3b82f6]/40 transition-all">
-                  <span class="absolute top-2 right-2 min-w-[22px] h-5 px-2 flex items-center justify-center text-[10px] font-mono font-bold rounded-md bg-[#3b82f6] text-white" x-text="d.count"></span>
-                  <svg class="w-14 h-14 text-[#3b82f6]" fill="currentColor" viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
-                  <span class="text-sm font-medium text-[#f1f5f9]" x-text="d.date"></span>
-                  <span class="text-[10px] text-[#94a3b8]" x-text="d.count + ' files'"></span>
-                </button>
-              </template>
-            </div>
-          </div>
-
-          <!-- LEVEL 2: Device folders for selected date -->
-          <div x-show="drillVendor && drillDate && !drillDevice">
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              <template x-for="d in devicesForDate" :key="d.device">
-                <button @click="drillDevice = d.device"
-                  class="group mission-card relative flex flex-col items-center gap-2 p-5 rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] hover:border-[#3b82f6]/40 transition-all">
-                  <span class="absolute top-2 right-2 min-w-[22px] h-5 px-2 flex items-center justify-center text-[10px] font-mono font-bold rounded-md bg-[#10b981] text-white" x-text="d.count"></span>
-                  <svg class="w-14 h-14 text-[#94a3b8]" fill="currentColor" viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
-                  <span class="text-sm font-medium text-[#f1f5f9] text-center truncate w-full" x-text="d.device"></span>
-                  <span class="text-[10px] text-[#94a3b8]" x-text="d.count + ' file' + (d.count !== 1 ? 's' : '')"></span>
-                </button>
-              </template>
-            </div>
-          </div>
-
-          <!-- LEVEL 3: File list -->
-          <div x-show="drillVendor && drillDate && drillDevice">
-            <div class="space-y-2">
-              <template x-for="r in filesForDevice" :key="r.id">
-                <div class="mission-card flex items-center gap-4 px-4 py-3.5 bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] hover:border-[#3b82f6]/30 transition-all">
-                  <svg class="w-8 h-8 flex-shrink-0 text-[#94a3b8]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
-
-                  <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-[#f1f5f9] truncate" x-text="r.device_name"></p>
-                    <p class="text-xs font-mono text-[#94a3b8] truncate" x-text="r.host"></p>
-                  </div>
-
-                  <!-- time badge -->
-                  <div class="text-right shrink-0">
-                    <p class="text-xs text-[#f1f5f9]" x-text="new Date(r.started_at).toLocaleTimeString()"></p>
-                    <p class="text-[10px] text-[#475569]" x-text="new Date(r.started_at).toLocaleDateString()"></p>
-                  </div>
-
-                  <!-- output size -->
-                  <span class="text-xs font-mono text-[#475569] shrink-0 w-16 text-right" x-text="formatBytes(r.output_size)"></span>
-
-                  <!-- status -->
-                  <span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full shrink-0"
-                    :class="r.status === 'ok' ? 'bg-[#10b981]/20 text-[#10b981]' : 'bg-[#ef4444]/20 text-[#ef4444]'">
-                    <span class="w-1.5 h-1.5 rounded-full" :class="r.status === 'ok' ? 'bg-[#10b981]' : 'bg-[#ef4444]'"></span>
-                    <span x-text="r.status === 'ok' ? 'OK' : 'Failed'"></span>
-                  </span>
-
-                  <!-- actions -->
-                  <div class="flex items-center gap-2 shrink-0">
-                    <button @click="previewRun(r)" class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border border-[rgba(255,255,255,0.08)] text-[#94a3b8] hover:text-[#f1f5f9] hover:bg-white/5 transition-colors">
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                      View
-                    </button>
-                    <button @click="downloadRun(r)" class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg bg-[#3b82f6]/20 text-[#3b82f6] hover:bg-[#3b82f6]/30 transition-colors">
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
-                      Download
-                    </button>
-                  </div>
+                <div x-show="isTreeOpen('ip-month-' + monthNode.label, true)" class="border-t border-[rgba(255,255,255,0.06)] divide-y divide-[rgba(255,255,255,0.06)]">
+                  <template x-for="dayNode in monthNode.days" :key="monthNode.label + '-' + dayNode.label">
+                    <div class="px-4 py-3">
+                      <button type="button" class="w-full flex items-center justify-between gap-4 px-3 py-2 rounded-xl text-left hover:bg-white/[0.03] transition-colors" @click="toggleTree('ip-day-' + monthNode.label + '-' + dayNode.label)">
+                        <div class="flex items-center gap-3 min-w-0">
+                          <span class="text-[#94a3b8] text-sm" x-text="isTreeOpen('ip-day-' + monthNode.label + '-' + dayNode.label, false) ? '▾' : '▸'"></span>
+                          <div>
+                            <p class="text-sm font-semibold text-[#e2e8f0]" x-text="dayNode.label"></p>
+                            <p class="text-[11px] text-[#64748b]" x-text="dayNode.count + ' backup files'"></p>
+                          </div>
+                        </div>
+                      </button>
+                      <div x-show="isTreeOpen('ip-day-' + monthNode.label + '-' + dayNode.label, false)" class="mt-3 pl-5 space-y-3 border-l border-[rgba(255,255,255,0.06)]">
+                        <template x-for="hourNode in dayNode.hours" :key="monthNode.label + '-' + dayNode.label + '-' + hourNode.label">
+                          <div>
+                            <button type="button" class="w-full flex items-center justify-between gap-4 px-3 py-2 rounded-xl text-left hover:bg-white/[0.03] transition-colors" @click="toggleTree('ip-hour-' + monthNode.label + '-' + dayNode.label + '-' + hourNode.label)">
+                              <div class="flex items-center gap-3 min-w-0">
+                                <span class="text-[#94a3b8] text-sm" x-text="isTreeOpen('ip-hour-' + monthNode.label + '-' + dayNode.label + '-' + hourNode.label, false) ? '▾' : '▸'"></span>
+                                <div>
+                                  <p class="text-sm font-medium text-[#f8fafc]" x-text="hourNode.label"></p>
+                                  <p class="text-[11px] text-[#64748b]" x-text="hourNode.count + ' backup files'"></p>
+                                </div>
+                              </div>
+                            </button>
+                            <div x-show="isTreeOpen('ip-hour-' + monthNode.label + '-' + dayNode.label + '-' + hourNode.label, false)" class="mt-3 pl-5 space-y-3 border-l border-[rgba(255,255,255,0.06)]">
+                              <template x-for="networkNode in hourNode.networks" :key="monthNode.label + '-' + dayNode.label + '-' + hourNode.label + '-' + networkNode.label">
+                                <div>
+                                  <button type="button" class="w-full flex items-center justify-between gap-4 px-3 py-2 rounded-xl text-left hover:bg-white/[0.03] transition-colors" @click="toggleTree('ip-network-' + monthNode.label + '-' + dayNode.label + '-' + hourNode.label + '-' + networkNode.label)">
+                                    <div class="flex items-center gap-3 min-w-0">
+                                      <span class="text-[#94a3b8] text-sm" x-text="isTreeOpen('ip-network-' + monthNode.label + '-' + dayNode.label + '-' + hourNode.label + '-' + networkNode.label, false) ? '▾' : '▸'"></span>
+                                      <div>
+                                        <p class="text-sm font-medium text-[#f8fafc]" x-text="networkNode.label"></p>
+                                        <p class="text-[11px] text-[#64748b]" x-text="networkNode.count + ' devices'"></p>
+                                      </div>
+                                    </div>
+                                  </button>
+                                  <div x-show="isTreeOpen('ip-network-' + monthNode.label + '-' + dayNode.label + '-' + hourNode.label + '-' + networkNode.label, false)" class="mt-3 pl-5 space-y-3 border-l border-[rgba(255,255,255,0.06)]">
+                                    <template x-for="typeNode in networkNode.types" :key="monthNode.label + '-' + dayNode.label + '-' + hourNode.label + '-' + networkNode.label + '-' + typeNode.label">
+                                      <div>
+                                        <button type="button" class="w-full flex items-center justify-between gap-4 px-3 py-2 rounded-xl text-left hover:bg-white/[0.03] transition-colors" @click="toggleTree('ip-type-' + monthNode.label + '-' + dayNode.label + '-' + hourNode.label + '-' + networkNode.label + '-' + typeNode.label)">
+                                          <div class="flex items-center gap-3 min-w-0">
+                                            <span class="text-[#94a3b8] text-sm" x-text="isTreeOpen('ip-type-' + monthNode.label + '-' + dayNode.label + '-' + hourNode.label + '-' + networkNode.label + '-' + typeNode.label, false) ? '▾' : '▸'"></span>
+                                            <div>
+                                              <p class="text-sm font-medium text-[#f8fafc]" x-text="typeNode.label"></p>
+                                              <p class="text-[11px] text-[#64748b]" x-text="typeNode.count + ' devices'"></p>
+                                            </div>
+                                          </div>
+                                        </button>
+                                        <div x-show="isTreeOpen('ip-type-' + monthNode.label + '-' + dayNode.label + '-' + hourNode.label + '-' + networkNode.label + '-' + typeNode.label, false)" class="mt-3 pl-5 space-y-3 border-l border-[rgba(255,255,255,0.06)]">
+                                          <template x-for="provinceNode in typeNode.provinces" :key="monthNode.label + '-' + dayNode.label + '-' + hourNode.label + '-' + networkNode.label + '-' + typeNode.label + '-' + provinceNode.label">
+                                            <div class="rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0f172a]">
+                                              <button type="button" class="w-full flex items-center justify-between gap-4 px-4 py-3 text-left hover:bg-white/[0.02] transition-colors rounded-xl" @click="toggleTree('ip-province-' + monthNode.label + '-' + dayNode.label + '-' + hourNode.label + '-' + networkNode.label + '-' + typeNode.label + '-' + provinceNode.label)">
+                                                <div class="flex items-center gap-3 min-w-0">
+                                                  <span class="text-[#94a3b8] text-sm" x-text="isTreeOpen('ip-province-' + monthNode.label + '-' + dayNode.label + '-' + hourNode.label + '-' + networkNode.label + '-' + typeNode.label + '-' + provinceNode.label, false) ? '▾' : '▸'"></span>
+                                                  <div>
+                                                    <p class="text-sm font-medium text-[#f1f5f9]" x-text="provinceNode.label"></p>
+                                                    <p class="text-[11px] text-[#64748b]" x-text="provinceNode.count + ' devices'"></p>
+                                                  </div>
+                                                </div>
+                                              </button>
+                                              <div x-show="isTreeOpen('ip-province-' + monthNode.label + '-' + dayNode.label + '-' + hourNode.label + '-' + networkNode.label + '-' + typeNode.label + '-' + provinceNode.label, false)" class="px-4 pb-4 space-y-3">
+                                                <template x-for="vendorNode in provinceNode.vendors" :key="monthNode.label + '-' + dayNode.label + '-' + hourNode.label + '-' + networkNode.label + '-' + typeNode.label + '-' + provinceNode.label + '-' + vendorNode.key">
+                                                  <div class="rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#111827] p-4">
+                                                    <p class="text-xs font-semibold uppercase text-[#64748b] mb-3" x-text="vendorNode.label"></p>
+                                                    <template x-for="entry in vendorNode.devices" :key="entry.run.id">
+                                                      <div class="py-3 border-t border-[rgba(255,255,255,0.06)] first:border-t-0 first:pt-0">
+                                                        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                                                          <div class="min-w-0">
+                                                            <p class="text-sm font-semibold text-[#f8fafc]" x-text="entry.run.device_name || entry.run.host"></p>
+                                                            <p class="text-xs font-mono text-[#94a3b8]" x-text="entry.run.host"></p>
+                                                          </div>
+                                                          <div class="flex items-center gap-2 text-[11px] text-[#64748b]">
+                                                            <span x-text="new Date(entry.run.started_at).toLocaleTimeString()"></span>
+                                                            <span x-text="formatBytes(entry.run.output_size || 0)"></span>
+                                                            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full" :class="entry.run.status === 'ok' ? 'bg-[#10b981]/20 text-[#10b981]' : 'bg-[#ef4444]/20 text-[#ef4444]'"><span class="w-1.5 h-1.5 rounded-full" :class="entry.run.status === 'ok' ? 'bg-[#10b981]' : 'bg-[#ef4444]'"></span><span x-text="entry.run.status === 'ok' ? 'OK' : 'Failed'"></span></span>
+                                                          </div>
+                                                        </div>
+                                                        <div class="mt-4 flex items-center gap-2">
+                                                          <button @click="previewRun(entry.run)" class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border border-[rgba(255,255,255,0.08)] text-[#94a3b8] hover:text-[#f1f5f9] hover:bg-white/5 transition-colors">View</button>
+                                                          <button @click="downloadRun(entry.run)" class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg bg-[#3b82f6]/20 text-[#3b82f6] hover:bg-[#3b82f6]/30 transition-colors">Download</button>
+                                                        </div>
+                                                      </div>
+                                                    </template>
+                                                  </div>
+                                                </template>
+                                              </div>
+                                            </div>
+                                          </template>
+                                        </div>
+                                      </div>
+                                    </template>
+                                  </div>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
                 </div>
-              </template>
-            </div>
+              </div>
+            </template>
           </div>
         </div>
       </template>
@@ -486,6 +473,7 @@ function ipBackupsPage() {
     devices: [],
     treeState: {},
     searchQuery: '',
+    backupTimeSearch: '',
     selectedBackupDate: '',
     backupView: 'browse',
     compareBaseDate: '',
@@ -493,9 +481,6 @@ function ipBackupsPage() {
     compareResult: null,
     compareLoading: false,
     compareError: '',
-    drillVendor: '',
-    drillDate: '',
-    drillDevice: '',
     showPreview: false,
     previewRun_: null,
     previewOutput: '',
@@ -504,7 +489,7 @@ function ipBackupsPage() {
     async init() {
       await Promise.all([
         this.fetchRuns(),
-        this.isNocMode ? this.fetchDevices() : Promise.resolve()
+        this.fetchDevices()
       ]);
       this.loading = false;
     },
@@ -579,6 +564,106 @@ function ipBackupsPage() {
       if (raw === 'cisco_ios') return 'Cisco';
       if (!raw) return 'Unknown';
       return raw.split('_').map(part => part ? part.charAt(0).toUpperCase() + part.slice(1) : '').join(' ');
+    },
+
+    backupTimeKey(run) {
+      if (!run?.started_at) return 'Unknown time';
+      return run.started_at.slice(0, 16).replace('T', ' ');
+    },
+
+    backupMonthKey(run) {
+      if (!run?.started_at) return 'Unknown month';
+      return run.started_at.slice(0, 7);
+    },
+
+    backupYearKey(run) {
+      if (!run?.started_at) return 'Unknown year';
+      return run.started_at.slice(0, 4);
+    },
+
+    backupDayKey(run) {
+      if (!run?.started_at) return 'Unknown day';
+      return run.started_at.slice(0, 10);
+    },
+
+    backupHourKey(run) {
+      if (!run?.started_at) return 'Unknown hour';
+      return run.started_at.slice(0, 13).replace('T', ' ') + ':00';
+    },
+
+    backupDeviceKey(run) {
+      return run?.device_name || run?.host || 'Unknown device';
+    },
+
+    provinceFromBackupName(run) {
+      const raw = String(run?.device_name || run?.host || '').toUpperCase();
+      const normalized = raw.replace(/[^A-Z0-9]+/g, ' ');
+      const knownProvinces = [
+        'HILLA',
+        'BASRA',
+        'KARBALLA',
+        'KARBALA',
+        'KUT',
+        'BAGHDAD',
+        'NAJAF',
+        'DIWANIYA',
+        'NASIRIYA',
+        'AMARA',
+        'KIRKUK',
+        'MOSUL',
+        'ANBAR',
+        'RAMADI',
+        'FALLUJA',
+        'DIYALA',
+        'BAQUBA',
+        'SALAHUDDIN',
+        'TIKRIT',
+        'SAMARRA',
+        'MUTHANNA',
+        'SAMAWA',
+        'WASIT',
+        'ERBIL',
+        'SULAYMANIYAH',
+        'DUHOK'
+      ];
+      const aliases = {
+        KARBALA: 'KARBALLA',
+        BAQUBA: 'DIYALA',
+        RAMADI: 'ANBAR',
+        FALLUJA: 'ANBAR',
+        TIKRIT: 'SALAHUDDIN',
+        SAMARRA: 'SALAHUDDIN',
+        SAMAWA: 'MUTHANNA'
+      };
+      const tokens = normalized.split(' ').filter(Boolean);
+      const found = knownProvinces.find(province => tokens.some(token => token === province || token.startsWith(province)));
+      if (found) return aliases[found] || found;
+      const firstToken = tokens[0];
+      return firstToken || 'UNKNOWN';
+    },
+
+    deviceForRun(run) {
+      const hostKey = String(run?.host || '').trim().toLowerCase();
+      return (this.devices || []).find(device => String(device.host || '').trim().toLowerCase() === hostKey) || null;
+    },
+
+    ipRunEntry(run) {
+      const device = this.deviceForRun(run);
+      const networkValue = String(device?.network_type || 'wifi').trim().toLowerCase() === 'ftth' ? 'ftth' : 'wifi';
+      return {
+        run,
+        time: this.backupTimeKey(run),
+        year: this.backupYearKey(run),
+        month: this.backupMonthKey(run),
+        day: this.backupDayKey(run),
+        hour: this.backupHourKey(run),
+        network: networkValue,
+        networkLabel: networkValue === 'ftth' ? 'FTTH' : 'WiFi',
+        deviceType: String(device?.device_type || 'Unknown Type').trim() || 'Unknown Type',
+        province: String(device?.province || this.provinceFromBackupName(run) || 'UNKNOWN').trim() || 'UNKNOWN',
+        vendor: String(run?.vendor || device?.vendor || 'unknown').trim().toLowerCase() || 'unknown',
+        vendorLabel: this.displayVendor(run?.vendor || device?.vendor || 'unknown')
+      };
     },
 
     toggleTree(key) {
@@ -691,57 +776,102 @@ function ipBackupsPage() {
         }));
     },
 
+    get ipBackupTree() {
+      if (this.isNocMode) return [];
+      const q = this.normalizeSearch(this.backupTimeSearch);
+      const monthMap = new Map();
+      for (const run of this.runs || []) {
+        const entry = this.ipRunEntry(run);
+        const searchableTime = [entry.year, entry.month, entry.day, entry.hour, entry.time].map(item => this.normalizeSearch(item)).join(' ');
+        if (q && !searchableTime.includes(q)) continue;
+        if (!monthMap.has(entry.year)) {
+          monthMap.set(entry.year, { label: entry.year, days: new Map(), count: 0 });
+        }
+        const monthNode = monthMap.get(entry.year);
+        monthNode.count += 1;
+
+        if (!monthNode.days.has(entry.month)) {
+          monthNode.days.set(entry.month, { label: entry.month, hours: new Map(), count: 0 });
+        }
+        const dayNode = monthNode.days.get(entry.month);
+        dayNode.count += 1;
+
+        if (!dayNode.hours.has(entry.day)) {
+          dayNode.hours.set(entry.day, { label: entry.day, networks: new Map(), count: 0 });
+        }
+        const hourNode = dayNode.hours.get(entry.day);
+        hourNode.count += 1;
+
+        if (!hourNode.networks.has(entry.time)) {
+          hourNode.networks.set(entry.time, { label: entry.time, types: new Map(), count: 0 });
+        }
+        const timeNode = hourNode.networks.get(entry.time);
+        timeNode.count += 1;
+
+        const deviceTypeLabel = entry.networkLabel + ' / ' + entry.deviceType;
+        if (!timeNode.types.has(deviceTypeLabel)) {
+          timeNode.types.set(deviceTypeLabel, { label: deviceTypeLabel, provinces: new Map(), count: 0 });
+        }
+        const typeNode = timeNode.types.get(deviceTypeLabel);
+        typeNode.count += 1;
+
+        if (!typeNode.provinces.has(entry.province)) {
+          typeNode.provinces.set(entry.province, { label: entry.province, vendors: new Map(), count: 0 });
+        }
+        const provinceNode = typeNode.provinces.get(entry.province);
+        provinceNode.count += 1;
+
+        if (!provinceNode.vendors.has(entry.vendor)) {
+          provinceNode.vendors.set(entry.vendor, { key: entry.vendor, label: entry.vendorLabel, devices: [], count: 0 });
+        }
+        const vendorNode = provinceNode.vendors.get(entry.vendor);
+        vendorNode.count += 1;
+        vendorNode.devices.push(entry);
+      }
+
+      return Array.from(monthMap.values())
+        .sort((a, b) => b.label.localeCompare(a.label))
+        .map(monthNode => ({
+          ...monthNode,
+          days: Array.from(monthNode.days.values())
+            .sort((a, b) => b.label.localeCompare(a.label))
+            .map(dayNode => ({
+              ...dayNode,
+              hours: Array.from(dayNode.hours.values())
+                .sort((a, b) => b.label.localeCompare(a.label))
+                .map(hourNode => ({
+                  ...hourNode,
+                  networks: Array.from(hourNode.networks.values())
+                    .sort((a, b) => b.label.localeCompare(a.label))
+                    .map(timeNode => ({
+                      ...timeNode,
+                      types: Array.from(timeNode.types.values())
+                        .sort((a, b) => a.label.localeCompare(b.label))
+                        .map(typeNode => ({
+                          ...typeNode,
+                          provinces: Array.from(typeNode.provinces.values())
+                            .sort((a, b) => a.label.localeCompare(b.label))
+                            .map(provinceNode => ({
+                              ...provinceNode,
+                              vendors: Array.from(provinceNode.vendors.values())
+                                .sort((a, b) => a.label.localeCompare(b.label))
+                                .map(vendorNode => ({
+                                  ...vendorNode,
+                                  devices: [...vendorNode.devices].sort((a, b) => (a.run.device_name || a.run.host || '').localeCompare(b.run.device_name || b.run.host || ''))
+                                }))
+                            }))
+                        }))
+                    }))
+                }))
+            }))
+        }));
+    },
+
     formatBytes(n) {
       if (!n) return '—';
       if (n < 1024) return n + ' B';
       if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
       return (n / (1024 * 1024)).toFixed(1) + ' MB';
-    },
-
-    get vendorGroups() {
-      const map = {};
-      this.runs.forEach(r => {
-        const v = r.vendor || 'unknown';
-        if (!map[v]) map[v] = 0;
-        map[v]++;
-      });
-      return Object.entries(map)
-        .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([vendor, count]) => ({ vendor, count }));
-    },
-
-    get datesForVendor() {
-      const map = {};
-      this.runs.filter(r => r.vendor === this.drillVendor).forEach(r => {
-        const date = r.started_at ? r.started_at.slice(0, 10) : '?';
-        if (!map[date]) map[date] = 0;
-        map[date]++;
-      });
-      return Object.entries(map)
-        .sort((a, b) => b[0].localeCompare(a[0]))
-        .map(([date, count]) => ({ date, count }));
-    },
-
-    get devicesForDate() {
-      const map = {};
-      this.runs
-        .filter(r => r.vendor === this.drillVendor && r.started_at?.slice(0, 10) === this.drillDate)
-        .forEach(r => {
-          const key = r.device_name || r.host;
-          if (!map[key]) map[key] = 0;
-          map[key]++;
-        });
-      return Object.entries(map)
-        .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([device, count]) => ({ device, count }));
-    },
-
-    get filesForDevice() {
-      return this.runs.filter(r =>
-        r.vendor === this.drillVendor &&
-        r.started_at?.slice(0, 10) === this.drillDate &&
-        (r.device_name || r.host) === this.drillDevice
-      ).sort((a, b) => new Date(b.started_at) - new Date(a.started_at));
     },
 
     async previewRun(r) {

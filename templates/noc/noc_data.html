@@ -640,6 +640,7 @@ function nocDataPage() {
     exclusionError: '',
     refreshTimer: null,
     summaryRenderFrame: null,
+    summaryChartScopeKey: '',
     charts: {
       province: null,
       status: null,
@@ -799,7 +800,8 @@ function nocDataPage() {
         const res = await fetch('/api/noc-data/run', { method: 'POST' });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Run failed');
-        setTimeout(() => this.fetchDevices(), 3000);
+        await this.fetchDevices();
+        this.startAutoRefresh('table');
       } catch (e) {
         alert(e.message || 'Run failed');
       } finally {
@@ -1291,8 +1293,15 @@ function nocDataPage() {
       const data = this.summaryDataset();
       if (!this.$refs.statusChart || !this.$refs.vendorChart || !this.$refs.layerChart) return;
       if (this.summaryScope === 'site' && !this.selectedSummarySite) {
-        this.destroyChart('province');
+        this.destroySummaryCharts();
+        this.summaryChartScopeKey = '';
         return;
+      }
+
+      const scopeKey = this.summaryScope + '::' + (this.summaryScope === 'site' ? this.selectedSummarySite : 'all');
+      if (this.summaryChartScopeKey !== scopeKey) {
+        this.destroySummaryCharts();
+        this.summaryChartScopeKey = scopeKey;
       }
 
       const counts = this.summaryCounts();

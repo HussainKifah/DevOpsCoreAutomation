@@ -16,12 +16,16 @@ type IPCapacityNodeWithLatest struct {
 
 type IPCapacityActionWithNode struct {
 	models.IPCapacityAction
-	NodeName string `json:"node_name"`
+	NodeName     string `json:"node_name"`
+	NodeType     string `json:"node_type"`
+	NodeProvince string `json:"node_province"`
 }
 
 type IPCapacityNodeDaySummary struct {
 	NodeID             uint      `json:"node_id"`
 	NodeName           string    `json:"node_name"`
+	NodeType           string    `json:"node_type"`
+	NodeProvince       string    `json:"node_province"`
 	OpeningCapacityIQD int64     `json:"opening_capacity_iqd"`
 	ClosingCapacityIQD int64     `json:"closing_capacity_iqd"`
 	DifferenceIQD      int64     `json:"difference_iqd"`
@@ -38,6 +42,7 @@ type IPCapacityRepository interface {
 	CreateNode(node *models.IPCapacityNode) error
 	GetNode(id uint) (*models.IPCapacityNode, error)
 	UpdateNode(node *models.IPCapacityNode) error
+	DeleteNode(id uint) error
 	ListActions() ([]IPCapacityActionWithNode, error)
 	CreateAction(action *models.IPCapacityAction) error
 	GetAction(id uint) (*models.IPCapacityAction, error)
@@ -60,6 +65,8 @@ func normalizeCapacityNode(node *models.IPCapacityNode) {
 		return
 	}
 	node.Name = strings.TrimSpace(node.Name)
+	node.Type = strings.TrimSpace(node.Type)
+	node.Province = strings.TrimSpace(node.Province)
 	if node.CurrentCapacityIQD == 0 {
 		node.CurrentCapacityIQD = node.InitialCapacityIQD
 	}
@@ -90,9 +97,9 @@ func (r *ipCapacityRepo) ListNodes(search string) ([]IPCapacityNodeWithLatest, e
 	tx := r.db.Model(&models.IPCapacityNode{})
 	if q != "" {
 		pat := "%" + strings.ToLower(q) + "%"
-		tx = tx.Where("LOWER(name) LIKE ? OR CAST(current_capacity_iqd AS TEXT) LIKE ? OR CAST(initial_capacity_iqd AS TEXT) LIKE ?", pat, pat, pat)
+		tx = tx.Where("LOWER(province) LIKE ? OR LOWER(name) LIKE ? OR LOWER(type) LIKE ? OR CAST(current_capacity_iqd AS TEXT) LIKE ? OR CAST(initial_capacity_iqd AS TEXT) LIKE ?", pat, pat, pat, pat, pat)
 	}
-	if err := tx.Order("name ASC, id ASC").Find(&nodes).Error; err != nil {
+	if err := tx.Order("province ASC, name ASC, type ASC, id ASC").Find(&nodes).Error; err != nil {
 		return nil, err
 	}
 	out := make([]IPCapacityNodeWithLatest, 0, len(nodes))
@@ -117,6 +124,12 @@ func (r *ipCapacityRepo) CreateNode(node *models.IPCapacityNode) error {
 	normalizeCapacityNode(node)
 	if node.Name == "" {
 		return errors.New("name required")
+	}
+	if node.Type == "" {
+		return errors.New("type required")
+	}
+	if node.Province == "" {
+		return errors.New("province required")
 	}
 	if node.InitialCapacityIQD < 0 {
 		return errors.New("initial_capacity_iqd cannot be negative")
@@ -144,6 +157,12 @@ func (r *ipCapacityRepo) UpdateNode(node *models.IPCapacityNode) error {
 	if node.Name == "" {
 		return errors.New("name required")
 	}
+	if node.Type == "" {
+		return errors.New("type required")
+	}
+	if node.Province == "" {
+		return errors.New("province required")
+	}
 	if node.InitialCapacityIQD < 0 {
 		return errors.New("initial_capacity_iqd cannot be negative")
 	}
@@ -154,11 +173,29 @@ func (r *ipCapacityRepo) UpdateNode(node *models.IPCapacityNode) error {
 		}
 		if err := tx.Model(&models.IPCapacityNode{}).Where("id = ?", node.ID).Updates(map[string]interface{}{
 			"name":                 node.Name,
+			"type":                 node.Type,
+			"province":             node.Province,
 			"initial_capacity_iqd": node.InitialCapacityIQD,
 		}).Error; err != nil {
 			return err
 		}
 		return recalculateCapacityNode(tx, node.ID)
+	})
+}
+
+func (r *ipCapacityRepo) DeleteNode(id uint) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("node_id = ?", id).Delete(&models.IPCapacityAction{}).Error; err != nil {
+			return err
+		}
+		result := tx.Delete(&models.IPCapacityNode{}, id)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return nil
 	})
 }
 
@@ -259,7 +296,66 @@ func (r *ipCapacityRepo) GetDayHistory(day time.Time) (*IPCapacityDayHistory, er
 		Find(&actions).Error; err != nil {
 		return nil, err
 	}
-	return buildDayHistory(actions), nil
+	var nodes []models.IPCapacityNode
+	if err := r.db.
+		Order("province ASC, name ASC, type ASC, id ASC").
+		Find(&nodes).Error; err != nil {
+		return nil, err
+	}
+	return r.buildFullDayHistory(nodes, actions, rawStart, rawEnd)
+}
+
+func (r *ipCapacityRepo) buildFullDayHistory(nodes []models.IPCapacityNode, actions []models.IPCapacityAction, rawStart, rawEnd time.Time) (*IPCapacityDayHistory, error) {
+	history := &IPCapacityDayHistory{
+		Summaries: make([]IPCapacityNodeDaySummary, 0, len(nodes)),
+		Actions:   actionsWithNodeNames(actions),
+	}
+	dayActionByNode := make(map[uint]models.IPCapacityAction)
+	for _, action := range actions {
+		dayActionByNode[action.NodeID] = action
+	}
+	for _, node := range nodes {
+		opening := node.InitialCapacityIQD
+		var beforeDay models.IPCapacityAction
+		err := r.db.
+			Where("node_id = ? AND action_at < ?", node.ID, rawStart).
+			Order("action_at DESC, id DESC").
+			First(&beforeDay).Error
+		if err == nil {
+			opening = beforeDay.CapacityAfterIQD
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+
+		closing := opening
+		latestAt := time.Time{}
+		var beforeEnd models.IPCapacityAction
+		err = r.db.
+			Where("node_id = ? AND action_at < ?", node.ID, rawEnd).
+			Order("action_at DESC, id DESC").
+			First(&beforeEnd).Error
+		if err == nil {
+			closing = beforeEnd.CapacityAfterIQD
+			latestAt = beforeEnd.ActionAt
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		if dayAction, ok := dayActionByNode[node.ID]; ok {
+			latestAt = dayAction.ActionAt
+		}
+
+		history.Summaries = append(history.Summaries, IPCapacityNodeDaySummary{
+			NodeID:             node.ID,
+			NodeName:           node.Name,
+			NodeType:           node.Type,
+			NodeProvince:       node.Province,
+			OpeningCapacityIQD: opening,
+			ClosingCapacityIQD: closing,
+			DifferenceIQD:      closing - opening,
+			LatestActionAt:     latestAt,
+		})
+	}
+	return history, nil
 }
 
 func recalculateCapacityNode(tx *gorm.DB, nodeID uint) error {
@@ -299,6 +395,8 @@ func actionsWithNodeNames(actions []models.IPCapacityAction) []IPCapacityActionW
 		out = append(out, IPCapacityActionWithNode{
 			IPCapacityAction: actions[i],
 			NodeName:         actions[i].Node.Name,
+			NodeType:         actions[i].Node.Type,
+			NodeProvince:     actions[i].Node.Province,
 		})
 	}
 	return out
@@ -316,6 +414,8 @@ func buildDayHistory(actions []models.IPCapacityAction) *IPCapacityDayHistory {
 			history.Summaries = append(history.Summaries, IPCapacityNodeDaySummary{
 				NodeID:             action.NodeID,
 				NodeName:           action.Node.Name,
+				NodeType:           action.Node.Type,
+				NodeProvince:       action.Node.Province,
 				OpeningCapacityIQD: action.CapacityBeforeIQD,
 				ClosingCapacityIQD: action.CapacityAfterIQD,
 				DifferenceIQD:      action.CapacityAfterIQD - action.CapacityBeforeIQD,

@@ -45,7 +45,12 @@ func ciscoLegacyRawSSH(host, user, pass, vendor string, profile VendorProfile, c
 		},
 	}
 
-	client, err := ssh.Dial("tcp", addr, cfg)
+	var client *ssh.Client
+	err := withWeakRSAHostKeySupport(func() error {
+		var dialErr error
+		client, dialErr = ssh.Dial("tcp", addr, cfg)
+		return dialErr
+	})
 	if err != nil {
 		log.Printf("[ip-ssh] %s (%s): raw SSH legacy fallback dial failed: %v", host, vendor, err)
 		return "", fmt.Errorf("ssh dial: %w", err)
