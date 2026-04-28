@@ -9,10 +9,14 @@ import (
 )
 
 type fakeNocPassRepo struct {
-	policy *models.NocPassPolicy
+	policy   *models.NocPassPolicy
+	policies []models.NocPassPolicy
 }
 
 func (f *fakeNocPassRepo) ListPolicies() ([]models.NocPassPolicy, error) {
+	if len(f.policies) > 0 {
+		return f.policies, nil
+	}
 	if f.policy == nil {
 		return nil, nil
 	}
@@ -165,5 +169,43 @@ func TestResolvePolicyTargets(t *testing.T) {
 	}
 	if got := ResolvePolicyTargets(rows, TargetDevice, "10.0.0.3"); len(got) != 1 || got[0].Host != "10.0.0.3" {
 		t.Fatalf("device target expected host 10.0.0.3, got %#v", got)
+	}
+}
+
+func TestFilterPolicyOwnedTargetsAllNetworkSkipsSpecificPolicies(t *testing.T) {
+	rows := []models.NocDataDevice{
+		{Host: "10.0.0.1", Site: "Basra FTTH", Vendor: "mikrotik", DeviceModel: "CCR", Hostname: "basra-1"},
+		{Host: "10.0.0.2", Site: "Basra WiFi", Vendor: "cisco_ios", DeviceModel: "C9300", Hostname: "basra-2"},
+		{Host: "10.0.0.3", Site: "Najaf FTTH", Vendor: "huawei", DeviceModel: "NE40E", Hostname: "najaf-1"},
+	}
+	all := models.NocPassPolicy{Enabled: true, TargetType: TargetAllNetworks, TargetValue: "all"}
+	basra := models.NocPassPolicy{Enabled: true, TargetType: TargetProvince, TargetValue: "Basra"}
+	najafDevice := models.NocPassPolicy{Enabled: true, TargetType: TargetDevice, TargetValue: "10.0.0.3"}
+	all.ID = 1
+	basra.ID = 2
+	najafDevice.ID = 3
+
+	targets := ResolvePolicyTargets(rows, all.TargetType, all.TargetValue)
+	got := FilterPolicyOwnedTargets(targets, &all, []models.NocPassPolicy{all, basra, najafDevice})
+	if len(got) != 0 {
+		t.Fatalf("all-network policy should skip devices owned by province/device policies, got %#v", got)
+	}
+}
+
+func TestFilterPolicyOwnedTargetsProvinceSkipsDevicePolicy(t *testing.T) {
+	rows := []models.NocDataDevice{
+		{Host: "10.0.0.1", Site: "Basra FTTH", Vendor: "mikrotik", DeviceModel: "CCR", Hostname: "basra-1"},
+		{Host: "10.0.0.2", Site: "Basra WiFi", Vendor: "cisco_ios", DeviceModel: "C9300", Hostname: "basra-2"},
+		{Host: "10.0.0.3", Site: "Najaf FTTH", Vendor: "huawei", DeviceModel: "NE40E", Hostname: "najaf-1"},
+	}
+	basra := models.NocPassPolicy{Enabled: true, TargetType: TargetProvince, TargetValue: "Basra"}
+	device := models.NocPassPolicy{Enabled: true, TargetType: TargetDevice, TargetValue: "10.0.0.2"}
+	basra.ID = 2
+	device.ID = 3
+
+	targets := ResolvePolicyTargets(rows, basra.TargetType, basra.TargetValue)
+	got := FilterPolicyOwnedTargets(targets, &basra, []models.NocPassPolicy{basra, device})
+	if len(got) != 1 || got[0].Host != "10.0.0.1" {
+		t.Fatalf("province policy should keep only Basra devices not owned by device policies, got %#v", got)
 	}
 }

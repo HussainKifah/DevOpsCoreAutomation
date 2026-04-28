@@ -90,6 +90,81 @@ func ResolvePolicyTargets(rows []models.NocDataDevice, targetType, targetValue s
 	return out
 }
 
+func policyTargetPriority(targetType string) int {
+	switch strings.ToLower(strings.TrimSpace(targetType)) {
+	case TargetDevice:
+		return 50
+	case TargetProvince:
+		return 40
+	case TargetModel:
+		return 30
+	case TargetVendor:
+		return 20
+	case TargetNetworkType:
+		return 10
+	case TargetAllNetworks:
+		return 0
+	default:
+		return 0
+	}
+}
+
+func policyMatchesRow(policy *models.NocPassPolicy, row *models.NocDataDevice) bool {
+	if policy == nil || row == nil || !policy.Enabled {
+		return false
+	}
+	targetType := strings.ToLower(strings.TrimSpace(policy.TargetType))
+	targetValue := strings.TrimSpace(policy.TargetValue)
+	if targetType == "" {
+		targetType = TargetAllNetworks
+		targetValue = "all"
+	}
+	host := strings.ToLower(strings.TrimSpace(row.Host))
+	if host == "" {
+		return false
+	}
+	if targetType == TargetDevice {
+		return host == strings.ToLower(strings.TrimSpace(targetValue))
+	}
+	return TargetMatches(targetType, targetValue, row)
+}
+
+func policyOwnsRow(policy *models.NocPassPolicy, policies []models.NocPassPolicy, row *models.NocDataDevice) bool {
+	if !policyMatchesRow(policy, row) {
+		return false
+	}
+	bestID := policy.ID
+	bestPriority := policyTargetPriority(policy.TargetType)
+	for i := range policies {
+		candidate := &policies[i]
+		if candidate.ID == policy.ID || !policyMatchesRow(candidate, row) {
+			continue
+		}
+		priority := policyTargetPriority(candidate.TargetType)
+		if priority > bestPriority || (priority == bestPriority && (bestID == 0 || candidate.ID < bestID)) {
+			bestID = candidate.ID
+			bestPriority = priority
+		}
+	}
+	return bestID == policy.ID
+}
+
+func FilterPolicyOwnedTargets(rows []models.NocDataDevice, policy *models.NocPassPolicy, policies []models.NocPassPolicy) []models.NocDataDevice {
+	if policy == nil || len(rows) == 0 {
+		return nil
+	}
+	if len(policies) == 0 {
+		return rows
+	}
+	out := make([]models.NocDataDevice, 0, len(rows))
+	for i := range rows {
+		if policyOwnsRow(policy, policies, &rows[i]) {
+			out = append(out, rows[i])
+		}
+	}
+	return out
+}
+
 func decryptPolicyPassword(masterKey []byte, primary, legacy []byte) (string, error) {
 	if len(primary) > 0 {
 		return crypto.Decrypt(masterKey, primary)
@@ -199,6 +274,23 @@ func RunPolicy(repo repository.NocPassRepository, nocDataRepo repository.NocData
 	}
 
 	targetRows := ResolvePolicyTargets(rows, targetType, targetValue)
+	matchedCount := len(targetRows)
+	policies, err := repo.ListPolicies()
+	if err != nil {
+		policy.LastRunAt = &now
+		policy.LastStatus = "error"
+		policy.LastMessage = "list policies: " + err.Error()
+		_ = repo.SavePolicy(policy)
+		return nil, fmt.Errorf("list policies: %w", err)
+	}
+	targetRows = FilterPolicyOwnedTargets(targetRows, policy, policies)
+	if matchedCount > 0 && len(targetRows) == 0 {
+		policy.LastRunAt = &now
+		policy.LastStatus = "ok"
+		policy.LastMessage = fmt.Sprintf("no devices owned by this policy on target %s; more specific policies own the matching devices", targetLabel)
+		_ = repo.SavePolicy(policy)
+		return &RunSummary{PolicyID: policy.ID, PolicyName: strings.TrimSpace(policy.Name), TargetLabel: targetLabel, ActiveMode: policy.PasswordMode}, nil
+	}
 	exclusions, err := repo.ListExclusions()
 	if err != nil {
 		policy.LastRunAt = &now
