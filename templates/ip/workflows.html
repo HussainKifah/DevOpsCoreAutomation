@@ -223,7 +223,7 @@
                     <span class="text-[#475569]">·</span>
                     <span x-text="j.schedule==='once'?'Run once':j.schedule"></span>
                     <template x-if="j.job_type==='command'&&j.command">
-                      <code class="text-[#60a5fa] bg-[#3b82f6]/10 px-1.5 py-0.5 rounded font-mono truncate max-w-xs" x-text="j.command"></code>
+                      <code class="text-[#60a5fa] bg-[#3b82f6]/10 px-1.5 py-0.5 rounded font-mono truncate max-w-xs" x-text="commandSummary(j.command)"></code>
                     </template>
                   </div>
                   <div class="mt-0.5 text-[10px] text-[#475569]" x-show="j.last_run_at">
@@ -329,7 +329,7 @@
             <button @click="jobForm.job_type='command'" :class="jobForm.job_type==='command'?'border-[#8b5cf6] bg-[#8b5cf6]/10 text-[#8b5cf6]':'border-[rgba(255,255,255,0.08)] text-[#94a3b8]'" class="flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition-all">Custom Command</button>
           </div>
         </div>
-        <template x-if="!editingJob && jobForm.job_type==='command'"><div><label class="block text-sm font-medium text-[#94a3b8] mb-1">Command</label><input type="text" x-model="jobForm.command" placeholder="show ip bgp summary" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] font-mono px-3 py-2 text-sm placeholder-[#475569] focus:ring-2 focus:ring-[#3b82f6]"></div></template>
+        <template x-if="!editingJob && jobForm.job_type==='command'"><div><label class="block text-sm font-medium text-[#94a3b8] mb-1">Interactive Command Block</label><textarea x-model="jobForm.command" rows="8" placeholder="conf t&#10;ip access-list VTY_MGMT_ACCESS&#10;10 permit 10.130.30.0 0.0.0.255&#10;line vty 0 15&#10;access-class VTY_MGMT_ACCESS in&#10;transport input ssh&#10;end" class="w-full resize-y rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] font-mono px-3 py-2 text-sm placeholder-[#475569] focus:ring-2 focus:ring-[#3b82f6]"></textarea><p class="mt-1 text-xs text-[#64748b]">Runs line by line in one CLI session. Empty lines are skipped.</p></div></template>
         <div>
           <label class="block text-sm font-medium text-[#94a3b8] mb-1">Schedule</label>
           <input type="text" x-model="jobForm.schedule" placeholder="24h, 0 21 * * *, or once" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] text-[#f1f5f9] font-mono px-3 py-2 text-sm placeholder-[#475569] focus:ring-2 focus:ring-[#3b82f6]">
@@ -497,6 +497,7 @@ function workflowsPage() {
     vendorBadgeClass(d){const v=(d.source_vendor||d.vendor||'').toLowerCase();return {'bg-[#3b82f6]/20 text-[#3b82f6]':v==='nokia','bg-[#10b981]/20 text-[#10b981]':v==='cisco'||v==='cisco_ios','bg-[#0ea5e9]/20 text-[#0ea5e9]':v==='cisco_nexus','bg-[#f59e0b]/20 text-[#f59e0b]':v==='mikrotik','bg-[#ef4444]/20 text-[#ef4444]':v==='huawei'};},
     vendorDotClass(d){const v=(d.source_vendor||d.vendor||'').toLowerCase();return {'bg-[#3b82f6]':v==='nokia','bg-[#10b981]':v==='cisco'||v==='cisco_ios','bg-[#0ea5e9]':v==='cisco_nexus','bg-[#f59e0b]':v==='mikrotik','bg-[#ef4444]':v==='huawei'};},
     jobTargetTypeLabel(j){const t=(j.target_type||'device').toLowerCase();if(t==='all_networks')return this.workflowTreeMode==='noc'?'All Networks':'All Devices';if(t==='network_type')return 'FTTH / WiFi';if(t==='device_type')return 'Device Type';if(t==='province')return 'Province';if(t==='vendor')return 'Vendor';if(t==='model')return 'Model';return 'Device';},
+    commandSummary(command){const lines=String(command||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);if(lines.length<=1)return lines[0]||'';return lines[0]+' + '+(lines.length-1)+' more';},
     jobProvinceLabel(j){const t=(j.target_type||'device').toLowerCase();if(t==='province')return 'Province: '+(j.target_value||'Unknown');if(t==='device')return 'Province: '+(j.device?.province||'Unknown');if(t==='all_networks')return 'Province: All';return 'Province: Mixed';},
     jobDeviceTypeLabel(j){const t=(j.target_type||'device').toLowerCase();if(t==='device_type')return 'Type: '+(j.target_value||'Unknown');if(t==='device')return 'Type: '+(j.device?.device_type||'Unknown');if(t==='all_networks')return 'Type: All';return 'Type: Mixed';},
     jobHostLabel(j){if((j.target_type||'device').toLowerCase()==='device'){return j.device?.host||'—';}return j.target_value||'—';},

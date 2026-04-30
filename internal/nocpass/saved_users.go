@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Flafl/DevOpsCore/internal/crypto"
 	"github.com/Flafl/DevOpsCore/internal/models"
@@ -236,6 +237,11 @@ func ApplySavedUserToDevice(repo repository.NocPassRepository, nocDataRepo repos
 	for _, cred := range creds {
 		_, _, runErr := shell.NocDataSendCommandUsingMethodContext(context.Background(), strings.TrimSpace(row.Host), cred.Username, cred.Password, vendor, "", cmds...)
 		if runErr == nil {
+			appliedAt := time.Now()
+			savedUserID := item.ID
+			if err := saveConfirmedCredential(repo, masterKey, strings.TrimSpace(row.Host), item.Username, "saved_user", &savedUserID, password, appliedAt); err != nil {
+				return fmt.Errorf("save saved-user credential: %w", err)
+			}
 			return nil
 		}
 		lastErr = runErr
@@ -243,6 +249,8 @@ func ApplySavedUserToDevice(repo repository.NocPassRepository, nocDataRepo repos
 	if lastErr == nil {
 		lastErr = fmt.Errorf("no usable credential for saved user apply")
 	}
+	savedUserID := item.ID
+	_ = repo.MarkCredentialFailure(strings.TrimSpace(row.Host), item.Username, "saved_user", &savedUserID, lastErr.Error())
 	return lastErr
 }
 
@@ -270,6 +278,7 @@ func DeleteSavedUserFromDevice(repo repository.NocPassRepository, nocDataRepo re
 	for _, cred := range creds {
 		_, _, runErr := shell.NocDataSendCommandUsingMethodContext(context.Background(), strings.TrimSpace(row.Host), cred.Username, cred.Password, vendor, "", cmds...)
 		if runErr == nil {
+			_ = repo.DeleteCredential(strings.TrimSpace(row.Host), item.Username)
 			return nil
 		}
 		lastErr = runErr

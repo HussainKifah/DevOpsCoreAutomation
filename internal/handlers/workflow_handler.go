@@ -539,6 +539,7 @@ func (h *WorkflowHandler) CreateJob(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.Command = strings.TrimSpace(req.Command)
 	if req.JobType == "command" && req.Command == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "command is required when job_type is command"})
 		return
@@ -933,6 +934,10 @@ func (h *WorkflowHandler) CompareBackups(c *gin.Context) {
 			continue
 		}
 		added, removed := compareBackupLines(baseRun.Output, compareRun.Output)
+		if len(added) == 0 && len(removed) == 0 {
+			resp.Unchanged++
+			continue
+		}
 		resp.Changed = append(resp.Changed, backupCompareDeviceFromRun(baseRun, compareRun, added, removed))
 	}
 	for host, compareRun := range compareRuns {
@@ -1258,12 +1263,36 @@ func backupLineCounts(output string) map[string]int {
 	counts := make(map[string]int)
 	for _, line := range strings.Split(output, "\n") {
 		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "!Time:") || strings.HasPrefix(line, "# Time:") {
+		if shouldIgnoreBackupCompareLine(line) {
 			continue
 		}
 		counts[line]++
 	}
 	return counts
+}
+
+func shouldIgnoreBackupCompareLine(line string) bool {
+	if line == "" {
+		return true
+	}
+	lower := strings.ToLower(line)
+	ignorePrefixes := []string{
+		"!time:",
+		"# time:",
+		"# ",
+		"! last configuration change at ",
+		"! nvram config last updated at ",
+		"! no configuration change since last restart",
+		"current configuration : ",
+		"ntp clock-period ",
+		"transport input ss",
+	}
+	for _, prefix := range ignorePrefixes {
+		if strings.HasPrefix(lower, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func firstNonEmpty(values ...string) string {

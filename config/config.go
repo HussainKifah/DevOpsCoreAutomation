@@ -24,6 +24,8 @@ type Config struct {
 	TLSCertFile string
 	TLSKeyFile  string
 
+	BetterStackWebhookSecret string
+
 	OLTUser string // Nokia SSH credentials
 	OLTPass string
 
@@ -113,6 +115,8 @@ func Load() *Config {
 		JWTSecret:   getEnv("JWT_SECRET", ""),
 		TLSCertFile: getEnv("TLS_CERT", ""),
 		TLSKeyFile:  getEnv("TLS_KEY", ""),
+
+		BetterStackWebhookSecret: strings.TrimSpace(getEnv("BETTERSTACK_WEBHOOK_SECRET", "")),
 
 		OLTUser: getEnv("OLT_SSH_USER", ""),
 		OLTPass: getEnv("OLT_SSH_PASS", ""),

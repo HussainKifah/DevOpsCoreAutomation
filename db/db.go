@@ -46,6 +46,7 @@ func Connect(cfg *config.Config) *gorm.DB {
 		&models.WorkflowRun{},
 		&models.WorkflowLog{},
 		&models.NocPassDevice{},
+		&models.NocPassCredential{},
 		&models.NocPassPolicy{},
 		&models.NocPassKeepUser{},
 		&models.NocPassSavedUser{},

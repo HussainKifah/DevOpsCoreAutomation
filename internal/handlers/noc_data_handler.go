@@ -431,13 +431,15 @@ func (h *NocDataHandler) upsertDiscoveredDevice(site, subnet, deviceRange, host 
 	existing, err := h.repo.FindByRangeHost(site, subnet, deviceRange, host)
 	if err == nil {
 		updates := map[string]interface{}{
-			"display_name":  site + " " + host,
-			"enc_username":  encUser,
-			"enc_password":  encPass,
-			"vendor":        "pending",
-			"access_method": "pending",
-			"last_status":   "pending",
-			"last_error":    "",
+			"display_name": site + " " + host,
+			"last_status":  "pending",
+			"last_error":   "",
+		}
+		if strings.TrimSpace(existing.Vendor) == "" || strings.EqualFold(strings.TrimSpace(existing.Vendor), "pending") {
+			updates["vendor"] = "pending"
+			updates["access_method"] = "pending"
+			updates["enc_username"] = encUser
+			updates["enc_password"] = encPass
 		}
 		if err := h.repo.UpdateDevice(existing.ID, updates); err != nil {
 			return 0, err

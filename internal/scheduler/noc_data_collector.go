@@ -732,10 +732,6 @@ func (c *NocDataCollector) resolveCredentialsWithSender(d *models.NocDataDevice,
 	preferredMethod := preferredNocDataMethod(d.AccessMethod)
 	ordered := []string{}
 
-	if strings.HasPrefix(host, "10.90.") {
-		ordered = append(ordered, "huawei")
-	}
-
 	if cachedFamily := credentialVendorFamily(d.Vendor); cachedFamily != "" {
 		switch cachedFamily {
 		case "cisco":

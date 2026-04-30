@@ -113,6 +113,7 @@ func main() {
 	esSyslogRepo := repository.NewEsSyslogRepository(database)
 	esSyslogH := handlers.NewEsSyslogHandler(esSyslogRepo)
 	ipCapacityH := handlers.NewIPCapacityHandler(ipCapacityRepo)
+	betterStackWebhookH := handlers.NewBetterStackWebhookHandler(cfg.BetterStackWebhookSecret)
 
 	var slackAPI *slack.Client
 	var slackBatcher *syslog.SlackSyslogBatcher
@@ -164,7 +165,7 @@ func main() {
 
 	pageH := handlers.NewPageHandler(filepath.Join(projectRoot, "templates"), userRepo, jwtManager)
 
-	router.Setup(server, jwtManager, hub, powerH, descH, healthH, healthHistoryH, portH, portHistoryH, calendarH, backupH, userH, authH, pageH, inventoryH, scanH, workflowH, nocWorkflowH, nocPassH, nocDataH, esSyslogH, ipCapacityH, slackEventsH)
+	router.Setup(server, jwtManager, hub, powerH, descH, healthH, healthHistoryH, portH, portHistoryH, calendarH, backupH, userH, authH, pageH, inventoryH, scanH, workflowH, nocWorkflowH, nocPassH, nocDataH, esSyslogH, ipCapacityH, slackEventsH, betterStackWebhookH)
 
 	esSyslogPoller := scheduler.NewEsSyslogPoller(cfg, esSyslogRepo, slackBatcher)
 	esSyslogPoller.Start()

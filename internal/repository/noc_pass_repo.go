@@ -7,6 +7,7 @@ import (
 
 	"github.com/Flafl/DevOpsCore/internal/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type NocPassRepository interface {
@@ -31,6 +32,10 @@ type NocPassRepository interface {
 	GetSavedUser(id uint) (*models.NocPassSavedUser, error)
 	CreateSavedUser(user *models.NocPassSavedUser) error
 	DeleteSavedUser(id uint) error
+	ListCredentials() ([]models.NocPassCredential, error)
+	UpsertCredential(host, username, source string, savedUserID *uint, encPassword []byte, appliedAt time.Time) error
+	MarkCredentialFailure(host, username, source string, savedUserID *uint, errMsg string) error
+	DeleteCredential(host, username string) error
 	UpdateAfterApply(id uint, encNocPass []byte, rotatedAt *time.Time, ok bool, errMsg string) error
 	UpdateAfterApplyByHost(displayName, host, vendor string, encNocPass []byte, rotatedAt *time.Time, ok bool, errMsg string) error
 }
@@ -294,6 +299,82 @@ func (r *nocPassRepo) CreateSavedUser(user *models.NocPassSavedUser) error {
 
 func (r *nocPassRepo) DeleteSavedUser(id uint) error {
 	return r.db.Unscoped().Delete(&models.NocPassSavedUser{}, id).Error
+}
+
+func (r *nocPassRepo) ListCredentials() ([]models.NocPassCredential, error) {
+	var list []models.NocPassCredential
+	err := r.db.Order("host ASC, canonical_username ASC").Find(&list).Error
+	return list, err
+}
+
+func (r *nocPassRepo) UpsertCredential(host, username, source string, savedUserID *uint, encPassword []byte, appliedAt time.Time) error {
+	trimmedHost := strings.TrimSpace(host)
+	displayUsername := strings.TrimSpace(username)
+	canonical := strings.ToLower(strings.TrimSpace(username))
+	if trimmedHost == "" {
+		return errors.New("host required")
+	}
+	if canonical == "" {
+		return errors.New("username required")
+	}
+	if len(encPassword) == 0 {
+		return errors.New("password required")
+	}
+	item := models.NocPassCredential{
+		Host:              trimmedHost,
+		Username:          displayUsername,
+		CanonicalUsername: canonical,
+		Source:            strings.TrimSpace(source),
+		EncPassword:       encPassword,
+		SavedUserID:       savedUserID,
+		LastApplyOK:       true,
+		LastApplyError:    "",
+		LastAppliedAt:     &appliedAt,
+	}
+	return r.db.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "host"}, {Name: "canonical_username"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"username",
+			"source",
+			"enc_password",
+			"saved_user_id",
+			"last_apply_ok",
+			"last_apply_error",
+			"last_applied_at",
+			"updated_at",
+			"deleted_at",
+		}),
+	}).Create(&item).Error
+}
+
+func (r *nocPassRepo) MarkCredentialFailure(host, username, source string, savedUserID *uint, errMsg string) error {
+	trimmedHost := strings.TrimSpace(host)
+	canonical := strings.ToLower(strings.TrimSpace(username))
+	if trimmedHost == "" || canonical == "" {
+		return nil
+	}
+	updates := map[string]interface{}{
+		"username":         strings.TrimSpace(username),
+		"source":           strings.TrimSpace(source),
+		"saved_user_id":    savedUserID,
+		"last_apply_ok":    false,
+		"last_apply_error": errMsg,
+		"updated_at":       time.Now(),
+	}
+	return r.db.Model(&models.NocPassCredential{}).
+		Where("LOWER(host) = ? AND canonical_username = ?", strings.ToLower(trimmedHost), canonical).
+		Updates(updates).Error
+}
+
+func (r *nocPassRepo) DeleteCredential(host, username string) error {
+	trimmedHost := strings.TrimSpace(host)
+	canonical := strings.ToLower(strings.TrimSpace(username))
+	if trimmedHost == "" || canonical == "" {
+		return nil
+	}
+	return r.db.Unscoped().
+		Where("LOWER(host) = ? AND canonical_username = ?", strings.ToLower(trimmedHost), canonical).
+		Delete(&models.NocPassCredential{}).Error
 }
 
 func (r *nocPassRepo) UpdateAfterApply(id uint, encNocPass []byte, rotatedAt *time.Time, ok bool, errMsg string) error {

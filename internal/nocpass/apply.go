@@ -478,6 +478,14 @@ func ApplyToNocDataDevice(repo repository.NocPassRepository, nocDataRepo reposit
 		}
 
 		appliedAt := time.Now()
+		if err := saveConfirmedCredential(repo, masterKey, host, UserFiberx, "rotator", nil, passwords.Fiberx, appliedAt); err != nil {
+			_ = repo.UpdateAfterApplyByHost(DeviceLabel(row), host, deviceState.Vendor, nil, nil, false, "save fiberx credential: "+err.Error())
+			return err
+		}
+		if err := saveConfirmedCredential(repo, masterKey, host, UserSupport, "rotator", nil, passwords.Support, appliedAt); err != nil {
+			_ = repo.UpdateAfterApplyByHost(DeviceLabel(row), host, deviceState.Vendor, nil, nil, false, "save support credential: "+err.Error())
+			return err
+		}
 		if err := repo.UpdateAfterApplyByHost(DeviceLabel(row), host, deviceState.Vendor, enc, &appliedAt, true, ""); err != nil {
 			return err
 		}
@@ -493,7 +501,17 @@ func ApplyToNocDataDevice(repo repository.NocPassRepository, nocDataRepo reposit
 		lastErr = fmt.Errorf("no usable NOC Setup credential succeeded")
 	}
 	_ = repo.UpdateAfterApplyByHost(DeviceLabel(row), host, deviceState.Vendor, nil, nil, false, lastErr.Error())
+	_ = repo.MarkCredentialFailure(host, UserFiberx, "rotator", nil, lastErr.Error())
+	_ = repo.MarkCredentialFailure(host, UserSupport, "rotator", nil, lastErr.Error())
 	return lastErr
+}
+
+func saveConfirmedCredential(repo repository.NocPassRepository, masterKey []byte, host, username, source string, savedUserID *uint, password string, appliedAt time.Time) error {
+	enc, err := crypto.Encrypt(masterKey, password)
+	if err != nil {
+		return err
+	}
+	return repo.UpsertCredential(host, username, source, savedUserID, enc, appliedAt)
 }
 
 func resolveApplyCredentials(nocDataRepo repository.NocDataRepository, masterKey []byte, row *models.NocDataDevice) ([]applyCredential, error) {

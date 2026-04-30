@@ -32,6 +32,7 @@ func Setup(
 	esSyslogH *handlers.EsSyslogHandler,
 	ipCapacityH *handlers.IPCapacityHandler,
 	slackEventsH *handlers.SlackEventsHandler,
+	betterStackWebhookH *handlers.BetterStackWebhookHandler,
 ) {
 	// WebSocket endpoint (auth inside handler)
 	r.GET("/ws", websocket.ServerWs(hub, jwtManager))
@@ -42,6 +43,9 @@ func Setup(
 
 	if slackEventsH != nil {
 		r.POST("/api/slack/events", slackEventsH.Handle)
+	}
+	if betterStackWebhookH != nil {
+		r.POST("/api/webhooks/betterstack", betterStackWebhookH.Handle)
 	}
 
 	// Auth API (public)
@@ -188,6 +192,7 @@ func Setup(
 	nocAPI := r.Group("/api/noc-pass")
 	nocAPI.Use(middleware.AuthMiddleware(jwtManager), middleware.RoleGuard("noc", "admin"))
 	{
+		nocAPI.GET("/all-devices", nocPassH.ListAllDevices)
 		nocAPI.GET("/devices", nocPassH.ListDevices)
 		nocAPI.GET("/policies", nocPassH.ListPolicies)
 		nocAPI.POST("/policies", nocPassH.CreatePolicy)
@@ -298,7 +303,9 @@ func Setup(
 		capacityAPI.POST("/actions", ipCapacityH.CreateAction)
 		capacityAPI.PUT("/actions/:id", ipCapacityH.UpdateAction)
 		capacityAPI.DELETE("/actions/:id", ipCapacityH.DeleteAction)
+		capacityAPI.POST("/import", ipCapacityH.ImportActions)
 		capacityAPI.GET("/history/days", ipCapacityH.ListHistoryDays)
 		capacityAPI.GET("/history/day", ipCapacityH.GetDayHistory)
+		capacityAPI.GET("/history/all", ipCapacityH.GetAllHistory)
 	}
 }

@@ -243,24 +243,32 @@ func (ws *WorkflowScheduler) runJobForDevice(job *models.WorkflowJob, device *mo
 	ws.writeJobLog(&jobView, &run.ID, "info", "job_started",
 		fmt.Sprintf("Started %s job on %s (%s)", job.JobType, device.Name, device.Host), 0)
 
-	var cmd string
+	var cmds []string
 	if job.JobType == "backup" {
-		cmd, err = shell.IPBackupCommand(device.Vendor)
+		cmd, err := shell.IPBackupCommand(device.Vendor)
 		if err != nil {
 			msg := "cannot resolve backup command for vendor: " + err.Error()
 			ws.writeJobLog(&jobView, &run.ID, "error", "job_failed", msg, 0)
 			_ = ws.repo.FinishRun(run.ID, "error", "", msg, time.Now())
 			return err
 		}
+		cmds = []string{cmd}
 	} else {
-		cmd = job.Command
+		cmds = workflowCommandLines(job.Command)
+		if len(cmds) == 0 {
+			err := fmt.Errorf("command is required")
+			msg := err.Error()
+			ws.writeJobLog(&jobView, &run.ID, "error", "job_failed", msg, 0)
+			_ = ws.repo.FinishRun(run.ID, "error", "", msg, time.Now())
+			return err
+		}
 	}
 
 	log.Printf("[workflow:%s] job %d: connecting to %s (vendor=%s, transport=%s)...",
 		ws.scope, job.ID, device.Host, device.Vendor, "auto")
-	log.Printf("[workflow:%s] job %d: sending command: %q", ws.scope, job.ID, cmd)
+	log.Printf("[workflow:%s] job %d: sending %d command(s): %q", ws.scope, job.ID, len(cmds), cmds)
 
-	output, method, execErr := shell.NocDataSendCommandUsingMethodContext(context.Background(), device.Host, user, pass, device.Vendor, "", cmd)
+	output, method, execErr := shell.NocDataSendCommandUsingMethodContext(context.Background(), device.Host, user, pass, device.Vendor, "", cmds...)
 
 	finishedAt := time.Now()
 	durationMs := finishedAt.Sub(startedAt).Milliseconds()
@@ -323,6 +331,19 @@ func ciscoSaveConfigCommand(vendor string) (string, bool) {
 	default:
 		return "", false
 	}
+}
+
+func workflowCommandLines(command string) []string {
+	lines := strings.Split(strings.ReplaceAll(command, "\r\n", "\n"), "\n")
+	cmds := make([]string, 0, len(lines))
+	for _, line := range lines {
+		cmd := strings.TrimSpace(line)
+		if cmd == "" {
+			continue
+		}
+		cmds = append(cmds, cmd)
+	}
+	return cmds
 }
 
 func (ws *WorkflowScheduler) resolveTargetDevices(job *models.WorkflowJob) ([]models.WorkflowDevice, string, error) {

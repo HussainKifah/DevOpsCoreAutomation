@@ -37,6 +37,31 @@ type IPCapacityDayHistory struct {
 	Actions   []IPCapacityActionWithNode `json:"actions"`
 }
 
+type IPCapacityHistorySnapshot struct {
+	Day                string    `json:"day"`
+	NodeID             uint      `json:"node_id"`
+	NodeName           string    `json:"node_name"`
+	NodeType           string    `json:"node_type"`
+	NodeProvince       string    `json:"node_province"`
+	CurrentCapacityIQD int64     `json:"current_capacity_iqd"`
+	LatestActionAt     time.Time `json:"latest_action_at"`
+}
+
+type IPCapacityImportRow struct {
+	Name                    string
+	Type                    string
+	Province                string
+	CapacityBeforeUpdateIQD int64
+	ActionType              string
+	AmountIQD               int64
+	ActionAt                time.Time
+}
+
+type IPCapacityImportResult struct {
+	ImportedActions int `json:"imported_actions"`
+	CreatedNodes    int `json:"created_nodes"`
+}
+
 type IPCapacityRepository interface {
 	ListNodes(search string) ([]IPCapacityNodeWithLatest, error)
 	CreateNode(node *models.IPCapacityNode) error
@@ -48,8 +73,10 @@ type IPCapacityRepository interface {
 	GetAction(id uint) (*models.IPCapacityAction, error)
 	UpdateAction(action *models.IPCapacityAction) error
 	DeleteAction(id uint) error
+	ImportActions(rows []IPCapacityImportRow) (*IPCapacityImportResult, error)
 	ListHistoryDays() ([]string, error)
 	GetDayHistory(day time.Time) (*IPCapacityDayHistory, error)
+	GetAllHistory() ([]IPCapacityHistorySnapshot, error)
 }
 
 type ipCapacityRepo struct {
@@ -270,6 +297,76 @@ func (r *ipCapacityRepo) DeleteAction(id uint) error {
 	})
 }
 
+func (r *ipCapacityRepo) ImportActions(rows []IPCapacityImportRow) (*IPCapacityImportResult, error) {
+	if len(rows) == 0 {
+		return nil, errors.New("no import rows provided")
+	}
+	result := &IPCapacityImportResult{}
+	return result, r.db.Transaction(func(tx *gorm.DB) error {
+		recalcNodeIDs := make(map[uint]struct{})
+		for i := range rows {
+			row := rows[i]
+			row.Name = strings.TrimSpace(row.Name)
+			row.Type = strings.TrimSpace(row.Type)
+			row.Province = strings.TrimSpace(row.Province)
+			row.ActionType = strings.TrimSpace(strings.ToLower(row.ActionType))
+			if row.Name == "" {
+				return errors.New("name required")
+			}
+			if row.Type == "" {
+				return errors.New("type required")
+			}
+			if row.Province == "" {
+				return errors.New("province required")
+			}
+			if row.CapacityBeforeUpdateIQD < 0 {
+				return errors.New("capacity before update cannot be negative")
+			}
+			action := models.IPCapacityAction{
+				Type:      row.ActionType,
+				AmountIQD: row.AmountIQD,
+				ActionAt:  row.ActionAt,
+			}
+
+			var node models.IPCapacityNode
+			err := tx.
+				Where("province = ? AND name = ? AND type = ?", row.Province, row.Name, row.Type).
+				First(&node).Error
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				node = models.IPCapacityNode{
+					Name:               row.Name,
+					Type:               row.Type,
+					Province:           row.Province,
+					InitialCapacityIQD: row.CapacityBeforeUpdateIQD,
+					CurrentCapacityIQD: row.CapacityBeforeUpdateIQD,
+				}
+				if err := tx.Create(&node).Error; err != nil {
+					return err
+				}
+				result.CreatedNodes++
+			} else if err != nil {
+				return err
+			}
+
+			action.NodeID = node.ID
+			if err := validateCapacityAction(&action); err != nil {
+				return err
+			}
+			if err := tx.Create(&action).Error; err != nil {
+				return err
+			}
+			recalcNodeIDs[node.ID] = struct{}{}
+			result.ImportedActions++
+		}
+		for nodeID := range recalcNodeIDs {
+			if err := recalculateCapacityNode(tx, nodeID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 func (r *ipCapacityRepo) ListHistoryDays() ([]string, error) {
 	var rows []struct {
 		Day time.Time `gorm:"column:day"`
@@ -303,6 +400,36 @@ func (r *ipCapacityRepo) GetDayHistory(day time.Time) (*IPCapacityDayHistory, er
 		return nil, err
 	}
 	return r.buildFullDayHistory(nodes, actions, rawStart, rawEnd)
+}
+
+func (r *ipCapacityRepo) GetAllHistory() ([]IPCapacityHistorySnapshot, error) {
+	days, err := r.ListHistoryDays()
+	if err != nil {
+		return nil, err
+	}
+	snapshots := make([]IPCapacityHistorySnapshot, 0)
+	for _, rawDay := range days {
+		day, err := time.ParseInLocation("2006-01-02", rawDay, time.Local)
+		if err != nil {
+			return nil, err
+		}
+		history, err := r.GetDayHistory(day)
+		if err != nil {
+			return nil, err
+		}
+		for _, summary := range history.Summaries {
+			snapshots = append(snapshots, IPCapacityHistorySnapshot{
+				Day:                rawDay,
+				NodeID:             summary.NodeID,
+				NodeName:           summary.NodeName,
+				NodeType:           summary.NodeType,
+				NodeProvince:       summary.NodeProvince,
+				CurrentCapacityIQD: summary.ClosingCapacityIQD,
+				LatestActionAt:     summary.LatestActionAt,
+			})
+		}
+	}
+	return snapshots, nil
 }
 
 func (r *ipCapacityRepo) buildFullDayHistory(nodes []models.IPCapacityNode, actions []models.IPCapacityAction, rawStart, rawEnd time.Time) (*IPCapacityDayHistory, error) {

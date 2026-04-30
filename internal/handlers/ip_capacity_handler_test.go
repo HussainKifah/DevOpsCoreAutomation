@@ -40,10 +40,16 @@ func (m *mockIPCapacityRepo) GetAction(id uint) (*models.IPCapacityAction, error
 }
 func (m *mockIPCapacityRepo) UpdateAction(*models.IPCapacityAction) error { return nil }
 func (m *mockIPCapacityRepo) DeleteAction(uint) error                     { return nil }
-func (m *mockIPCapacityRepo) ListHistoryDays() ([]string, error)          { return nil, nil }
+func (m *mockIPCapacityRepo) ImportActions([]repository.IPCapacityImportRow) (*repository.IPCapacityImportResult, error) {
+	return &repository.IPCapacityImportResult{}, nil
+}
+func (m *mockIPCapacityRepo) ListHistoryDays() ([]string, error) { return nil, nil }
 func (m *mockIPCapacityRepo) GetDayHistory(day time.Time) (*repository.IPCapacityDayHistory, error) {
 	m.historyDay = day
 	return &repository.IPCapacityDayHistory{Summaries: []repository.IPCapacityNodeDaySummary{}, Actions: []repository.IPCapacityActionWithNode{}}, nil
+}
+func (m *mockIPCapacityRepo) GetAllHistory() ([]repository.IPCapacityHistorySnapshot, error) {
+	return []repository.IPCapacityHistorySnapshot{}, nil
 }
 
 func setupIPCapacityRouter(repo repository.IPCapacityRepository) *gin.Engine {

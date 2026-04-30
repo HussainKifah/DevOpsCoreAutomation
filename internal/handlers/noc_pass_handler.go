@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -45,6 +46,27 @@ type nocPassDeviceDTO struct {
 	LastApplyError    string              `json:"last_apply_error,omitempty"`
 	LastAppliedAt     *time.Time          `json:"last_applied_at,omitempty"`
 	PasswordRotatedAt *time.Time          `json:"password_rotated_at,omitempty"`
+}
+
+type nocPassAllDeviceCredentialDTO struct {
+	Username       string     `json:"username"`
+	Password       string     `json:"password"`
+	Source         string     `json:"source"`
+	LastUpdatedAt  *time.Time `json:"last_updated_at,omitempty"`
+	LastApplyOK    bool       `json:"last_apply_ok"`
+	LastApplyError string     `json:"last_apply_error,omitempty"`
+}
+
+type nocPassAllDeviceDTO struct {
+	Province       string                          `json:"province"`
+	IP             string                          `json:"ip"`
+	DisplayName    string                          `json:"display_name"`
+	Site           string                          `json:"site"`
+	Vendor         string                          `json:"vendor"`
+	LastApplyOK    bool                            `json:"last_apply_ok"`
+	LastApplyError string                          `json:"last_apply_error,omitempty"`
+	LastAppliedAt  *time.Time                      `json:"last_applied_at,omitempty"`
+	Credentials    []nocPassAllDeviceCredentialDTO `json:"credentials"`
 }
 
 type nocPassKeepUserDTO struct {
@@ -349,6 +371,179 @@ func (h *NocPassHandler) ListDevices(c *gin.Context) {
 		out = append(out, toNocPassDeviceDTO(&row, statusByHost[host]))
 	}
 	c.JSON(http.StatusOK, gin.H{"devices": out})
+}
+
+// ListAllDevices GET /api/noc-pass/all-devices
+func (h *NocPassHandler) ListAllDevices(c *gin.Context) {
+	states, err := h.repo.ListStatuses()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	rows, err := h.nocDataRepo.ListAll()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	creds, err := h.repo.ListCredentials()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	policies, err := h.repo.ListPolicies()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	nocDataByHost := make(map[string]*models.NocDataDevice, len(rows))
+	for i := range rows {
+		host := strings.ToLower(strings.TrimSpace(rows[i].Host))
+		if host == "" {
+			continue
+		}
+		row := rows[i]
+		nocDataByHost[host] = &row
+	}
+
+	credsByHost := make(map[string][]models.NocPassCredential)
+	for i := range creds {
+		host := strings.ToLower(strings.TrimSpace(creds[i].Host))
+		if host == "" {
+			continue
+		}
+		credsByHost[host] = append(credsByHost[host], creds[i])
+	}
+
+	out := make([]nocPassAllDeviceDTO, 0, len(states))
+	for i := range states {
+		state := states[i]
+		hostKey := strings.ToLower(strings.TrimSpace(state.Host))
+		if hostKey == "" {
+			continue
+		}
+		row := nocDataByHost[hostKey]
+		displayName := strings.TrimSpace(state.DisplayName)
+		site := ""
+		province := "Unknown"
+		vendor := strings.TrimSpace(state.Vendor)
+		if row != nil {
+			if label := nocpass.DeviceLabel(row); strings.TrimSpace(label) != "" {
+				displayName = label
+			}
+			site = strings.TrimSpace(row.Site)
+			province = nocpass.ProvinceFromSite(row.Site)
+			vendor = nocpass.NormalizeSourceVendor(row.Vendor, row.DeviceModel)
+		}
+		if displayName == "" {
+			displayName = strings.TrimSpace(state.Host)
+		}
+
+		credentialDTOs := h.allDeviceCredentialDTOs(credsByHost[hostKey])
+		hasFiberx := false
+		hasSupport := false
+		for _, item := range credentialDTOs {
+			if strings.EqualFold(item.Username, nocpass.UserFiberx) {
+				hasFiberx = true
+			}
+			if strings.EqualFold(item.Username, nocpass.UserSupport) {
+				hasSupport = true
+			}
+		}
+		if !hasFiberx && len(state.EncNocPassword) > 0 {
+			if plain, err := crypto.Decrypt(h.key, state.EncNocPassword); err == nil {
+				credentialDTOs = append(credentialDTOs, nocPassAllDeviceCredentialDTO{
+					Username:       nocpass.UserFiberx,
+					Password:       plain,
+					Source:         "rotator",
+					LastUpdatedAt:  state.PasswordRotatedAt,
+					LastApplyOK:    state.LastApplyOK,
+					LastApplyError: state.LastApplyError,
+				})
+			}
+		}
+		if !hasSupport {
+			if supportFallback, ok := h.supportCredentialFallback(&state, row, policies); ok {
+				credentialDTOs = append(credentialDTOs, supportFallback)
+			}
+		}
+		sort.SliceStable(credentialDTOs, func(a, b int) bool {
+			return strings.ToLower(credentialDTOs[a].Username) < strings.ToLower(credentialDTOs[b].Username)
+		})
+
+		out = append(out, nocPassAllDeviceDTO{
+			Province:       province,
+			IP:             strings.TrimSpace(state.Host),
+			DisplayName:    displayName,
+			Site:           site,
+			Vendor:         vendor,
+			LastApplyOK:    state.LastApplyOK,
+			LastApplyError: state.LastApplyError,
+			LastAppliedAt:  state.LastAppliedAt,
+			Credentials:    credentialDTOs,
+		})
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if !strings.EqualFold(out[i].Province, out[j].Province) {
+			return strings.ToLower(out[i].Province) < strings.ToLower(out[j].Province)
+		}
+		return out[i].IP < out[j].IP
+	})
+	c.JSON(http.StatusOK, gin.H{"devices": out})
+}
+
+func (h *NocPassHandler) supportCredentialFallback(state *models.NocPassDevice, row *models.NocDataDevice, policies []models.NocPassPolicy) (nocPassAllDeviceCredentialDTO, bool) {
+	if state == nil || row == nil || !state.LastApplyOK || state.PasswordRotatedAt == nil {
+		return nocPassAllDeviceCredentialDTO{}, false
+	}
+	rotationDate := state.PasswordRotatedAt.Format("2006-01-02")
+	for i := range policies {
+		policy := &policies[i]
+		if !policy.Enabled || strings.TrimSpace(policy.ActivePasswordDate) != rotationDate {
+			continue
+		}
+		targetRows := nocpass.ResolvePolicyTargets([]models.NocDataDevice{*row}, policy.TargetType, policy.TargetValue)
+		if len(targetRows) == 0 {
+			continue
+		}
+		if len(nocpass.FilterPolicyOwnedTargets(targetRows, policy, policies)) == 0 {
+			continue
+		}
+		if len(policy.EncActiveSupportPassword) == 0 {
+			continue
+		}
+		plain, err := crypto.Decrypt(h.key, policy.EncActiveSupportPassword)
+		if err != nil || strings.TrimSpace(plain) == "" {
+			continue
+		}
+		return nocPassAllDeviceCredentialDTO{
+			Username:      nocpass.UserSupport,
+			Password:      plain,
+			Source:        "rotator",
+			LastUpdatedAt: state.PasswordRotatedAt,
+			LastApplyOK:   true,
+		}, true
+	}
+	return nocPassAllDeviceCredentialDTO{}, false
+}
+
+func (h *NocPassHandler) allDeviceCredentialDTOs(creds []models.NocPassCredential) []nocPassAllDeviceCredentialDTO {
+	out := make([]nocPassAllDeviceCredentialDTO, 0, len(creds))
+	for i := range creds {
+		plain, err := crypto.Decrypt(h.key, creds[i].EncPassword)
+		if err != nil {
+			continue
+		}
+		out = append(out, nocPassAllDeviceCredentialDTO{
+			Username:       strings.TrimSpace(creds[i].Username),
+			Password:       plain,
+			Source:         strings.TrimSpace(creds[i].Source),
+			LastUpdatedAt:  creds[i].LastAppliedAt,
+			LastApplyOK:    creds[i].LastApplyOK,
+			LastApplyError: creds[i].LastApplyError,
+		})
+	}
+	return out
 }
 
 // ListPolicies GET /api/noc-pass/policies

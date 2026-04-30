@@ -5,6 +5,8 @@
       <h1 class="text-2xl font-bold text-[#f1f5f9]">Capacities Update</h1>
     </div>
     <div class="flex items-center gap-2">
+      <input x-ref="importFile" type="file" accept=".xlsx,.xls,.csv" class="hidden" @change="importExcel($event)">
+      <button type="button" @click="$refs.importFile.click()" :disabled="importing" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold btn-press" x-text="importing ? 'Importing...' : 'Import Excel'"></button>
       <button type="button" @click="openNodeModal()" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-semibold btn-press">Add Capacity</button>
       <button type="button" @click="openActionModal()" class="px-4 py-2 rounded-lg bg-[#334155] hover:bg-[#475569] text-white text-sm font-semibold btn-press">Add Action</button>
     </div>
@@ -43,16 +45,18 @@
             <th class="px-4 py-3 font-semibold">Name</th>
             <th class="px-4 py-3 font-semibold">Type</th>
             <th class="px-4 py-3 font-semibold">Before Update</th>
+            <th class="px-4 py-3 font-semibold">Action</th>
             <th class="px-4 py-3 font-semibold">After Update</th>
             <th class="px-4 py-3 font-semibold">Difference</th>
+            <th class="px-4 py-3 font-semibold">Date</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-[rgba(255,255,255,0.06)]">
           <template x-if="loadingNodes">
-            <tr><td colspan="6" class="px-4 py-10 text-center text-sm text-[#64748b]">Loading...</td></tr>
+            <tr><td colspan="8" class="px-4 py-10 text-center text-sm text-[#64748b]">Loading...</td></tr>
           </template>
           <template x-if="!loadingNodes && reviewRows().length === 0">
-            <tr><td colspan="6" class="px-4 py-10 text-center text-sm text-[#64748b]">No capacity updates found.</td></tr>
+            <tr><td colspan="8" class="px-4 py-10 text-center text-sm text-[#64748b]">No capacity updates found.</td></tr>
           </template>
           <template x-for="action in reviewRows()" :key="'review-action-' + action.id">
             <tr class="hover:bg-white/[0.03]">
@@ -60,8 +64,10 @@
               <td class="px-4 py-3 text-sm font-semibold text-[#f1f5f9]" x-text="action.node_name"></td>
               <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="action.node_type"></td>
               <td class="px-4 py-3 font-mono text-sm text-[#94a3b8]" x-text="capacity(action.capacity_before_iqd)"></td>
+              <td class="px-4 py-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full" :class="typeClass(action.type)" x-text="action.type"></span></td>
               <td class="px-4 py-3 font-mono text-sm text-[#f1f5f9]" x-text="capacity(action.capacity_after_iqd)"></td>
               <td class="px-4 py-3 font-mono text-sm" :class="action.type === 'upgrade' ? 'text-emerald-300' : 'text-red-300'" x-text="signedCapacity(action)"></td>
+              <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="fmtDateOnly(action.action_at)"></td>
             </tr>
           </template>
         </tbody>
@@ -70,7 +76,10 @@
   </div>
 
   <div x-show="tab === 'actions'" x-cloak class="space-y-4">
-    <div class="flex justify-end">
+    <div class="flex items-center justify-between gap-3 flex-wrap">
+      <div class="relative flex-1 min-w-[240px] max-w-md">
+        <input x-model.debounce.250ms="actionSearch" type="search" placeholder="Search province, name, or node type" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:border-teal-500/50">
+      </div>
       <button type="button" @click="loadActions()" class="px-3 py-2 rounded-lg border border-[rgba(255,255,255,0.08)] text-sm text-[#94a3b8] hover:text-[#f1f5f9] hover:border-teal-500/40">Refresh</button>
     </div>
     <div class="overflow-x-auto rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827]">
@@ -80,7 +89,7 @@
             <th class="px-4 py-3 font-semibold">Province</th>
             <th class="px-4 py-3 font-semibold">Name</th>
             <th class="px-4 py-3 font-semibold">Node Type</th>
-            <th class="px-4 py-3 font-semibold">Time</th>
+            <th class="px-4 py-3 font-semibold">Date</th>
             <th class="px-4 py-3 font-semibold">Action</th>
             <th class="px-4 py-3 font-semibold">Amount</th>
             <th class="px-4 py-3 font-semibold">Before</th>
@@ -92,15 +101,15 @@
           <template x-if="loadingActions">
             <tr><td colspan="9" class="px-4 py-10 text-center text-sm text-[#64748b]">Loading...</td></tr>
           </template>
-          <template x-if="!loadingActions && actions.length === 0">
+          <template x-if="!loadingActions && filteredActions().length === 0">
             <tr><td colspan="9" class="px-4 py-10 text-center text-sm text-[#64748b]">No capacity actions yet.</td></tr>
           </template>
-          <template x-for="action in actions" :key="action.id">
+          <template x-for="action in filteredActions()" :key="action.id">
             <tr class="hover:bg-white/[0.03]">
               <td class="px-4 py-3 text-sm text-[#f1f5f9]" x-text="action.node_province"></td>
               <td class="px-4 py-3 text-sm font-semibold text-[#f1f5f9]" x-text="action.node_name"></td>
               <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="action.node_type"></td>
-              <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="fmtDateTime(action.action_at)"></td>
+              <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="fmtDateOnly(action.action_at)"></td>
               <td class="px-4 py-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full" :class="typeClass(action.type)" x-text="action.type"></span></td>
               <td class="px-4 py-3 font-mono text-sm" :class="action.type === 'upgrade' ? 'text-emerald-300' : 'text-red-300'" x-text="signedCapacity(action)"></td>
               <td class="px-4 py-3 font-mono text-sm text-[#94a3b8]" x-text="capacity(action.capacity_before_iqd)"></td>
@@ -120,12 +129,12 @@
     <aside class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-3 h-fit">
       <div class="flex items-center justify-between mb-3">
         <h2 class="text-sm font-semibold text-[#f1f5f9]">Days</h2>
-        <button type="button" @click="loadHistoryDays()" class="text-xs text-teal-400 hover:underline">Refresh</button>
+        <button type="button" @click="refreshHistory()" class="text-xs text-teal-400 hover:underline">Refresh</button>
       </div>
       <template x-if="historyDays.length === 0">
         <p class="text-sm text-[#64748b] py-4">No history yet.</p>
       </template>
-      <div class="space-y-1">
+      <div class="space-y-1 max-h-[28rem] overflow-y-auto pr-1">
         <template x-for="day in historyDays" :key="day">
           <button type="button" @click="selectDay(day)" class="w-full text-left px-3 py-2 rounded-lg text-sm transition-colors" :class="selectedDay === day ? 'bg-teal-500/20 text-teal-300' : 'text-[#94a3b8] hover:bg-white/5 hover:text-[#f1f5f9]'">
             <span x-text="day"></span>
@@ -135,12 +144,32 @@
     </aside>
     <section class="space-y-4 min-w-0">
       <div class="flex items-center justify-between gap-3 flex-wrap">
-        <h2 class="text-lg font-semibold text-[#f1f5f9]" x-text="selectedDay ? ('History for ' + selectedDay) : 'History'"></h2>
+        <h2 class="text-lg font-semibold text-[#f1f5f9]" x-text="historyScope === 'all' ? 'Whole History' : (selectedDay ? ('History for ' + selectedDay) : 'History')"></h2>
         <div class="flex items-center gap-2 flex-wrap">
-          <input type="date" x-model="selectedDay" @change="loadDayHistory()" class="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9]">
+          <input type="date" x-model="selectedDay" @change="setHistoryScope('day')" class="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9]">
+          <div class="flex gap-1 p-1 rounded-lg bg-[#111827] border border-[rgba(255,255,255,0.08)]">
+            <button type="button" @click="setHistoryScope('day')" class="px-3 py-1.5 rounded-md text-xs font-semibold" :class="historyScope === 'day' ? 'bg-teal-500/20 text-teal-300' : 'text-[#94a3b8] hover:text-[#f1f5f9]'">This Day</button>
+            <button type="button" @click="setHistoryScope('all')" class="px-3 py-1.5 rounded-md text-xs font-semibold" :class="historyScope === 'all' ? 'bg-teal-500/20 text-teal-300' : 'text-[#94a3b8] hover:text-[#f1f5f9]'">Whole History</button>
+          </div>
           <button type="button" @click="exportHistoryExcel()" :disabled="!historyRows().length" class="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold">Export Excel</button>
-          <button type="button" @click="loadHistoryDays()" class="px-3 py-2 rounded-lg border border-[rgba(255,255,255,0.08)] text-sm text-[#94a3b8] hover:text-[#f1f5f9] hover:border-teal-500/40">Refresh</button>
+          <button type="button" @click="refreshHistory()" class="px-3 py-2 rounded-lg border border-[rgba(255,255,255,0.08)] text-sm text-[#94a3b8] hover:text-[#f1f5f9] hover:border-teal-500/40">Refresh</button>
         </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <select x-model="historyFilter.province" class="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9] focus:outline-none focus:border-teal-500/50">
+          <option value="">All provinces</option>
+          <template x-for="province in provinceOptions()" :key="'history-province-' + province">
+            <option :value="province" x-text="province"></option>
+          </template>
+        </select>
+        <select x-model="historyFilter.type" class="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9] focus:outline-none focus:border-teal-500/50">
+          <option value="">All node types</option>
+          <template x-for="type in typeOptions()" :key="'history-type-' + type">
+            <option :value="type" x-text="type"></option>
+          </template>
+        </select>
+        <input x-model.debounce.250ms="historyFilter.name" type="search" placeholder="Filter by name" class="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:border-teal-500/50">
       </div>
 
       <div class="overflow-x-auto rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827]">
@@ -150,26 +179,24 @@
               <th class="px-4 py-3 font-semibold">Province</th>
               <th class="px-4 py-3 font-semibold">Name</th>
               <th class="px-4 py-3 font-semibold">Type</th>
-              <th class="px-4 py-3 font-semibold">Capacity Now</th>
-              <th class="px-4 py-3 font-semibold">Action</th>
-              <th class="px-4 py-3 font-semibold">Latest Time</th>
+              <th class="px-4 py-3 font-semibold">Current</th>
+              <th class="px-4 py-3 font-semibold">Date</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-[rgba(255,255,255,0.06)]">
             <template x-if="loadingHistory">
-              <tr><td colspan="6" class="px-4 py-8 text-center text-sm text-[#64748b]">Loading...</td></tr>
+              <tr><td colspan="5" class="px-4 py-8 text-center text-sm text-[#64748b]">Loading...</td></tr>
             </template>
             <template x-if="!loadingHistory && historyRows().length === 0">
-              <tr><td colspan="6" class="px-4 py-8 text-center text-sm text-[#64748b]">No capacity actions for this date.</td></tr>
+              <tr><td colspan="5" class="px-4 py-8 text-center text-sm text-[#64748b]">No capacity history found.</td></tr>
             </template>
-            <template x-for="row in historyRows()" :key="'history-node-' + row.node_id">
+            <template x-for="row in historyRows()" :key="row.row_key">
               <tr>
                 <td class="px-4 py-3 text-sm text-[#f1f5f9]" x-text="row.node_province"></td>
                 <td class="px-4 py-3 text-sm font-semibold text-[#f1f5f9]" x-text="row.node_name"></td>
                 <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="row.node_type"></td>
-                <td class="px-4 py-3 font-mono text-sm text-[#f1f5f9]" x-text="capacity(row.closing_capacity_iqd)"></td>
-                <td class="px-4 py-3 font-mono text-sm" :class="Number(row.difference_iqd || 0) >= 0 ? 'text-emerald-300' : 'text-red-300'" x-text="capacityWithSign(row.difference_iqd)"></td>
-                <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="fmtDateTime(row.latest_action_at)"></td>
+                <td class="px-4 py-3 font-mono text-sm text-[#f1f5f9]" x-text="capacity(row.current_capacity_iqd)"></td>
+                <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="fmtDateOnly(row.latest_action_at)"></td>
               </tr>
             </template>
           </tbody>
@@ -195,7 +222,7 @@
           <input x-model="nodeForm.type" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
         </div>
         <div>
-          <label class="block text-xs text-[#94a3b8] mb-1">Initial Capacity Gb/s</label>
+          <label class="block text-xs text-[#94a3b8] mb-1">Initial Capacity Mb/s</label>
           <input type="number" min="0" step="1" x-model.number="nodeForm.initial_capacity_iqd" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
         </div>
         <p class="text-xs text-red-400" x-show="formError" x-text="formError"></p>
@@ -229,7 +256,7 @@
             </select>
           </div>
           <div>
-            <label class="block text-xs text-[#94a3b8] mb-1">Amount Gb/s</label>
+            <label class="block text-xs text-[#94a3b8] mb-1">Amount Mb/s</label>
             <input type="number" min="1" step="1" x-model.number="actionForm.amount_iqd" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
           </div>
         </div>
@@ -257,12 +284,17 @@ function ipCapacitiesPage() {
     historyDays: [],
     selectedDay: '',
     dayHistory: { summaries: [], actions: [] },
+    allHistory: [],
     search: '',
+    actionSearch: '',
+    historyScope: 'day',
+    historyFilter: { province: '', type: '', name: '' },
     error: '',
     formError: '',
     loadingNodes: false,
     loadingActions: false,
     loadingHistory: false,
+    importing: false,
     nodeModal: false,
     actionModal: false,
     selectedNodeDeleteId: 0,
@@ -276,7 +308,10 @@ function ipCapacitiesPage() {
       this.tab = next;
       if (next === 'review') this.loadActions();
       if (next === 'actions') this.loadActions();
-      if (next === 'history') this.loadHistoryDays();
+      if (next === 'history') {
+        this.loadActions();
+        this.loadHistoryDays();
+      }
     },
     async refreshAll() {
       await Promise.all([this.loadNodes(), this.loadActions(), this.loadHistoryDays()]);
@@ -314,6 +349,103 @@ function ipCapacitiesPage() {
         this.loadingActions = false;
       }
     },
+    async importExcel(event) {
+      const file = event.target.files && event.target.files[0];
+      event.target.value = '';
+      if (!file) return;
+      if (typeof XLSX === 'undefined') {
+        this.error = 'Excel import library is not loaded';
+        return;
+      }
+      this.importing = true;
+      this.error = '';
+      try {
+        const rows = await this.readCapacityImportRows(file);
+        if (!rows.length) throw new Error('No import rows found');
+        const data = await this.api('/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rows })
+        });
+        this.nodes = data.nodes || [];
+        this.actions = data.actions || [];
+        await this.loadHistoryDays();
+        this.tab = 'actions';
+      } catch (e) {
+        this.error = e.message;
+      } finally {
+        this.importing = false;
+      }
+    },
+    readCapacityImportRows(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+            resolve(rawRows.map((row, index) => this.normalizeImportRow(row, index)).filter(Boolean));
+          } catch (err) {
+            reject(err);
+          }
+        };
+        reader.onerror = () => reject(new Error('Could not read Excel file'));
+        reader.readAsArrayBuffer(file);
+      });
+    },
+    normalizeImportRow(row, index) {
+      const value = (...names) => {
+        for (const key of Object.keys(row)) {
+          const normalized = this.normalizeHeader(key);
+          if (names.some((name) => normalized === this.normalizeHeader(name))) return row[key];
+        }
+        return '';
+      };
+      const name = String(value('name') || '').trim();
+      const province = String(value('province') || '').trim();
+      const type = String(value('type', 'node type') || '').trim();
+      const action = String(value('action') || '').trim().toLowerCase();
+      const before = this.importNumber(value('total capacity before update', 'before update', 'capacity before'));
+      const difference = Math.abs(this.importNumber(value('difference', 'amount', 'action mb/s', 'action gb/s')));
+      const actionAt = this.importDate(value('date / time', 'date/time', 'date time', 'action time', 'time'));
+      const empty = !name && !province && !type && !action && before === 0 && difference === 0 && !actionAt;
+      if (empty) return null;
+      if (!name || !province || !type || !action || !difference || !actionAt) {
+        throw new Error('Row ' + (index + 2) + ' is missing Name, Province, Type, Action, Difference, or Date / Time');
+      }
+      if (!['upgrade', 'downgrade'].includes(action)) {
+        throw new Error('Row ' + (index + 2) + ' action must be Upgrade or Downgrade');
+      }
+      return {
+        name,
+        province,
+        type,
+        capacity_before_update_iqd: before,
+        action,
+        difference_iqd: difference,
+        action_at: actionAt
+      };
+    },
+    normalizeHeader(value) {
+      return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    },
+    importNumber(value) {
+      if (typeof value === 'number') return value;
+      const cleaned = String(value || '').replace(/,/g, '').trim();
+      const parsed = Number(cleaned);
+      return Number.isFinite(parsed) ? parsed : 0;
+    },
+    importDate(value) {
+      if (!value) return '';
+      if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return this.rawActionTime(this.datetimeLocal(value.toISOString(), false));
+      }
+      const raw = String(value).trim();
+      const parsed = new Date(raw);
+      if (!Number.isNaN(parsed.getTime())) return this.rawActionTime(this.datetimeLocal(parsed.toISOString(), false));
+      return raw;
+    },
     async loadHistoryDays() {
       try {
         const data = await this.api('/history/days');
@@ -328,8 +460,18 @@ function ipCapacitiesPage() {
       }
     },
     async selectDay(day) {
+      this.historyScope = 'day';
       this.selectedDay = day;
       await this.loadDayHistory();
+    },
+    async setHistoryScope(scope) {
+      this.historyScope = scope;
+      if (scope === 'all') await this.loadAllHistory();
+      if (scope === 'day') await this.loadDayHistory();
+    },
+    async refreshHistory() {
+      await this.loadHistoryDays();
+      if (this.historyScope === 'all') await this.loadAllHistory();
     },
     async loadDayHistory() {
       if (!this.selectedDay) {
@@ -340,6 +482,17 @@ function ipCapacitiesPage() {
       try {
         const data = await this.api('/history/day?date=' + encodeURIComponent(this.selectedDay));
         this.dayHistory = data.history || { summaries: [], actions: [] };
+      } catch (e) {
+        this.error = e.message;
+      } finally {
+        this.loadingHistory = false;
+      }
+    },
+    async loadAllHistory() {
+      this.loadingHistory = true;
+      try {
+        const data = await this.api('/history/all');
+        this.allHistory = data.history || [];
       } catch (e) {
         this.error = e.message;
       } finally {
@@ -454,6 +607,35 @@ function ipCapacitiesPage() {
     nodeLabel(node) {
       return [node.province, node.name, node.type].filter(Boolean).join(' / ');
     },
+    filteredActions() {
+      const q = String(this.actionSearch || '').trim().toLowerCase();
+      const rows = Array.isArray(this.actions) ? this.actions : [];
+      if (!q) return rows;
+      return rows.filter((action) => [
+        action.node_province,
+        action.node_name,
+        action.node_type
+      ].some((value) => String(value || '').toLowerCase().includes(q)));
+    },
+    provinceOptions() {
+      return this.uniqueSorted((Array.isArray(this.nodes) ? this.nodes : []).map((node) => node.province));
+    },
+    typeOptions() {
+      return this.uniqueSorted((Array.isArray(this.nodes) ? this.nodes : []).map((node) => node.type));
+    },
+    uniqueSorted(values) {
+      return Array.from(new Set(values.map((value) => String(value || '').trim()).filter(Boolean)))
+        .sort((a, b) => a.localeCompare(b));
+    },
+    rowMatchesHistoryFilter(row) {
+      const province = String(this.historyFilter.province || '').trim().toLowerCase();
+      const type = String(this.historyFilter.type || '').trim().toLowerCase();
+      const name = String(this.historyFilter.name || '').trim().toLowerCase();
+      if (province && String(row.node_province || '').toLowerCase() !== province) return false;
+      if (type && String(row.node_type || '').toLowerCase() !== type) return false;
+      if (name && !String(row.node_name || '').toLowerCase().includes(name)) return false;
+      return true;
+    },
     reviewRows() {
       const q = String(this.search || '').trim().toLowerCase();
       const rows = (Array.isArray(this.nodes) ? this.nodes : [])
@@ -483,7 +665,40 @@ function ipCapacitiesPage() {
       ].some((value) => String(value || '').toLowerCase().includes(q)));
     },
     historyRows() {
-      return Array.isArray(this.dayHistory.summaries) ? this.dayHistory.summaries : [];
+      if (this.historyScope === 'all') {
+        const seenChanges = new Set();
+        return (Array.isArray(this.allHistory) ? this.allHistory : [])
+          .map((action) => ({
+            row_key: 'history-' + action.node_id + '-' + action.latest_action_at,
+            node_id: action.node_id,
+            node_province: action.node_province,
+            node_name: action.node_name,
+            node_type: action.node_type,
+            current_capacity_iqd: action.current_capacity_iqd,
+            day: action.day,
+            latest_action_at: action.latest_action_at
+          }))
+          .filter((row) => row.latest_action_at && !String(row.latest_action_at).startsWith('0001-01-01'))
+          .filter((row) => this.rowMatchesHistoryFilter(row))
+          .filter((row) => {
+            const changeKey = row.node_id + '|' + row.latest_action_at;
+            if (seenChanges.has(changeKey)) return false;
+            seenChanges.add(changeKey);
+            return true;
+          })
+          .sort((a, b) => new Date(b.latest_action_at).getTime() - new Date(a.latest_action_at).getTime());
+      }
+      return (Array.isArray(this.dayHistory.summaries) ? this.dayHistory.summaries : [])
+        .map((row) => ({
+          row_key: 'day-' + row.node_id,
+          node_province: row.node_province,
+          node_name: row.node_name,
+          node_type: row.node_type,
+          current_capacity_iqd: row.closing_capacity_iqd,
+          day: this.selectedDay,
+          latest_action_at: row.latest_action_at
+        }))
+        .filter((row) => this.rowMatchesHistoryFilter(row));
     },
     todayDate() {
       const d = new Date();
@@ -491,7 +706,7 @@ function ipCapacitiesPage() {
       return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
     },
     capacity(value) {
-      return new Intl.NumberFormat('en-US').format(Number(value || 0)) + ' Gb/s';
+      return new Intl.NumberFormat('en-US').format(Number(value || 0)) + ' Mb/s';
     },
     capacityWithSign(value) {
       const n = Number(value || 0);
@@ -510,13 +725,12 @@ function ipCapacitiesPage() {
         Province: row.node_province || '',
         Name: row.node_name || '',
         Type: row.node_type || '',
-        'Capacity Now Gb/s': Number(row.closing_capacity_iqd || 0),
-        'Action Gb/s': Number(row.difference_iqd || 0),
-        'Latest Time': this.fmtDateTime(row.latest_action_at)
+        'Current Capacity Mb/s': Number(row.current_capacity_iqd || 0),
+        Date: this.fmtDateOnly(row.latest_action_at)
       }));
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length ? rows : [{}]), 'History');
-      XLSX.writeFile(wb, 'ip-capacities-history-' + (this.selectedDay || 'latest') + '.xlsx');
+      XLSX.writeFile(wb, 'ip-capacities-history-' + (this.historyScope === 'all' ? 'all' : (this.selectedDay || 'latest')) + '.xlsx');
     },
     adjustedDate(value) {
       if (!value) return null;
@@ -526,6 +740,13 @@ function ipCapacitiesPage() {
       if (!value || String(value).startsWith('0001-01-01')) return '-';
       const d = this.adjustedDate(value);
       return d ? d.toLocaleString() : '-';
+    },
+    fmtDateOnly(value) {
+      if (!value || String(value).startsWith('0001-01-01')) return '-';
+      const d = this.adjustedDate(value);
+      if (!d) return '-';
+      const pad = (n) => String(n).padStart(2, '0');
+      return d.getFullYear() + '/' + pad(d.getMonth() + 1) + '/' + pad(d.getDate());
     },
     datetimeLocal(value, applyOffset) {
       const d = applyOffset ? this.adjustedDate(value) : new Date(value);

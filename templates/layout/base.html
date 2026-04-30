@@ -76,6 +76,55 @@
       box-shadow: 0 0 0 1px rgba(59,130,246,0.4), 0 8px 24px rgba(0,0,0,0.4);
     }
     .btn-press:active { transform: scale(0.98); }
+
+    html:not(.dark) [class*="bg-[#0a0e1a]"],
+    html:not(.dark) [class*="bg-[#111827]"],
+    html:not(.dark) [class*="bg-[#0f172a]"],
+    html:not(.dark) [class*="bg-[#1a2236]"],
+    html:not(.dark) [class*="bg-[#1e293b]"] {
+      background-color: #ffffff !important;
+    }
+    html:not(.dark) thead[class*="bg-[#1a2236]"],
+    html:not(.dark) thead[class*="bg-[#111827]"],
+    html:not(.dark) tr[class*="bg-[#111827]"],
+    html:not(.dark) tr[class*="bg-[#1a2236]"] {
+      background-color: #f8fafc !important;
+    }
+    html:not(.dark) [class*="border-[rgba(255,255,255"] {
+      border-color: #e5e7eb !important;
+    }
+    html:not(.dark) [class*="divide-[rgba(255,255,255"] > :not([hidden]) ~ :not([hidden]) {
+      border-color: #e5e7eb !important;
+    }
+    html:not(.dark) [class*="text-[#f1f5f9]"],
+    html:not(.dark) [class*="text-[#e2e8f0]"],
+    html:not(.dark) [class*="text-[#d1fae5]"],
+    html:not(.dark) [class*="text-[#fee2e2]"] {
+      color: #111827 !important;
+    }
+    html:not(.dark) [class*="text-[#94a3b8]"],
+    html:not(.dark) [class*="text-[#64748b]"],
+    html:not(.dark) [class*="text-[#475569]"] {
+      color: #64748b !important;
+    }
+    html:not(.dark) [class*="placeholder-[#475569]"]::placeholder,
+    html:not(.dark) [class*="placeholder-[#94a3b8]"]::placeholder {
+      color: #94a3b8 !important;
+    }
+    html:not(.dark) [class*="hover:bg-white/"]:hover {
+      background-color: #f1f5f9 !important;
+    }
+    html:not(.dark) [class*="hover:text-[#f1f5f9]"]:hover,
+    html:not(.dark) [class*="hover:text-[#e2e8f0]"]:hover,
+    html:not(.dark) [class*="hover:text-[#cbd5e1]"]:hover {
+      color: #111827 !important;
+    }
+    html:not(.dark) input,
+    html:not(.dark) select,
+    html:not(.dark) textarea {
+      color-scheme: light;
+    }
+
     @keyframes pulse-critical {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.85; }
@@ -84,16 +133,16 @@
     .ws-pulse { animation: pulse-critical 2s ease-in-out infinite; }
   </style>
 </head>
-<body class="bg-[#0a0e1a] text-[#f1f5f9] min-h-screen flex font-sans dark" x-cloak>
+<body class="bg-gray-50 text-gray-900 dark:bg-[#0a0e1a] dark:text-[#f1f5f9] min-h-screen flex font-sans" x-cloak>
 
   <!-- Sidebar: hidden mobile, icon-only tablet (64px), full desktop (256px) -->
-  <aside id="sidebar" class="fixed inset-y-0 left-0 w-16 lg:w-64 bg-[#111827] border-r border-[rgba(255,255,255,0.08)] flex flex-col z-30 transition-all duration-200 hidden sm:flex">
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-16 lg:w-64 bg-white dark:bg-[#111827] border-r border-gray-200 dark:border-[rgba(255,255,255,0.08)] flex flex-col z-30 transition-all duration-200 hidden sm:flex">
     <!-- Logo area with WS indicator -->
-    <div class="h-16 flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-5 border-b border-[rgba(255,255,255,0.08)]">
+    <div class="h-16 flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-5 border-b border-gray-200 dark:border-[rgba(255,255,255,0.08)]">
       <div class="shrink-0">
         <img src="/static/logo.png" alt="FiberX" class="h-10 w-10 lg:h-12 lg:w-12 rounded-lg object-contain">
       </div>
-      <span class="hidden lg:inline font-semibold text-sm leading-tight text-[#f1f5f9]">DevOps Core<br><span class="text-xs font-normal text-[#94a3b8]">Management System</span></span>
+      <span class="hidden lg:inline font-semibold text-sm leading-tight text-gray-900 dark:text-[#f1f5f9]">DevOps Core<br><span class="text-xs font-normal text-gray-500 dark:text-[#94a3b8]">Management System</span></span>
     </div>
 
     <!-- Navigation -->
@@ -123,7 +172,7 @@
       {{end}}
 
       {{if or (eq .UserRole "ip") (eq .UserRole "admin")}}
-      <div class="pt-4 mt-4 border-t border-[rgba(255,255,255,0.08)]">
+      <div class="pt-4 mt-4 border-t border-gray-200 dark:border-[rgba(255,255,255,0.08)]">
         <div class="px-3 pb-2 mb-1 hidden lg:block">
           <span class="text-xs font-semibold uppercase tracking-[0.2em] text-teal-400">IP TEAM</span>
         </div>
@@ -159,7 +208,7 @@
       {{end}}
 
       {{if or (eq .UserRole "noc") (eq .UserRole "admin")}}
-      <div class="pt-4 mt-4 border-t border-[rgba(255,255,255,0.08)]">
+      <div class="pt-4 mt-4 border-t border-gray-200 dark:border-[rgba(255,255,255,0.08)]">
         <div class="px-3 pb-2 mb-1 hidden lg:block">
           <span class="text-xs font-semibold uppercase tracking-[0.2em] text-[#f97316]">NOC TEAM</span>
         </div>
@@ -195,7 +244,7 @@
       {{end}}
 
       {{if eq .UserRole "admin"}}
-      <div class="pt-4 mt-4 border-t border-[rgba(255,255,255,0.08)]">
+      <div class="pt-4 mt-4 border-t border-gray-200 dark:border-[rgba(255,255,255,0.08)]">
         <span class="px-3 text-xs font-semibold uppercase tracking-wider text-[#475569]">Administration</span>
       </div>
       <a href="/admin/users" class="sidebar-link flex items-center justify-center lg:justify-start gap-2 lg:gap-3 px-2 lg:px-3 py-2.5 rounded-r-lg text-sm font-medium text-[#94a3b8] lg:pl-4 {{if eq .Page "admin-users"}}active{{end}}" title="Admin Panel">
@@ -206,8 +255,8 @@
     </nav>
 
     <!-- Dark mode toggle -->
-    <div class="p-3 border-t border-[rgba(255,255,255,0.08)]">
-      <button @click="toggle()" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[#94a3b8] hover:bg-white/5 transition-colors btn-press">
+    <div class="p-3 border-t border-gray-200 dark:border-[rgba(255,255,255,0.08)]">
+      <button @click="toggle()" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600 dark:text-[#94a3b8] hover:bg-gray-100 dark:hover:bg-white/5 transition-colors btn-press">
         <template x-if="dark">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z"/></svg>
         </template>
@@ -219,7 +268,7 @@
     </div>
 
     <!-- User info & Logout -->
-    <div class="p-3 border-t border-[rgba(255,255,255,0.08)]">
+    <div class="p-3 border-t border-gray-200 dark:border-[rgba(255,255,255,0.08)]">
       <div class="flex items-center gap-3 px-3 py-2">
         <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0
           {{if eq .UserRole "admin"}}bg-gradient-to-br from-purple-600 to-purple-800{{end}}
@@ -231,8 +280,8 @@
           {{$display := or .UserName .UserEmail}}{{if $display}}{{slice $display 0 1}}{{end}}
         </div>
         <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium text-[#f1f5f9] truncate">{{or .UserName .UserEmail}}</p>
-          <p class="text-xs text-[#94a3b8] capitalize">{{.UserRole}}</p>
+          <p class="text-sm font-medium text-gray-900 dark:text-[#f1f5f9] truncate">{{or .UserName .UserEmail}}</p>
+          <p class="text-xs text-gray-500 dark:text-[#94a3b8] capitalize">{{.UserRole}}</p>
         </div>
       </div>
       <button onclick="logout()" class="mt-1 w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[#ef4444] hover:bg-red-500/10 transition-colors btn-press">
@@ -243,7 +292,7 @@
   </aside>
 
   <!-- Mobile bottom nav -->
-  <nav class="fixed bottom-0 left-0 right-0 sm:hidden h-16 bg-[#111827] border-t border-[rgba(255,255,255,0.08)] flex items-center justify-around z-30">
+  <nav class="fixed bottom-0 left-0 right-0 sm:hidden h-16 bg-white dark:bg-[#111827] border-t border-gray-200 dark:border-[rgba(255,255,255,0.08)] flex items-center justify-around z-30">
     {{if eq .UserRole "noc"}}
     <a href="/noc-setup" class="flex flex-col items-center gap-1 py-2 px-4 {{if eq .Page "noc-setup"}}text-[#f97316]{{else}}text-[#94a3b8]{{end}}">
       <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 6.75h15m-15 5.25h15m-15 5.25h9m5.25 0h.008v.008h-.008v-.008Z"/></svg>
@@ -298,7 +347,7 @@
   <!-- Main content -->
   <main class="ml-0 sm:ml-16 lg:ml-64 pb-16 sm:pb-0 flex-1 min-h-screen flex flex-col">
     <!-- Top bar with WS status & notifications -->
-    <div x-data="notificationManager()" x-init="init()" class="sticky top-0 z-20 bg-[#0a0e1a]/90 backdrop-blur-sm border-b border-[rgba(255,255,255,0.08)]">
+    <div x-data="notificationManager()" x-init="init()" class="sticky top-0 z-20 bg-white/90 dark:bg-[#0a0e1a]/90 backdrop-blur-sm border-b border-gray-200 dark:border-[rgba(255,255,255,0.08)]">
       <div class="flex items-center justify-between px-6 h-12">
         <!-- WebSocket Live Indicator (single place) -->
         <div id="ws-status" class="flex items-center gap-2 text-xs font-medium">
@@ -320,8 +369,8 @@
         </button>
         {{end}}
         <div class="relative">
-          <button @click="open = !open" class="relative p-2 rounded-lg hover:bg-white/5 transition-colors">
-            <svg class="w-5 h-5 text-[#94a3b8]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <button @click="open = !open" class="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
+            <svg class="w-5 h-5 text-gray-500 dark:text-[#94a3b8]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/>
             </svg>
             <span x-show="unreadCount > 0" x-transition
@@ -333,25 +382,25 @@
           <div x-show="open" @click.away="open = false"
             x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
             x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-2"
-            class="absolute right-0 top-full mt-2 w-[400px] bg-[#1a2236] rounded-xl shadow-2xl border border-[rgba(255,255,255,0.08)] overflow-hidden" x-cloak>
+            class="absolute right-0 top-full mt-2 w-[400px] bg-white dark:bg-[#1a2236] rounded-xl shadow-2xl border border-gray-200 dark:border-[rgba(255,255,255,0.08)] overflow-hidden" x-cloak>
 
-            <div class="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.08)]">
-              <h3 class="text-sm font-semibold text-[#f1f5f9]">Notifications</h3>
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-[rgba(255,255,255,0.08)]">
+              <h3 class="text-sm font-semibold text-gray-900 dark:text-[#f1f5f9]">Notifications</h3>
               <div class="flex items-center gap-2">
                 <button @click="markAllRead()" x-show="unreadCount > 0" class="text-[11px] text-[#3b82f6] hover:underline">Mark all read</button>
                 <button @click="clearAll()" x-show="notifications.length > 0" class="text-[11px] text-[#94a3b8] hover:text-[#ef4444] hover:underline">Clear all</button>
               </div>
             </div>
 
-            <div class="max-h-[420px] overflow-y-auto divide-y divide-[rgba(255,255,255,0.08)]">
+            <div class="max-h-[420px] overflow-y-auto divide-y divide-gray-100 dark:divide-[rgba(255,255,255,0.08)]">
               <template x-for="n in notifications" :key="n.id">
-                <a :href="n.link" @click="markRead(n.id)" class="flex items-start gap-3 px-4 py-3 hover:bg-white/5 transition-colors"
-                  :class="!n.read && 'bg-[#3b82f6]/10'">
+                <a :href="n.link" @click="markRead(n.id)" class="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                  :class="!n.read && 'bg-blue-50 dark:bg-[#3b82f6]/10'">
                   <span class="w-2 h-2 mt-1.5 rounded-full shrink-0" :class="ntColor(n.type)"></span>
                   <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium truncate text-[#f1f5f9]" x-text="n.title"></p>
-                    <p class="text-xs text-[#94a3b8] truncate" x-text="n.message"></p>
-                    <p class="text-[10px] text-[#475569] mt-0.5" x-text="timeAgo(n.time)"></p>
+                    <p class="text-sm font-medium truncate text-gray-900 dark:text-[#f1f5f9]" x-text="n.title"></p>
+                    <p class="text-xs text-gray-500 dark:text-[#94a3b8] truncate" x-text="n.message"></p>
+                    <p class="text-[10px] text-gray-400 dark:text-[#475569] mt-0.5" x-text="timeAgo(n.time)"></p>
                   </div>
                   <svg class="w-4 h-4 text-[#475569] shrink-0 mt-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
                 </a>

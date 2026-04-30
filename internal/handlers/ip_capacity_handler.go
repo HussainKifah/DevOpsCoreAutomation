@@ -35,6 +35,20 @@ type ipCapacityActionRequest struct {
 	ActionAt  string `json:"action_at"`
 }
 
+type ipCapacityImportRequest struct {
+	Rows []ipCapacityImportRowRequest `json:"rows"`
+}
+
+type ipCapacityImportRowRequest struct {
+	Name                    string `json:"name"`
+	Type                    string `json:"type"`
+	Province                string `json:"province"`
+	CapacityBeforeUpdateIQD int64  `json:"capacity_before_update_iqd"`
+	Action                  string `json:"action"`
+	DifferenceIQD           int64  `json:"difference_iqd"`
+	ActionAt                string `json:"action_at"`
+}
+
 func (h *IPCapacityHandler) ListNodes(c *gin.Context) {
 	nodes, err := h.repo.ListNodes(c.Query("search"))
 	if err != nil {
@@ -196,6 +210,47 @@ func (h *IPCapacityHandler) DeleteAction(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
+func (h *IPCapacityHandler) ImportActions(c *gin.Context) {
+	var req ipCapacityImportRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	rows := make([]repository.IPCapacityImportRow, 0, len(req.Rows))
+	for i, row := range req.Rows {
+		actionAt, err := parseCapacityActionTime(row.ActionAt)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "row " + strconv.Itoa(i+1) + ": action_at must be RFC3339, YYYY-MM-DD HH:MM, or Jan 02, 2006"})
+			return
+		}
+		rows = append(rows, repository.IPCapacityImportRow{
+			Name:                    strings.TrimSpace(row.Name),
+			Type:                    strings.TrimSpace(row.Type),
+			Province:                strings.TrimSpace(row.Province),
+			CapacityBeforeUpdateIQD: row.CapacityBeforeUpdateIQD,
+			ActionType:              strings.TrimSpace(strings.ToLower(row.Action)),
+			AmountIQD:               absInt64(row.DifferenceIQD),
+			ActionAt:                actionAt,
+		})
+	}
+	result, err := h.repo.ImportActions(rows)
+	if err != nil {
+		c.JSON(statusForCapacityError(err), gin.H{"error": err.Error()})
+		return
+	}
+	nodes, err := h.repo.ListNodes("")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	actions, err := h.repo.ListActions()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"result": result, "nodes": nodes, "actions": actions})
+}
+
 func (h *IPCapacityHandler) ListHistoryDays(c *gin.Context) {
 	days, err := h.repo.ListHistoryDays()
 	if err != nil {
@@ -221,6 +276,15 @@ func (h *IPCapacityHandler) GetDayHistory(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"date": raw, "history": history})
+}
+
+func (h *IPCapacityHandler) GetAllHistory(c *gin.Context) {
+	history, err := h.repo.GetAllHistory()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"history": history})
 }
 
 func (h *IPCapacityHandler) bindAction(c *gin.Context, existingNodeID uint) (*models.IPCapacityAction, bool) {
@@ -274,7 +338,10 @@ func parseCapacityActionTime(raw string) (time.Time, error) {
 	if t, err := time.ParseInLocation("2006-01-02T15:04", raw, time.Local); err == nil {
 		return t, nil
 	}
-	return time.ParseInLocation("2006-01-02 15:04", raw, time.Local)
+	if t, err := time.ParseInLocation("2006-01-02 15:04", raw, time.Local); err == nil {
+		return t, nil
+	}
+	return time.ParseInLocation("Jan 02, 2006", raw, time.Local)
 }
 
 func parseUintParam(c *gin.Context, name string) (uint, bool) {
@@ -286,6 +353,13 @@ func parseUintParam(c *gin.Context, name string) (uint, bool) {
 	return uint(id64), true
 }
 
+func absInt64(value int64) int64 {
+	if value < 0 {
+		return -value
+	}
+	return value
+}
+
 func statusForCapacityError(err error) int {
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return http.StatusNotFound
@@ -294,7 +368,7 @@ func statusForCapacityError(err error) int {
 	if strings.Contains(lower, "duplicate") || strings.Contains(lower, "unique") || strings.Contains(lower, "already exists") {
 		return http.StatusConflict
 	}
-	if strings.Contains(lower, "required") || strings.Contains(lower, "cannot") || strings.Contains(lower, "greater than") || strings.Contains(lower, "invalid") {
+	if strings.Contains(lower, "required") || strings.Contains(lower, "cannot") || strings.Contains(lower, "greater than") || strings.Contains(lower, "invalid") || strings.Contains(lower, "no import rows") {
 		return http.StatusBadRequest
 	}
 	return http.StatusInternalServerError
