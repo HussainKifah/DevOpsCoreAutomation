@@ -48,15 +48,17 @@
             <th class="px-4 py-3 font-semibold">Action</th>
             <th class="px-4 py-3 font-semibold">After Update</th>
             <th class="px-4 py-3 font-semibold">Difference</th>
+            <th x-show="canViewCost" class="px-4 py-3 font-semibold">Cost / Mb/s</th>
+            <th x-show="canViewCost" class="px-4 py-3 font-semibold">Total Cost</th>
             <th class="px-4 py-3 font-semibold">Date</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-[rgba(255,255,255,0.06)]">
           <template x-if="loadingNodes">
-            <tr><td colspan="8" class="px-4 py-10 text-center text-sm text-[#64748b]">Loading...</td></tr>
+            <tr><td :colspan="canViewCost ? 10 : 8" class="px-4 py-10 text-center text-sm text-[#64748b]">Loading...</td></tr>
           </template>
           <template x-if="!loadingNodes && reviewRows().length === 0">
-            <tr><td colspan="8" class="px-4 py-10 text-center text-sm text-[#64748b]">No capacity updates found.</td></tr>
+            <tr><td :colspan="canViewCost ? 10 : 8" class="px-4 py-10 text-center text-sm text-[#64748b]">No capacity updates found.</td></tr>
           </template>
           <template x-for="action in reviewRows()" :key="'review-action-' + action.id">
             <tr class="hover:bg-white/[0.03]">
@@ -67,6 +69,8 @@
               <td class="px-4 py-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full" :class="typeClass(action.type)" x-text="action.type"></span></td>
               <td class="px-4 py-3 font-mono text-sm text-[#f1f5f9]" x-text="capacity(action.capacity_after_iqd)"></td>
               <td class="px-4 py-3 font-mono text-sm" :class="action.type === 'upgrade' ? 'text-emerald-300' : 'text-red-300'" x-text="signedCapacity(action)"></td>
+              <td x-show="canViewCost" class="px-4 py-3 font-mono text-sm text-[#94a3b8]" x-text="money(action.cost_per_mbps_iqd)"></td>
+              <td x-show="canViewCost" class="px-4 py-3 font-mono text-sm" :class="Number(action.total_cost_iqd || 0) >= 0 ? 'text-emerald-300' : 'text-red-300'" x-text="signedMoney(action.total_cost_iqd)"></td>
               <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="fmtDateOnly(action.action_at)"></td>
             </tr>
           </template>
@@ -92,6 +96,8 @@
             <th class="px-4 py-3 font-semibold">Date</th>
             <th class="px-4 py-3 font-semibold">Action</th>
             <th class="px-4 py-3 font-semibold">Amount</th>
+            <th x-show="canViewCost" class="px-4 py-3 font-semibold">Cost / Mb/s</th>
+            <th x-show="canViewCost" class="px-4 py-3 font-semibold">Total Cost</th>
             <th class="px-4 py-3 font-semibold">Before</th>
             <th class="px-4 py-3 font-semibold">After</th>
             <th class="px-4 py-3 font-semibold text-right">Edit</th>
@@ -99,10 +105,10 @@
         </thead>
         <tbody class="divide-y divide-[rgba(255,255,255,0.06)]">
           <template x-if="loadingActions">
-            <tr><td colspan="9" class="px-4 py-10 text-center text-sm text-[#64748b]">Loading...</td></tr>
+            <tr><td :colspan="canViewCost ? 11 : 9" class="px-4 py-10 text-center text-sm text-[#64748b]">Loading...</td></tr>
           </template>
           <template x-if="!loadingActions && filteredActions().length === 0">
-            <tr><td colspan="9" class="px-4 py-10 text-center text-sm text-[#64748b]">No capacity actions yet.</td></tr>
+            <tr><td :colspan="canViewCost ? 11 : 9" class="px-4 py-10 text-center text-sm text-[#64748b]">No capacity actions yet.</td></tr>
           </template>
           <template x-for="action in filteredActions()" :key="action.id">
             <tr class="hover:bg-white/[0.03]">
@@ -112,6 +118,8 @@
               <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="fmtDateOnly(action.action_at)"></td>
               <td class="px-4 py-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full" :class="typeClass(action.type)" x-text="action.type"></span></td>
               <td class="px-4 py-3 font-mono text-sm" :class="action.type === 'upgrade' ? 'text-emerald-300' : 'text-red-300'" x-text="signedCapacity(action)"></td>
+              <td x-show="canViewCost" class="px-4 py-3 font-mono text-sm text-[#94a3b8]" x-text="money(action.cost_per_mbps_iqd)"></td>
+              <td x-show="canViewCost" class="px-4 py-3 font-mono text-sm" :class="Number(action.total_cost_iqd || 0) >= 0 ? 'text-emerald-300' : 'text-red-300'" x-text="signedMoney(action.total_cost_iqd)"></td>
               <td class="px-4 py-3 font-mono text-sm text-[#94a3b8]" x-text="capacity(action.capacity_before_iqd)"></td>
               <td class="px-4 py-3 font-mono text-sm text-[#f1f5f9]" x-text="capacity(action.capacity_after_iqd)"></td>
               <td class="px-4 py-3 text-right">
@@ -169,7 +177,12 @@
             <option :value="type" x-text="type"></option>
           </template>
         </select>
-        <input x-model.debounce.250ms="historyFilter.name" type="search" placeholder="Filter by name" class="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:border-teal-500/50">
+        <select x-model="historyFilter.name" class="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9] focus:outline-none focus:border-teal-500/50">
+          <option value="">All names</option>
+          <template x-for="name in nameOptions()" :key="'history-name-' + name">
+            <option :value="name" x-text="name"></option>
+          </template>
+        </select>
       </div>
 
       <div class="overflow-x-auto rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827]">
@@ -180,15 +193,16 @@
               <th class="px-4 py-3 font-semibold">Name</th>
               <th class="px-4 py-3 font-semibold">Type</th>
               <th class="px-4 py-3 font-semibold">Current</th>
+              <th x-show="canViewCost" class="px-4 py-3 font-semibold">Total Cost</th>
               <th class="px-4 py-3 font-semibold">Date</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-[rgba(255,255,255,0.06)]">
             <template x-if="loadingHistory">
-              <tr><td colspan="5" class="px-4 py-8 text-center text-sm text-[#64748b]">Loading...</td></tr>
+              <tr><td :colspan="canViewCost ? 6 : 5" class="px-4 py-8 text-center text-sm text-[#64748b]">Loading...</td></tr>
             </template>
             <template x-if="!loadingHistory && historyRows().length === 0">
-              <tr><td colspan="5" class="px-4 py-8 text-center text-sm text-[#64748b]">No capacity history found.</td></tr>
+              <tr><td :colspan="canViewCost ? 6 : 5" class="px-4 py-8 text-center text-sm text-[#64748b]">No capacity history found.</td></tr>
             </template>
             <template x-for="row in historyRows()" :key="row.row_key">
               <tr>
@@ -196,6 +210,7 @@
                 <td class="px-4 py-3 text-sm font-semibold text-[#f1f5f9]" x-text="row.node_name"></td>
                 <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="row.node_type"></td>
                 <td class="px-4 py-3 font-mono text-sm text-[#f1f5f9]" x-text="capacity(row.current_capacity_iqd)"></td>
+                <td x-show="canViewCost" class="px-4 py-3 font-mono text-sm" :class="Number(row.total_cost_iqd || 0) >= 0 ? 'text-emerald-300' : 'text-red-300'" x-text="signedMoney(row.total_cost_iqd)"></td>
                 <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="fmtDateOnly(row.latest_action_at)"></td>
               </tr>
             </template>
@@ -260,6 +275,10 @@
             <input type="number" min="1" step="1" x-model.number="actionForm.amount_iqd" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
           </div>
         </div>
+        <div x-show="canViewCost">
+          <label class="block text-xs text-[#94a3b8] mb-1">Cost / Mb/s IQD</label>
+          <input type="number" min="0" step="1" x-model.number="actionForm.cost_per_mbps_iqd" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+        </div>
         <div>
           <label class="block text-xs text-[#94a3b8] mb-1">Action Time</label>
           <input type="datetime-local" x-model="actionForm.action_at" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
@@ -279,6 +298,7 @@ function ipCapacitiesPage() {
   return {
     timeOffsetMs: -3 * 60 * 60 * 1000,
     tab: 'review',
+    canViewCost: false,
     nodes: [],
     actions: [],
     historyDays: [],
@@ -299,7 +319,7 @@ function ipCapacitiesPage() {
     actionModal: false,
     selectedNodeDeleteId: 0,
     nodeForm: { id: 0, province: '', name: '', type: '', initial_capacity_iqd: 0 },
-    actionForm: { id: 0, node_id: 0, type: 'upgrade', amount_iqd: 0, action_at: '' },
+    actionForm: { id: 0, node_id: 0, type: 'upgrade', amount_iqd: 0, cost_per_mbps_iqd: 0, action_at: '' },
 
     async init() {
       await this.refreshAll();
@@ -328,6 +348,7 @@ function ipCapacitiesPage() {
       try {
         const params = this.search ? ('?search=' + encodeURIComponent(this.search)) : '';
         const data = await this.api('/nodes' + params);
+        this.canViewCost = !!data.can_view_cost;
         this.nodes = data.nodes || [];
         if (this.selectedNodeDeleteId && !this.nodes.some(node => Number(node.id) === Number(this.selectedNodeDeleteId))) {
           this.selectedNodeDeleteId = 0;
@@ -342,6 +363,7 @@ function ipCapacitiesPage() {
       this.loadingActions = true;
       try {
         const data = await this.api('/actions');
+        this.canViewCost = !!data.can_view_cost;
         this.actions = data.actions || [];
       } catch (e) {
         this.error = e.message;
@@ -367,6 +389,7 @@ function ipCapacitiesPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ rows })
         });
+        this.canViewCost = !!data.can_view_cost;
         this.nodes = data.nodes || [];
         this.actions = data.actions || [];
         await this.loadHistoryDays();
@@ -408,6 +431,7 @@ function ipCapacitiesPage() {
       const action = String(value('action') || '').trim().toLowerCase();
       const before = this.importNumber(value('total capacity before update', 'before update', 'capacity before'));
       const difference = Math.abs(this.importNumber(value('difference', 'amount', 'action mb/s', 'action gb/s')));
+      const costPerMbps = this.importNumber(value('cost per mb/s', 'cost/mbps', 'cost per mbps', 'cost'));
       const actionAt = this.importDate(value('date / time', 'date/time', 'date time', 'action time', 'time'));
       const empty = !name && !province && !type && !action && before === 0 && difference === 0 && !actionAt;
       if (empty) return null;
@@ -424,6 +448,7 @@ function ipCapacitiesPage() {
         capacity_before_update_iqd: before,
         action,
         difference_iqd: difference,
+        cost_per_mbps_iqd: costPerMbps,
         action_at: actionAt
       };
     },
@@ -481,6 +506,7 @@ function ipCapacitiesPage() {
       this.loadingHistory = true;
       try {
         const data = await this.api('/history/day?date=' + encodeURIComponent(this.selectedDay));
+        this.canViewCost = !!data.can_view_cost;
         this.dayHistory = data.history || { summaries: [], actions: [] };
       } catch (e) {
         this.error = e.message;
@@ -492,6 +518,7 @@ function ipCapacitiesPage() {
       this.loadingHistory = true;
       try {
         const data = await this.api('/history/all');
+        this.canViewCost = !!data.can_view_cost;
         this.allHistory = data.history || [];
       } catch (e) {
         this.error = e.message;
@@ -556,6 +583,7 @@ function ipCapacitiesPage() {
           node_id: action.node_id,
           type: action.type,
           amount_iqd: action.amount_iqd,
+          cost_per_mbps_iqd: action.cost_per_mbps_iqd || 0,
           action_at: this.datetimeLocal(action.action_at, true)
         };
       } else {
@@ -564,6 +592,7 @@ function ipCapacitiesPage() {
           node_id: node ? node.id : 0,
           type: 'upgrade',
           amount_iqd: 0,
+          cost_per_mbps_iqd: 0,
           action_at: this.datetimeLocal(new Date().toISOString(), true)
         };
       }
@@ -575,11 +604,13 @@ function ipCapacitiesPage() {
         node_id: Number(this.actionForm.node_id || 0),
         type: this.actionForm.type,
         amount_iqd: Number(this.actionForm.amount_iqd || 0),
+        cost_per_mbps_iqd: this.canViewCost ? Number(this.actionForm.cost_per_mbps_iqd || 0) : 0,
         action_at: this.rawActionTime(this.actionForm.action_at)
       };
       if (!payload.node_id) { this.formError = 'Node is required'; return; }
       if (!['upgrade', 'downgrade'].includes(payload.type)) { this.formError = 'Type is required'; return; }
       if (payload.amount_iqd <= 0) { this.formError = 'Amount must be greater than 0'; return; }
+      if (payload.cost_per_mbps_iqd < 0) { this.formError = 'Cost cannot be negative'; return; }
       try {
         const path = this.actionForm.id ? '/actions/' + this.actionForm.id : '/actions';
         const method = this.actionForm.id ? 'PUT' : 'POST';
@@ -623,6 +654,9 @@ function ipCapacitiesPage() {
     typeOptions() {
       return this.uniqueSorted((Array.isArray(this.nodes) ? this.nodes : []).map((node) => node.type));
     },
+    nameOptions() {
+      return this.uniqueSorted((Array.isArray(this.nodes) ? this.nodes : []).map((node) => node.name));
+    },
     uniqueSorted(values) {
       return Array.from(new Set(values.map((value) => String(value || '').trim()).filter(Boolean)))
         .sort((a, b) => a.localeCompare(b));
@@ -633,7 +667,7 @@ function ipCapacitiesPage() {
       const name = String(this.historyFilter.name || '').trim().toLowerCase();
       if (province && String(row.node_province || '').toLowerCase() !== province) return false;
       if (type && String(row.node_type || '').toLowerCase() !== type) return false;
-      if (name && !String(row.node_name || '').toLowerCase().includes(name)) return false;
+      if (name && String(row.node_name || '').toLowerCase() !== name) return false;
       return true;
     },
     reviewRows() {
@@ -648,6 +682,8 @@ function ipCapacitiesPage() {
           node_type: node.type,
           type: node.latest_action.type,
           amount_iqd: node.latest_action.amount_iqd,
+          cost_per_mbps_iqd: node.latest_action.cost_per_mbps_iqd || 0,
+          total_cost_iqd: node.latest_action.total_cost_iqd || 0,
           capacity_before_iqd: node.latest_action.capacity_before_iqd,
           capacity_after_iqd: node.latest_action.capacity_after_iqd,
           action_at: node.latest_action.action_at
@@ -661,6 +697,8 @@ function ipCapacitiesPage() {
         action.amount_iqd,
         action.capacity_before_iqd,
         action.capacity_after_iqd,
+        action.cost_per_mbps_iqd,
+        action.total_cost_iqd,
         action.action_at
       ].some((value) => String(value || '').toLowerCase().includes(q)));
     },
@@ -675,6 +713,7 @@ function ipCapacitiesPage() {
             node_name: action.node_name,
             node_type: action.node_type,
             current_capacity_iqd: action.current_capacity_iqd,
+            total_cost_iqd: action.total_cost_iqd || 0,
             day: action.day,
             latest_action_at: action.latest_action_at
           }))
@@ -695,6 +734,7 @@ function ipCapacitiesPage() {
           node_name: row.node_name,
           node_type: row.node_type,
           current_capacity_iqd: row.closing_capacity_iqd,
+          total_cost_iqd: row.total_cost_iqd || 0,
           day: this.selectedDay,
           latest_action_at: row.latest_action_at
         }))
@@ -707,6 +747,13 @@ function ipCapacitiesPage() {
     },
     capacity(value) {
       return new Intl.NumberFormat('en-US').format(Number(value || 0)) + ' Mb/s';
+    },
+    money(value) {
+      return new Intl.NumberFormat('en-US').format(Number(value || 0)) + ' IQD';
+    },
+    signedMoney(value) {
+      const n = Number(value || 0);
+      return (n >= 0 ? '+' : '-') + this.money(Math.abs(n));
     },
     capacityWithSign(value) {
       const n = Number(value || 0);
@@ -721,13 +768,17 @@ function ipCapacitiesPage() {
         this.error = 'Excel export library is not loaded';
         return;
       }
-      const rows = this.historyRows().map((row) => ({
-        Province: row.node_province || '',
-        Name: row.node_name || '',
-        Type: row.node_type || '',
-        'Current Capacity Mb/s': Number(row.current_capacity_iqd || 0),
-        Date: this.fmtDateOnly(row.latest_action_at)
-      }));
+      const rows = this.historyRows().map((row) => {
+        const out = {
+          Province: row.node_province || '',
+          Name: row.node_name || '',
+          Type: row.node_type || '',
+          'Current Capacity Mb/s': Number(row.current_capacity_iqd || 0),
+          Date: this.fmtDateOnly(row.latest_action_at)
+        };
+        if (this.canViewCost) out['Total Cost IQD'] = Number(row.total_cost_iqd || 0);
+        return out;
+      });
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length ? rows : [{}]), 'History');
       XLSX.writeFile(wb, 'ip-capacities-history-' + (this.historyScope === 'all' ? 'all' : (this.selectedDay || 'latest')) + '.xlsx');

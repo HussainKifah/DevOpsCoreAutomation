@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Flafl/DevOpsCore/config"
+	auth "github.com/Flafl/DevOpsCore/internal/Auth"
 	"github.com/Flafl/DevOpsCore/internal/models"
 	"github.com/Flafl/DevOpsCore/internal/repository"
 	"github.com/gin-gonic/gin"
@@ -14,11 +16,16 @@ import (
 )
 
 type IPCapacityHandler struct {
-	repo repository.IPCapacityRepository
+	repo     repository.IPCapacityRepository
+	costAuth func(email string) bool
 }
 
-func NewIPCapacityHandler(repo repository.IPCapacityRepository) *IPCapacityHandler {
-	return &IPCapacityHandler{repo: repo}
+func NewIPCapacityHandler(repo repository.IPCapacityRepository, cfg ...*config.Config) *IPCapacityHandler {
+	h := &IPCapacityHandler{repo: repo, costAuth: func(string) bool { return false }}
+	if len(cfg) > 0 && cfg[0] != nil {
+		h.costAuth = cfg[0].CanViewIPCapacityCost
+	}
+	return h
 }
 
 type ipCapacityNodeRequest struct {
@@ -29,10 +36,11 @@ type ipCapacityNodeRequest struct {
 }
 
 type ipCapacityActionRequest struct {
-	NodeID    uint   `json:"node_id"`
-	Type      string `json:"type"`
-	AmountIQD int64  `json:"amount_iqd"`
-	ActionAt  string `json:"action_at"`
+	NodeID         uint   `json:"node_id"`
+	Type           string `json:"type"`
+	AmountIQD      int64  `json:"amount_iqd"`
+	CostPerMbpsIQD int64  `json:"cost_per_mbps_iqd"`
+	ActionAt       string `json:"action_at"`
 }
 
 type ipCapacityImportRequest struct {
@@ -46,6 +54,7 @@ type ipCapacityImportRowRequest struct {
 	CapacityBeforeUpdateIQD int64  `json:"capacity_before_update_iqd"`
 	Action                  string `json:"action"`
 	DifferenceIQD           int64  `json:"difference_iqd"`
+	CostPerMbpsIQD          int64  `json:"cost_per_mbps_iqd"`
 	ActionAt                string `json:"action_at"`
 }
 
@@ -55,7 +64,9 @@ func (h *IPCapacityHandler) ListNodes(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"nodes": nodes})
+	canViewCost := h.canViewCost(c)
+	h.redactNodeCosts(nodes, canViewCost)
+	c.JSON(http.StatusOK, gin.H{"nodes": nodes, "can_view_cost": canViewCost})
 }
 
 func (h *IPCapacityHandler) CreateNode(c *gin.Context) {
@@ -156,17 +167,28 @@ func (h *IPCapacityHandler) ListActions(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"actions": actions})
+	canViewCost := h.canViewCost(c)
+	h.redactActionCosts(actions, canViewCost)
+	c.JSON(http.StatusOK, gin.H{"actions": actions, "can_view_cost": canViewCost})
 }
 
 func (h *IPCapacityHandler) CreateAction(c *gin.Context) {
-	action, ok := h.bindAction(c, 0)
+	canViewCost := h.canViewCost(c)
+	action, ok := h.bindAction(c, 0, nil, canViewCost)
 	if !ok {
 		return
 	}
 	if err := h.repo.CreateAction(action); err != nil {
 		c.JSON(statusForCapacityError(err), gin.H{"error": err.Error()})
 		return
+	}
+	created, err := h.repo.GetAction(action.ID)
+	if err == nil {
+		action = created
+	}
+	if !canViewCost {
+		action.CostPerMbpsIQD = 0
+		action.TotalCostIQD = 0
 	}
 	c.JSON(http.StatusCreated, gin.H{"action": action})
 }
@@ -181,7 +203,8 @@ func (h *IPCapacityHandler) UpdateAction(c *gin.Context) {
 		c.JSON(statusForCapacityError(err), gin.H{"error": err.Error()})
 		return
 	}
-	action, ok := h.bindAction(c, existing.NodeID)
+	canViewCost := h.canViewCost(c)
+	action, ok := h.bindAction(c, existing.NodeID, existing, canViewCost)
 	if !ok {
 		return
 	}
@@ -194,6 +217,10 @@ func (h *IPCapacityHandler) UpdateAction(c *gin.Context) {
 	if err != nil {
 		c.JSON(statusForCapacityError(err), gin.H{"error": err.Error()})
 		return
+	}
+	if !canViewCost {
+		updated.CostPerMbpsIQD = 0
+		updated.TotalCostIQD = 0
 	}
 	c.JSON(http.StatusOK, gin.H{"action": updated})
 }
@@ -216,6 +243,7 @@ func (h *IPCapacityHandler) ImportActions(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	canViewCost := h.canViewCost(c)
 	rows := make([]repository.IPCapacityImportRow, 0, len(req.Rows))
 	for i, row := range req.Rows {
 		actionAt, err := parseCapacityActionTime(row.ActionAt)
@@ -230,6 +258,7 @@ func (h *IPCapacityHandler) ImportActions(c *gin.Context) {
 			CapacityBeforeUpdateIQD: row.CapacityBeforeUpdateIQD,
 			ActionType:              strings.TrimSpace(strings.ToLower(row.Action)),
 			AmountIQD:               absInt64(row.DifferenceIQD),
+			CostPerMbpsIQD:          costPerMbpsForWrite(row.CostPerMbpsIQD, canViewCost),
 			ActionAt:                actionAt,
 		})
 	}
@@ -243,12 +272,14 @@ func (h *IPCapacityHandler) ImportActions(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.redactNodeCosts(nodes, canViewCost)
 	actions, err := h.repo.ListActions()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"result": result, "nodes": nodes, "actions": actions})
+	h.redactActionCosts(actions, canViewCost)
+	c.JSON(http.StatusOK, gin.H{"result": result, "nodes": nodes, "actions": actions, "can_view_cost": canViewCost})
 }
 
 func (h *IPCapacityHandler) ListHistoryDays(c *gin.Context) {
@@ -275,7 +306,9 @@ func (h *IPCapacityHandler) GetDayHistory(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"date": raw, "history": history})
+	canViewCost := h.canViewCost(c)
+	h.redactDayHistoryCosts(history, canViewCost)
+	c.JSON(http.StatusOK, gin.H{"date": raw, "history": history, "can_view_cost": canViewCost})
 }
 
 func (h *IPCapacityHandler) GetAllHistory(c *gin.Context) {
@@ -284,10 +317,12 @@ func (h *IPCapacityHandler) GetAllHistory(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"history": history})
+	canViewCost := h.canViewCost(c)
+	h.redactSnapshotCosts(history, canViewCost)
+	c.JSON(http.StatusOK, gin.H{"history": history, "can_view_cost": canViewCost})
 }
 
-func (h *IPCapacityHandler) bindAction(c *gin.Context, existingNodeID uint) (*models.IPCapacityAction, bool) {
+func (h *IPCapacityHandler) bindAction(c *gin.Context, existingNodeID uint, existing *models.IPCapacityAction, canViewCost bool) (*models.IPCapacityAction, bool) {
 	var req ipCapacityActionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -302,10 +337,14 @@ func (h *IPCapacityHandler) bindAction(c *gin.Context, existingNodeID uint) (*mo
 		nodeID = existingNodeID
 	}
 	action := &models.IPCapacityAction{
-		NodeID:    nodeID,
-		Type:      strings.TrimSpace(strings.ToLower(req.Type)),
-		AmountIQD: req.AmountIQD,
-		ActionAt:  time.Now(),
+		NodeID:         nodeID,
+		Type:           strings.TrimSpace(strings.ToLower(req.Type)),
+		AmountIQD:      req.AmountIQD,
+		CostPerMbpsIQD: costPerMbpsForWrite(req.CostPerMbpsIQD, canViewCost),
+		ActionAt:       time.Now(),
+	}
+	if !canViewCost && existing != nil {
+		action.CostPerMbpsIQD = existing.CostPerMbpsIQD
 	}
 	if strings.TrimSpace(req.ActionAt) != "" {
 		parsed, err := parseCapacityActionTime(req.ActionAt)
@@ -327,7 +366,74 @@ func (h *IPCapacityHandler) bindAction(c *gin.Context, existingNodeID uint) (*mo
 		c.JSON(http.StatusBadRequest, gin.H{"error": "amount_iqd must be greater than 0"})
 		return nil, false
 	}
+	if canViewCost && action.CostPerMbpsIQD < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cost_per_mbps_iqd cannot be negative"})
+		return nil, false
+	}
 	return action, true
+}
+
+func (h *IPCapacityHandler) canViewCost(c *gin.Context) bool {
+	if h == nil || h.costAuth == nil {
+		return false
+	}
+	user, ok := c.Get("user")
+	if !ok {
+		return false
+	}
+	claims, ok := user.(*auth.Claims)
+	if !ok {
+		return false
+	}
+	return h.costAuth(claims.Email)
+}
+
+func (h *IPCapacityHandler) redactNodeCosts(nodes []repository.IPCapacityNodeWithLatest, canViewCost bool) {
+	if canViewCost {
+		return
+	}
+	for i := range nodes {
+		if nodes[i].LatestAction != nil {
+			nodes[i].LatestAction.CostPerMbpsIQD = 0
+			nodes[i].LatestAction.TotalCostIQD = 0
+		}
+	}
+}
+
+func (h *IPCapacityHandler) redactActionCosts(actions []repository.IPCapacityActionWithNode, canViewCost bool) {
+	if canViewCost {
+		return
+	}
+	for i := range actions {
+		actions[i].CostPerMbpsIQD = 0
+		actions[i].TotalCostIQD = 0
+	}
+}
+
+func (h *IPCapacityHandler) redactDayHistoryCosts(history *repository.IPCapacityDayHistory, canViewCost bool) {
+	if canViewCost || history == nil {
+		return
+	}
+	for i := range history.Summaries {
+		history.Summaries[i].TotalCostIQD = 0
+	}
+	h.redactActionCosts(history.Actions, false)
+}
+
+func (h *IPCapacityHandler) redactSnapshotCosts(history []repository.IPCapacityHistorySnapshot, canViewCost bool) {
+	if canViewCost {
+		return
+	}
+	for i := range history {
+		history[i].TotalCostIQD = 0
+	}
+}
+
+func costPerMbpsForWrite(value int64, canViewCost bool) int64 {
+	if !canViewCost {
+		return 0
+	}
+	return value
 }
 
 func parseCapacityActionTime(raw string) (time.Time, error) {

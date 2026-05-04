@@ -1,0 +1,288 @@
+{{define "content"}}
+<div x-data="accessOltSetupPage()" x-init="init()" class="max-w-[95rem] mx-auto">
+  <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-[#f1f5f9]">OLT Setup</h1>
+    </div>
+  </div>
+
+  <div class="flex flex-wrap gap-2 mb-5">
+    <button type="button" @click="tab = 'olts'" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors" :class="tab === 'olts' ? 'bg-[#3b82f6] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">OLTs</button>
+    <button type="button" @click="tab = 'users'" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors" :class="tab === 'users' ? 'bg-[#3b82f6] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">Users</button>
+    <button type="button" @click="tab = 'table'" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors" :class="tab === 'table' ? 'bg-[#3b82f6] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">OLT Table</button>
+  </div>
+
+  <div x-show="tab === 'olts'" class="grid gap-5 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+    <section class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-xl">
+      <h2 class="text-lg font-semibold text-[#f1f5f9] mb-4">Add OLT</h2>
+      <form @submit.prevent="submitOlt()" class="space-y-3">
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">IP</label>
+          <input x-model="oltForm.ip" required placeholder="10.130.10.2" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9] font-mono">
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label class="block text-xs text-[#94a3b8] mb-1">Name</label>
+            <input x-model="oltForm.name" required class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+          </div>
+          <div>
+            <label class="block text-xs text-[#94a3b8] mb-1">Site</label>
+            <input x-model="oltForm.site" required class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">OLT Type</label>
+          <select x-model="oltForm.olt_type" required class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+            <option value="nokia">Nokia</option>
+            <option value="huawei">Huawei</option>
+          </select>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label class="block text-xs text-[#94a3b8] mb-1">Latitude</label>
+            <input x-model="oltForm.latitude" type="number" step="any" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+          </div>
+          <div>
+            <label class="block text-xs text-[#94a3b8] mb-1">Longitude</label>
+            <input x-model="oltForm.longitude" type="number" step="any" class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#1a2236] px-3 py-2 text-sm text-[#f1f5f9]">
+          </div>
+        </div>
+        <p class="text-xs text-[#ef4444]" x-show="oltError" x-text="oltError"></p>
+        <p class="text-xs text-emerald-400" x-show="oltNotice" x-text="oltNotice"></p>
+        <button type="submit" :disabled="savingOlt" class="w-full px-4 py-2 rounded-lg bg-[#3b82f6] text-white text-sm font-semibold disabled:opacity-50">Save OLT</button>
+      </form>
+    </section>
+
+    <section class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-xl">
+      <div class="flex items-center justify-between gap-3 mb-4">
+        <h2 class="text-lg font-semibold text-[#f1f5f9]">Saved OLTs</h2>
+        <span class="text-xs text-[#94a3b8]" x-text="olts.length + ' total'"></span>
+      </div>
+      <template x-if="loading">
+        <div class="h-36 rounded-xl bg-[#1a2236] animate-pulse border border-[rgba(255,255,255,0.08)]"></div>
+      </template>
+      <template x-if="!loading && olts.length === 0">
+        <p class="text-sm text-[#94a3b8]">No OLTs added yet.</p>
+      </template>
+      <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3" x-show="!loading && olts.length > 0">
+        <template x-for="olt in olts" :key="olt.id">
+          <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] p-4">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="font-semibold text-[#f1f5f9] truncate" x-text="olt.name"></p>
+                <p class="text-xs text-[#94a3b8] mt-1"><span x-text="olt.site"></span> · <span class="font-mono" x-text="olt.ip"></span></p>
+                <span class="inline-flex mt-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-500/20 text-blue-300" x-text="olt.olt_type"></span>
+              </div>
+              <button type="button" @click="deleteOlt(olt)" class="px-2 py-1 text-xs rounded-lg text-[#ef4444] hover:bg-red-500/10">Remove</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </section>
+  </div>
+
+  <div x-show="tab === 'users'" class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-xl">
+    <div class="flex gap-2 mb-5">
+      <button type="button" @click="userVendorTab = 'nokia'" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors" :class="userVendorTab === 'nokia' ? 'bg-[#3b82f6] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">Nokia</button>
+      <button type="button" @click="userVendorTab = 'huawei'" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors" :class="userVendorTab === 'huawei' ? 'bg-[#3b82f6] text-white' : 'bg-[#1a2236] text-[#94a3b8] hover:text-[#f1f5f9]'">Huawei</button>
+    </div>
+
+    <div class="grid gap-5 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+      <form @submit.prevent="submitCredential()" class="space-y-3 rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] p-5">
+        <h2 class="text-lg font-semibold text-[#f1f5f9]" x-text="'Add ' + vendorLabel(userVendorTab) + ' user'"></h2>
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">Username</label>
+          <input x-model="credentialForms[userVendorTab].username" required class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9]">
+        </div>
+        <div>
+          <label class="block text-xs text-[#94a3b8] mb-1">Password</label>
+          <input x-model="credentialForms[userVendorTab].password" type="password" required class="w-full rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9]">
+        </div>
+        <p class="text-xs text-[#ef4444]" x-show="credentialError" x-text="credentialError"></p>
+        <button type="submit" :disabled="savingCredential" class="w-full px-4 py-2 rounded-lg bg-[#3b82f6] text-white text-sm font-semibold disabled:opacity-50">Save user</button>
+      </form>
+
+      <div class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1a2236] p-5">
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <h2 class="text-lg font-semibold text-[#f1f5f9]" x-text="vendorLabel(userVendorTab) + ' users'"></h2>
+          <span class="text-xs text-[#94a3b8]" x-text="credentials[userVendorTab].length + ' total'"></span>
+        </div>
+        <template x-if="credentials[userVendorTab].length === 0">
+          <p class="text-sm text-[#94a3b8]">No users saved for this vendor.</p>
+        </template>
+        <div class="divide-y divide-[rgba(255,255,255,0.06)]">
+          <template x-for="cred in credentials[userVendorTab]" :key="cred.id">
+            <div class="flex items-center justify-between gap-3 py-3">
+              <span class="text-sm font-mono text-[#f1f5f9]" x-text="cred.username"></span>
+              <button type="button" @click="deleteCredential(cred)" class="px-3 py-1.5 text-xs rounded-lg text-[#ef4444] hover:bg-red-500/10">Remove</button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="tab === 'table'" class="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] shadow-xl overflow-hidden">
+    <div class="px-5 py-4 border-b border-[rgba(255,255,255,0.08)] flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-[#f1f5f9]">OLT Table</h2>
+      <button type="button" @click="fetchOlts()" class="px-3 py-2 rounded-lg border border-[rgba(255,255,255,0.08)] text-sm text-[#94a3b8] hover:text-[#f1f5f9]">Refresh</button>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-[rgba(255,255,255,0.08)]">
+        <thead class="bg-[#1a2236]">
+          <tr class="text-left text-xs uppercase tracking-wide text-[#94a3b8]">
+            <th class="px-4 py-3 font-semibold">IP</th>
+            <th class="px-4 py-3 font-semibold">Name</th>
+            <th class="px-4 py-3 font-semibold">Site</th>
+            <th class="px-4 py-3 font-semibold">Type</th>
+            <th class="px-4 py-3 font-semibold">Latitude</th>
+            <th class="px-4 py-3 font-semibold">Longitude</th>
+            <th class="px-4 py-3 font-semibold"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-[rgba(255,255,255,0.06)]">
+          <template x-if="!loading && olts.length === 0">
+            <tr><td colspan="7" class="px-4 py-8 text-center text-sm text-[#94a3b8]">No OLTs added yet.</td></tr>
+          </template>
+          <template x-for="olt in olts" :key="'table-' + olt.id">
+            <tr>
+              <td class="px-4 py-3 text-sm font-mono text-[#f1f5f9]" x-text="olt.ip"></td>
+              <td class="px-4 py-3 text-sm font-semibold text-[#f1f5f9]" x-text="olt.name"></td>
+              <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="olt.site"></td>
+              <td class="px-4 py-3 text-sm text-[#94a3b8]" x-text="vendorLabel(olt.olt_type)"></td>
+              <td class="px-4 py-3 text-sm font-mono text-[#94a3b8]" x-text="coord(olt.latitude)"></td>
+              <td class="px-4 py-3 text-sm font-mono text-[#94a3b8]" x-text="coord(olt.longitude)"></td>
+              <td class="px-4 py-3 text-right"><button type="button" @click="deleteOlt(olt)" class="px-3 py-1.5 text-xs rounded-lg text-[#ef4444] hover:bg-red-500/10">Remove</button></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+function accessOltSetupPage() {
+  return {
+    tab: 'olts',
+    userVendorTab: 'nokia',
+    olts: [],
+    credentials: { nokia: [], huawei: [] },
+    loading: true,
+    savingOlt: false,
+    savingCredential: false,
+    oltError: '',
+    oltNotice: '',
+    credentialError: '',
+    oltForm: { ip: '', name: '', site: '', olt_type: 'nokia', latitude: '', longitude: '' },
+    credentialForms: {
+      nokia: { username: '', password: '' },
+      huawei: { username: '', password: '' }
+    },
+    async init() {
+      await Promise.all([this.fetchOlts(), this.fetchCredentials()]);
+    },
+    async fetchOlts() {
+      this.loading = true;
+      try {
+        const res = await fetch('/api/access/olt-setup/olts');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load OLTs');
+        this.olts = data.olts || [];
+      } catch (e) {
+        console.error(e);
+        this.olts = [];
+      }
+      this.loading = false;
+    },
+    async submitOlt() {
+      this.savingOlt = true;
+      this.oltError = '';
+      this.oltNotice = '';
+      try {
+        const payload = {
+          ip: this.oltForm.ip,
+          name: this.oltForm.name,
+          site: this.oltForm.site,
+          olt_type: this.oltForm.olt_type,
+          latitude: this.optionalNumber(this.oltForm.latitude),
+          longitude: this.optionalNumber(this.oltForm.longitude)
+        };
+        const res = await fetch('/api/access/olt-setup/olts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to save OLT');
+        this.oltForm = { ip: '', name: '', site: '', olt_type: 'nokia', latitude: '', longitude: '' };
+        this.oltNotice = 'OLT saved.';
+        await this.fetchOlts();
+      } catch (e) {
+        this.oltError = e.message || 'Failed to save OLT';
+      }
+      this.savingOlt = false;
+    },
+    async deleteOlt(olt) {
+      if (!confirm('Remove ' + olt.name + '?')) return;
+      const res = await fetch('/api/access/olt-setup/olts/' + olt.id, { method: 'DELETE' });
+      if (res.ok) await this.fetchOlts();
+    },
+    async fetchCredentials() {
+      try {
+        const res = await fetch('/api/access/olt-setup/credentials');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load users');
+        const all = data.credentials || [];
+        this.credentials = {
+          nokia: all.filter(item => item.vendor_family === 'nokia'),
+          huawei: all.filter(item => item.vendor_family === 'huawei')
+        };
+      } catch (e) {
+        console.error(e);
+        this.credentials = { nokia: [], huawei: [] };
+      }
+    },
+    async submitCredential() {
+      this.savingCredential = true;
+      this.credentialError = '';
+      try {
+        const form = this.credentialForms[this.userVendorTab];
+        const res = await fetch('/api/access/olt-setup/credentials', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            vendor_family: this.userVendorTab,
+            username: form.username,
+            password: form.password
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to save user');
+        this.credentialForms[this.userVendorTab] = { username: '', password: '' };
+        await this.fetchCredentials();
+      } catch (e) {
+        this.credentialError = e.message || 'Failed to save user';
+      }
+      this.savingCredential = false;
+    },
+    async deleteCredential(cred) {
+      if (!confirm('Remove user ' + cred.username + '?')) return;
+      const res = await fetch('/api/access/olt-setup/credentials/' + cred.id, { method: 'DELETE' });
+      if (res.ok) await this.fetchCredentials();
+    },
+    optionalNumber(value) {
+      if (value === '' || value === null || value === undefined) return null;
+      const n = Number(value);
+      return Number.isFinite(n) ? n : null;
+    },
+    vendorLabel(value) {
+      return value === 'huawei' ? 'Huawei' : 'Nokia';
+    },
+    coord(value) {
+      return value === null || value === undefined ? '-' : Number(value).toFixed(6);
+    }
+  };
+}
+</script>
+{{end}}

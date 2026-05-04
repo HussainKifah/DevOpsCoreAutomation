@@ -24,6 +24,7 @@ func Setup(
 	authH *handlers.AuthHandler,
 	pageH *handlers.PageHandler,
 	inventoryH *handlers.InventoryHandler,
+	accessOltH *handlers.AccessOltHandler,
 	scanH *handlers.ScanHandler,
 	workflowH *handlers.WorkflowHandler,
 	nocWorkflowH *handlers.WorkflowHandler,
@@ -31,6 +32,7 @@ func Setup(
 	nocDataH *handlers.NocDataHandler,
 	esSyslogH *handlers.EsSyslogHandler,
 	ipCapacityH *handlers.IPCapacityHandler,
+	betterStackH *handlers.BetterStackHandler,
 	slackEventsH *handlers.SlackEventsHandler,
 	betterStackWebhookH *handlers.BetterStackWebhookHandler,
 ) {
@@ -65,6 +67,7 @@ func Setup(
 	backupPages.Use(middleware.PageAuthMiddleware(jwtManager), middleware.PageRoleGuard("excess", "admin"))
 	{
 		backupPages.GET("/backups", pageH.Backups)
+		backupPages.GET("/olt-setup", pageH.OltSetup)
 	}
 
 	// Admin-only page routes
@@ -160,6 +163,16 @@ func Setup(
 			users.PUT("/:id", userH.UpdateUser)
 			users.DELETE("/:id", userH.DeleteUser)
 		}
+
+		oltSetup := writeAPI.Group("/access/olt-setup")
+		{
+			oltSetup.GET("/olts", accessOltH.ListOlts)
+			oltSetup.POST("/olts", accessOltH.CreateOlt)
+			oltSetup.DELETE("/olts/:id", accessOltH.DeleteOlt)
+			oltSetup.GET("/credentials", accessOltH.ListCredentials)
+			oltSetup.POST("/credentials", accessOltH.CreateCredential)
+			oltSetup.DELETE("/credentials/:id", accessOltH.DeleteCredential)
+		}
 	}
 
 	// ──────────── IP Team pages (role: ip, admin) ────────────
@@ -171,7 +184,8 @@ func Setup(
 		ipPages.GET("/bng-sync-checker", pageH.BNGSyncChecker)
 		ipPages.GET("/ip-cmd-output", pageH.IPCmdOutput)
 		ipPages.GET("/ip-activity-log", pageH.IPActivityLog)
-		ipPages.GET("/ip-syslog-alerts", pageH.IPSyslogAlerts)
+		ipPages.GET("/ip-alerts", pageH.IPAlerts)
+		ipPages.GET("/ip-syslog-alerts", func(c *gin.Context) { c.Redirect(302, "/ip-alerts") })
 		ipPages.GET("/ip-capacities", pageH.IPCapacities)
 	}
 
@@ -290,6 +304,12 @@ func Setup(
 		esAPI.POST("/filters", esSyslogH.CreateFilter)
 		esAPI.PUT("/filters/:id", esSyslogH.UpdateFilter)
 		esAPI.DELETE("/filters/:id", esSyslogH.DeleteFilter)
+	}
+
+	betterStackAPI := r.Group("/api/ip/betterstack")
+	betterStackAPI.Use(middleware.AuthMiddleware(jwtManager), middleware.RoleGuard("ip", "admin"))
+	{
+		betterStackAPI.GET("/incidents", betterStackH.ListIncidents)
 	}
 
 	capacityAPI := r.Group("/api/ip/capacities")

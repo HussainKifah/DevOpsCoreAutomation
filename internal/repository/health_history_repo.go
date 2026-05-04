@@ -25,6 +25,7 @@ type HealthHistoryRepository interface {
 	DeleteOlderThan(cutoff time.Time) (int64, error)
 	GetCalendarDays(from, to time.Time, vendor string) ([]HealthCalendarDay, error)
 	GetSnapshotsForDate(date time.Time, vendor string) ([]models.HealthSnapshot, error)
+	GetSnapshotsForRange(from, to time.Time, vendor string) ([]models.HealthSnapshot, error)
 }
 
 type healthHistoryRepository struct {
@@ -73,9 +74,13 @@ func (r *healthHistoryRepository) GetCalendarDays(from, to time.Time, vendor str
 
 func (r *healthHistoryRepository) GetSnapshotsForDate(date time.Time, vendor string) ([]models.HealthSnapshot, error) {
 	nextDay := date.AddDate(0, 0, 1)
+	return r.GetSnapshotsForRange(date, nextDay, vendor)
+}
+
+func (r *healthHistoryRepository) GetSnapshotsForRange(from, to time.Time, vendor string) ([]models.HealthSnapshot, error) {
 	var out []models.HealthSnapshot
 	err := r.DB.
-		Where("measured_at >= ? AND measured_at < ? AND vendor = ?", date, nextDay, vendor).
+		Where("measured_at >= ? AND measured_at < ? AND vendor = ?", from, to, vendor).
 		Order("measured_at, host").
 		Find(&out).Error
 	return out, err

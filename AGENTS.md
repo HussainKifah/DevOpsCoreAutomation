@@ -53,6 +53,7 @@ Common optional values:
 - `POWER_SCAN_INTERVAL`, `HEALTH_SCAN_INTERVAL`, `DESC_SCAN_INTERVAL`, `PORT_SCAN_INTERVAL`, `BACKUP_INTERVAL`.
 - Elasticsearch syslog polling settings: `ELASTICSEARCH_URL`, credentials, index pattern, poll interval, retention, dedup window.
 - Slack settings: `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, syslog channel, ticket channel, team mentions, reminder intervals.
+- IP capacity cost visibility: `IP_CAPACITY_COST_USERS` as comma-separated user emails allowed to see and edit cost columns.
 - Ruijie mail alarm settings: Microsoft Graph tenant/client/user/folder settings plus `RUIJIE_SLACK_CHANNEL_ID`.
 
 Keep secrets in `.env`; do not commit live credentials.
@@ -67,10 +68,9 @@ Keep secrets in `.env`; do not commit live credentials.
 - `internal/repository/`: GORM data access layer.
 - `internal/models/`: GORM models and migration surface.
 - `internal/scheduler/`: recurring scans, backups, cleanup, inventory, syslog polling, workflows, and NOC rotation.
-- `internal/shell/`: SSH/vendor command execution.
+- `internal/shell/`: SSH/vendor command execution; NOC Data transport can auto-fallback from SSH to Telnet where still supported.
 - `internal/extractor/`: vendor command output parsing.
 - `internal/Ruijie/`: Microsoft Graph Junk Email polling for Ruijie Cloud alarm messages and Slack reminder posting.
-- `internal/SlackReminders/`: Slack ticket/thread reminder helpers and worker.
 - `internal/syslog/`: Elasticsearch syslog client, Slack syslog batching, Slack reminder text/signature helpers.
 - `templates/`: HTML templates and static assets.
 
@@ -120,8 +120,10 @@ If `go` or `gofmt` is not on `PATH`, check `/usr/local/go/bin/go` and `/usr/loca
 3. Keep scheduler singleton behavior and scan semaphore logic intact.
 4. Avoid ad hoc parsing when an existing extractor/helper already handles the format.
 5. Keep Slack reminder behavior consistent: post in thread, mention the configured team, and stop reminders on configured resolution reactions where supported.
-6. Never add live credentials, `.env` values, tokens, Graph client secrets, Slack secrets, or device passwords to tracked files.
-7. Validate with `gofmt` and a focused `go test` when feasible; call out any pre-existing compile failures or hung integration tests.
+6. IP workflow backups are SSH-only. Do not allow Telnet fallback for IP backup collection paths; `WorkflowScheduler.transportMethod` should return `ssh` for `scope == "ip"` and `job_type == "backup"`, and on-demand IP backup helpers such as the BNG sync checker should pass `ssh` explicitly. NOC/NOC Data recovery paths may still use auto SSH/Telnet where intended.
+7. IP capacity costs are restricted by email allowlist. Keep cost fields hidden/redacted for users not listed in `IP_CAPACITY_COST_USERS`; only allowlisted users may submit cost values.
+8. Never add live credentials, `.env` values, tokens, Graph client secrets, Slack secrets, or device passwords to tracked files.
+9. Validate with `gofmt` and a focused `go test` when feasible; call out any pre-existing compile failures or hung integration tests.
 
 ## First Files To Open
 
@@ -131,4 +133,4 @@ If `go` or `gofmt` is not on `PATH`, check `/usr/local/go/bin/go` and `/usr/loca
 4. The relevant handler in `internal/handlers/`
 5. Matching repository/model files in `internal/repository/` and `internal/models/`
 6. `internal/scheduler/`, `internal/shell/`, or `internal/extractor/` if scans/device commands are involved
-7. `internal/Ruijie/`, `internal/syslog/`, or `internal/SlackReminders/` if Slack, syslog, email alarms, or reminders are involved
+7. `internal/Ruijie/` or `internal/syslog/` if Slack, syslog, email alarms, or reminders are involved

@@ -1,10 +1,19 @@
 {{define "content"}}
 <div x-data="ipSyslogPage()" x-init="init()" class="max-w-6xl mx-auto">
   <div class="mb-6">
-    <h1 class="text-2xl font-bold text-[#f1f5f9]">Syslog alerts</h1>
+    <h1 class="text-2xl font-bold text-[#f1f5f9]">Alerts</h1>
   </div>
 
-  <!-- Sub-tabs -->
+  <div class="flex gap-1 p-1 rounded-xl bg-[#1a2236] border border-[rgba(255,255,255,0.08)] w-fit mb-4">
+    <button type="button" @click="main = 'syslog'"
+      class="px-4 py-2 text-sm font-semibold rounded-lg transition-colors"
+      :class="main === 'syslog' ? 'bg-teal-500/20 text-teal-300' : 'text-[#94a3b8] hover:text-[#f1f5f9]'">Syslog</button>
+    <button type="button" @click="main = 'betterstack'; loadBetterStack()"
+      class="px-4 py-2 text-sm font-semibold rounded-lg transition-colors"
+      :class="main === 'betterstack' ? 'bg-teal-500/20 text-teal-300' : 'text-[#94a3b8] hover:text-[#f1f5f9]'">Better Stack</button>
+  </div>
+
+  <div x-show="main === 'syslog'" x-cloak>
   <div class="flex gap-1 p-1 rounded-xl bg-[#1a2236] border border-[rgba(255,255,255,0.08)] w-fit mb-6">
     <button type="button" @click="sub = 'alerts'"
       class="px-4 py-2 text-sm font-semibold rounded-lg transition-colors"
@@ -93,6 +102,69 @@
       </template>
     </div>
   </div>
+  </div>
+
+  <div x-show="main === 'betterstack'" x-cloak class="space-y-4">
+    <div class="flex items-center justify-between gap-3 flex-wrap">
+      <div class="flex gap-1 p-1 rounded-xl bg-[#1a2236] border border-[rgba(255,255,255,0.08)]">
+        <button type="button" @click="betterState = 'unresolved'; betterPage = 1; loadBetterStack()"
+          class="px-4 py-2 text-sm font-semibold rounded-lg transition-colors"
+          :class="betterState === 'unresolved' ? 'bg-red-500/15 text-red-300' : 'text-[#94a3b8] hover:text-[#f1f5f9]'">Unresolved</button>
+        <button type="button" @click="betterState = 'resolved'; betterPage = 1; loadBetterStack()"
+          class="px-4 py-2 text-sm font-semibold rounded-lg transition-colors"
+          :class="betterState === 'resolved' ? 'bg-emerald-500/15 text-emerald-300' : 'text-[#94a3b8] hover:text-[#f1f5f9]'">Resolved</button>
+      </div>
+      <button type="button" @click="loadBetterStack()" class="text-xs px-3 py-1.5 rounded-lg bg-[#1a2236] border border-[rgba(255,255,255,0.08)] text-[#f1f5f9] hover:border-teal-500/40">Refresh</button>
+    </div>
+    <template x-if="loadingBetter">
+      <div class="h-40 rounded-xl bg-[#1a2236] animate-pulse border border-[rgba(255,255,255,0.08)]"></div>
+    </template>
+    <template x-if="!loadingBetter && betterIncidents.length === 0">
+      <p class="text-sm text-[#64748b] py-8 text-center" x-text="betterState === 'resolved' ? 'No resolved Better Stack incidents tracked yet.' : 'No unresolved Better Stack incidents tracked yet.'"></p>
+    </template>
+    <div class="space-y-3" x-show="!loadingBetter && betterIncidents.length > 0">
+      <template x-for="inc in betterIncidents" :key="inc.id">
+        <article class="mission-card rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] overflow-hidden">
+          <div class="h-0.5" :class="inc.resolved_at_utc ? 'bg-emerald-500/60' : 'bg-red-500/60'"></div>
+          <div class="p-4 space-y-3">
+            <div class="flex flex-wrap items-start gap-3 justify-between">
+              <div class="min-w-0">
+                <h2 class="text-base font-semibold text-[#f1f5f9] break-words" x-text="inc.name || 'Better Stack incident'"></h2>
+                <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-[#94a3b8]">
+                  <span class="font-mono" x-text="'#' + (inc.better_stack_incident_id || inc.id)"></span>
+                  <span>·</span>
+                  <span x-text="inc.team_name || 'Better Stack'"></span>
+                  <span>·</span>
+                  <span x-text="fmtTs(inc.started_at_utc)"></span>
+                </div>
+              </div>
+              <span class="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full border"
+                :class="inc.resolved_at_utc ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' : 'bg-red-500/15 text-red-300 border-red-500/25'"
+                x-text="inc.resolved_at_utc ? 'resolved' : 'unresolved'"></span>
+            </div>
+            <p class="text-sm text-[#e2e8f0] leading-relaxed break-words" x-show="inc.cause" x-text="inc.cause"></p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-[#94a3b8]">
+              <p><span class="text-[#64748b]">Status:</span> <span x-text="inc.status || '—'"></span></p>
+              <p><span class="text-[#64748b]">Last seen:</span> <span x-text="fmtTs(inc.last_seen_at_utc)"></span></p>
+              <p x-show="inc.next_reminder_at && !inc.resolved_at_utc"><span class="text-[#64748b]">Next reminder:</span> <span x-text="fmtTs(inc.next_reminder_at)"></span></p>
+              <p x-show="inc.resolved_at_utc"><span class="text-[#64748b]">Resolved:</span> <span x-text="fmtTs(inc.resolved_at_utc)"></span></p>
+              <p x-show="inc.resolved_by"><span class="text-[#64748b]">Resolved by:</span> <span x-text="inc.resolved_by"></span></p>
+              <p x-show="inc.message_ts"><span class="text-[#64748b]">Slack thread:</span> <span class="font-mono" x-text="inc.message_ts"></span></p>
+            </div>
+            <div class="flex flex-wrap gap-2" x-show="inc.url || inc.origin_url">
+              <a x-show="inc.url" :href="inc.url" target="_blank" rel="noopener" class="text-xs text-teal-300 hover:underline">Better Stack</a>
+              <a x-show="inc.origin_url" :href="inc.origin_url" target="_blank" rel="noopener" class="text-xs text-teal-300 hover:underline">Origin</a>
+            </div>
+          </div>
+        </article>
+      </template>
+    </div>
+    <div class="flex justify-center gap-2 pt-2" x-show="betterPages > 1">
+      <button type="button" :disabled="betterPage <= 1" @click="betterPage--; loadBetterStack()" class="px-3 py-1 text-xs rounded-lg border border-[rgba(255,255,255,0.08)] disabled:opacity-40">Prev</button>
+      <span class="text-xs text-[#94a3b8] self-center" x-text="betterPage + ' / ' + betterPages"></span>
+      <button type="button" :disabled="betterPage >= betterPages" @click="betterPage++; loadBetterStack()" class="px-3 py-1 text-xs rounded-lg border border-[rgba(255,255,255,0.08)] disabled:opacity-40">Next</button>
+    </div>
+  </div>
 
   <!-- Filter modal -->
   <div x-show="filterModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
@@ -128,13 +200,19 @@
 <script>
 function ipSyslogPage() {
   return {
+    main: 'syslog',
     sub: 'alerts',
     alerts: [],
     filters: [],
+    betterIncidents: [],
     loadingAlerts: true,
     loadingFilters: true,
+    loadingBetter: false,
     alertPage: 1,
     alertPages: 1,
+    betterState: 'unresolved',
+    betterPage: 1,
+    betterPages: 1,
     filterModal: false,
     editFilter: null,
     form: { label: '', query_text: '', sort_order: 0, enabled: true },
@@ -146,6 +224,25 @@ function ipSyslogPage() {
 
     async init() {
       await Promise.all([this.loadFilters(), this.loadAlerts()]);
+    },
+
+    async loadBetterStack() {
+      this.loadingBetter = true;
+      try {
+        const params = new URLSearchParams({ state: this.betterState, page: String(this.betterPage), limit: '30' });
+        const res = await fetch('/api/ip/betterstack/incidents?' + params, { credentials: 'same-origin' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'failed');
+        this.betterIncidents = data.incidents || [];
+        const p = data.pagination || {};
+        this.betterPages = Math.max(1, Number(p.total_pages) || 1);
+        this.betterPage = Number(p.page) || 1;
+      } catch (e) {
+        console.error(e);
+        this.betterIncidents = [];
+        this.betterPages = 1;
+      }
+      this.loadingBetter = false;
     },
 
     async loadFilters() {

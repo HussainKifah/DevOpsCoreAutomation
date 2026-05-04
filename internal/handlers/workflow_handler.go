@@ -1123,7 +1123,7 @@ func (h *WorkflowHandler) runDeviceBackupNow(device *models.WorkflowDevice) (*mo
 		return nil, err
 	}
 
-	output, _, execErr := shell.NocDataSendCommandUsingMethodContext(context.Background(), device.Host, user, pass, device.Vendor, "", cmd)
+	output, _, execErr := shell.NocDataSendCommandUsingMethodContext(context.Background(), device.Host, user, pass, device.Vendor, "ssh", cmd)
 	finishedAt := time.Now()
 	if execErr != nil {
 		errMsg := execErr.Error()

@@ -25,13 +25,14 @@ func NewPageHandler(templateDir string, userRepo repository.UserRepository, jwtM
 		"devices":          filepath.Join(templateDir, "excess", "devices.html"),
 		"alerts":           filepath.Join(templateDir, "excess", "alerts.html"),
 		"backups":          filepath.Join(templateDir, "excess", "backups.html"),
+		"olt-setup":        filepath.Join(templateDir, "excess", "olt_setup.html"),
 		"admin-users":      filepath.Join(templateDir, "admin", "users.html"),
 		"workflows":        filepath.Join(templateDir, "ip", "workflows.html"),
 		"ip-backups":       filepath.Join(templateDir, "ip", "backups.html"),
 		"bng-sync-checker": filepath.Join(templateDir, "ip", "bng_sync_checker.html"),
 		"ip-cmd-output":    filepath.Join(templateDir, "ip", "cmd_output.html"),
 		"ip-activity-log":  filepath.Join(templateDir, "ip", "activity_log.html"),
-		"ip-syslog-alerts": filepath.Join(templateDir, "ip", "syslog_alerts.html"),
+		"ip-alerts":        filepath.Join(templateDir, "ip", "syslog_alerts.html"),
 		"ip-capacities":    filepath.Join(templateDir, "ip", "capacities.html"),
 		"noc-setup":        filepath.Join(templateDir, "noc", "noc_data.html"),
 		"noc-pass":         filepath.Join(templateDir, "noc", "noc_pass.html"),
@@ -113,6 +114,7 @@ func (h *PageHandler) Dashboard(c *gin.Context)  { h.render(c, "dashboard", nil)
 func (h *PageHandler) Devices(c *gin.Context)    { h.render(c, "devices", nil) }
 func (h *PageHandler) Alerts(c *gin.Context)     { h.render(c, "alerts", nil) }
 func (h *PageHandler) Backups(c *gin.Context)    { h.render(c, "backups", nil) }
+func (h *PageHandler) OltSetup(c *gin.Context)   { h.render(c, "olt-setup", nil) }
 func (h *PageHandler) AdminUsers(c *gin.Context) { h.render(c, "admin-users", nil) }
 func (h *PageHandler) NocSetup(c *gin.Context) {
 	h.render(c, "noc-setup", gin.H{
@@ -157,9 +159,9 @@ func (h *PageHandler) IPActivityLog(c *gin.Context) {
 		"ActivityLogDescription": "Every job execution — successes, failures, warnings, and system events",
 	})
 }
-func (h *PageHandler) IPSyslogAlerts(c *gin.Context) { h.render(c, "ip-syslog-alerts", nil) }
-func (h *PageHandler) IPCapacities(c *gin.Context)   { h.render(c, "ip-capacities", nil) }
-func (h *PageHandler) NocPass(c *gin.Context)        { h.render(c, "noc-pass", nil) }
+func (h *PageHandler) IPAlerts(c *gin.Context)     { h.render(c, "ip-alerts", nil) }
+func (h *PageHandler) IPCapacities(c *gin.Context) { h.render(c, "ip-capacities", nil) }
+func (h *PageHandler) NocPass(c *gin.Context)      { h.render(c, "noc-pass", nil) }
 func (h *PageHandler) NocData(c *gin.Context) {
 	h.render(c, "noc-data", gin.H{
 		"NocDataMode":       "data",

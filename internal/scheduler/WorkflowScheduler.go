@@ -264,11 +264,16 @@ func (ws *WorkflowScheduler) runJobForDevice(job *models.WorkflowJob, device *mo
 		}
 	}
 
+	transportMethod := ws.transportMethod(job)
+	logTransport := transportMethod
+	if logTransport == "" {
+		logTransport = "auto"
+	}
 	log.Printf("[workflow:%s] job %d: connecting to %s (vendor=%s, transport=%s)...",
-		ws.scope, job.ID, device.Host, device.Vendor, "auto")
+		ws.scope, job.ID, device.Host, device.Vendor, logTransport)
 	log.Printf("[workflow:%s] job %d: sending %d command(s): %q", ws.scope, job.ID, len(cmds), cmds)
 
-	output, method, execErr := shell.NocDataSendCommandUsingMethodContext(context.Background(), device.Host, user, pass, device.Vendor, "", cmds...)
+	output, method, execErr := shell.NocDataSendCommandUsingMethodContext(context.Background(), device.Host, user, pass, device.Vendor, transportMethod, cmds...)
 
 	finishedAt := time.Now()
 	durationMs := finishedAt.Sub(startedAt).Milliseconds()
@@ -322,6 +327,13 @@ func (ws *WorkflowScheduler) runJobForDevice(job *models.WorkflowJob, device *mo
 		log.Printf("[workflow:%s] job %d: output preview:\n%s", ws.scope, job.ID, preview)
 	}
 	return nil
+}
+
+func (ws *WorkflowScheduler) transportMethod(job *models.WorkflowJob) string {
+	if strings.EqualFold(ws.scope, "ip") && strings.EqualFold(strings.TrimSpace(job.JobType), "backup") {
+		return "ssh"
+	}
+	return ""
 }
 
 func ciscoSaveConfigCommand(vendor string) (string, bool) {

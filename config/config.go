@@ -24,7 +24,14 @@ type Config struct {
 	TLSCertFile string
 	TLSKeyFile  string
 
-	BetterStackWebhookSecret string
+	BetterStackWebhookSecret    string
+	BetterStackEnabled          bool
+	BetterStackAPIToken         string
+	BetterStackSlackChannelID   string
+	BetterStackReminderInterval time.Duration
+	BetterStackPollInterval     time.Duration
+	BetterStackLookbackDays     int
+	BetterStackSlackTeamMention string
 
 	OLTUser string // Nokia SSH credentials
 	OLTPass string
@@ -62,19 +69,12 @@ type Config struct {
 	// SlackSyslogTeamMention is raw mrkdwn for pings, e.g. <!subteam^S01234|ip-core> (from Slack user group).
 	SlackSyslogTeamMention string
 
-	SlackTicketReminderEnabled    bool
-	SlackTicketChannelID          string
-	SlackTicketReminderInterval   time.Duration
-	SlackTicketFirstReminderAfter time.Duration
-	SlackTicketTickInterval       time.Duration
-	SlackTicketIPTeamMention      string
-	SlackTicketDisplayOffset      time.Duration
-	SlackTicketSourceBotID        string
-
 	SlackActivityLogEnabled       bool
 	SlackActivityLogChannelID     string
 	SlackActivityLogDailyTime     string
 	SlackActivityLogDisplayOffset time.Duration
+
+	IPCapacityCostUsers map[string]struct{}
 
 	RuijieMailEnabled           bool
 	RuijieMailTenantID          string
@@ -116,7 +116,14 @@ func Load() *Config {
 		TLSCertFile: getEnv("TLS_CERT", ""),
 		TLSKeyFile:  getEnv("TLS_KEY", ""),
 
-		BetterStackWebhookSecret: strings.TrimSpace(getEnv("BETTERSTACK_WEBHOOK_SECRET", "")),
+		BetterStackWebhookSecret:    strings.TrimSpace(getEnv("BETTERSTACK_WEBHOOK_SECRET", "")),
+		BetterStackEnabled:          getEnv("BETTERSTACK_ENABLED", "") == "1" || getEnv("BETTERSTACK_ENABLED", "") == "true",
+		BetterStackAPIToken:         strings.TrimSpace(getEnv("BETTERSTACK_API_TOKEN", "")),
+		BetterStackSlackChannelID:   strings.TrimSpace(getEnv("BETTERSTACK_SLACK_CHANNEL_ID", "")),
+		BetterStackReminderInterval: parseDurationWithFallback(getEnv("BETTERSTACK_REMINDER_INTERVAL", "6h"), 6*time.Hour),
+		BetterStackPollInterval:     parseDurationWithFallback(getEnv("BETTERSTACK_POLL_INTERVAL", "1m"), time.Minute),
+		BetterStackLookbackDays:     parseBoundedInt("BETTERSTACK_LOOKBACK_DAYS", 1, 0, 30),
+		BetterStackSlackTeamMention: strings.TrimSpace(getEnv("BETTERSTACK_SLACK_TEAM_MENTION", "")),
 
 		OLTUser: getEnv("OLT_SSH_USER", ""),
 		OLTPass: getEnv("OLT_SSH_PASS", ""),
@@ -150,19 +157,12 @@ func Load() *Config {
 		SlackSyslogDisplayOffset: parseDurationWithFallback(getEnv("SLACK_SYSLOG_DISPLAY_OFFSET", "3h"), 3*time.Hour),
 		SlackSyslogTeamMention:   strings.TrimSpace(getEnv("SLACK_SYSLOG_TEAM_MENTION", "")),
 
-		SlackTicketReminderEnabled:    getEnv("SLACK_TICKET_REMINDER_ENABLED", "") == "1" || getEnv("SLACK_TICKET_REMINDER_ENABLED", "") == "true",
-		SlackTicketChannelID:          strings.TrimSpace(getEnv("SLACK_TICKET_CHANNEL_ID", getEnv("SLACK_CHANNEL_ID", ""))),
-		SlackTicketReminderInterval:   parseDurationWithFallback(getEnv("SLACK_TICKET_REMINDER_INTERVAL", "6h"), 6*time.Hour),
-		SlackTicketFirstReminderAfter: parseDurationWithFallback(getEnv("SLACK_TICKET_FIRST_REMINDER_AFTER", "6h"), 6*time.Hour),
-		SlackTicketTickInterval:       parseDurationWithFallback(getEnv("SLACK_TICKET_TICK_INTERVAL", "2m"), 2*time.Minute),
-		SlackTicketIPTeamMention:      strings.TrimSpace(getEnv("SLACK_TICKET_IP_TEAM_MENTION", "")),
-		SlackTicketDisplayOffset:      parseDurationWithFallback(getEnv("SLACK_TICKET_DISPLAY_OFFSET", "3h"), 3*time.Hour),
-		SlackTicketSourceBotID:        strings.TrimSpace(getEnv("SLACK_TICKET_SOURCE_BOT_ID", "")),
-
 		SlackActivityLogEnabled:       getEnv("SLACK_ACTIVITY_LOG_ENABLED", "true") == "1" || getEnv("SLACK_ACTIVITY_LOG_ENABLED", "true") == "true",
 		SlackActivityLogChannelID:     strings.TrimSpace(getEnv("SLACK_ACTIVITY_LOG_CHANNEL_ID", "C0B063ARXPX")),
 		SlackActivityLogDailyTime:     normalizeClockTime(getEnv("SLACK_ACTIVITY_LOG_DAILY_TIME", "09:00"), "09:00"),
 		SlackActivityLogDisplayOffset: parseDurationWithFallback(getEnv("SLACK_ACTIVITY_LOG_DISPLAY_OFFSET", "3h"), 3*time.Hour),
+
+		IPCapacityCostUsers: parseEmailSet(getEnv("IP_CAPACITY_COST_USERS", "")),
 
 		RuijieMailEnabled:           getEnv("RUIJIE_MAIL_ENABLED", "") == "1" || getEnv("RUIJIE_MAIL_ENABLED", "") == "true",
 		RuijieMailTenantID:          strings.TrimSpace(getEnv("RUIJIE_MAIL_TENANT_ID", "")),
@@ -202,6 +202,25 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
+func parseEmailSet(raw string) map[string]struct{} {
+	out := make(map[string]struct{})
+	for _, part := range strings.Split(raw, ",") {
+		email := strings.ToLower(strings.TrimSpace(part))
+		if email != "" {
+			out[email] = struct{}{}
+		}
+	}
+	return out
+}
+
+func (c *Config) CanViewIPCapacityCost(email string) bool {
+	if c == nil || len(c.IPCapacityCostUsers) == 0 {
+		return false
+	}
+	_, ok := c.IPCapacityCostUsers[strings.ToLower(strings.TrimSpace(email))]
+	return ok
+}
+
 func parseDuration(s string) time.Duration {
 	d, err := time.ParseDuration(s)
 	if err != nil {
@@ -213,14 +232,6 @@ func parseDuration(s string) time.Duration {
 // SlackSyslogConfigured is true when posting to Slack should run (token + channel).
 func (c *Config) SlackSyslogConfigured() bool {
 	return c != nil && c.SlackSyslogEnabled && c.SlackBotToken != "" && c.SlackChannelID != ""
-}
-
-func (c *Config) SlackTicketReminderConfigured() bool {
-	return c != nil &&
-		c.SlackTicketReminderEnabled &&
-		c.SlackBotToken != "" &&
-		c.SlackSigningSecret != "" &&
-		c.SlackTicketChannelID != ""
 }
 
 func (c *Config) SlackActivityLogConfigured() bool {
@@ -240,6 +251,14 @@ func (c *Config) RuijieMailConfigured() bool {
 		c.RuijieMailUserID != "" &&
 		c.SlackBotToken != "" &&
 		c.RuijieSlackChannelID != ""
+}
+
+func (c *Config) BetterStackConfigured() bool {
+	return c != nil &&
+		c.BetterStackEnabled &&
+		c.BetterStackAPIToken != "" &&
+		c.SlackBotToken != "" &&
+		c.BetterStackSlackChannelID != ""
 }
 
 func normalizeClockTime(value, fallback string) string {

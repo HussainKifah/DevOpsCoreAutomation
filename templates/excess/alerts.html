@@ -2,19 +2,28 @@
 <div x-data="alertsPage()" x-init="init()">
   <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold text-[#f1f5f9]">Alerts</h1>
-    <!-- View toggle: Cards vs List -->
-    <div class="flex rounded-lg border border-[rgba(255,255,255,0.08)] p-0.5 bg-[#1a2236]">
-      <button @click="alertView = 'cards'"
-        :class="alertView === 'cards' ? 'bg-[#3b82f6] text-white' : 'text-[#94a3b8] hover:text-[#f1f5f9]'"
-        class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors">Cards</button>
-      <button @click="alertView = 'list'"
-        :class="alertView === 'list' ? 'bg-[#3b82f6] text-white' : 'text-[#94a3b8] hover:text-[#f1f5f9]'"
-        class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors">List</button>
+    <div class="flex items-center gap-2 flex-wrap justify-end">
+      <div class="flex rounded-lg border border-[rgba(255,255,255,0.08)] p-0.5 bg-[#1a2236]">
+        <button @click="alertMode = 'active'"
+          :class="alertMode === 'active' ? 'bg-[#3b82f6] text-white' : 'text-[#94a3b8] hover:text-[#f1f5f9]'"
+          class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors">Active</button>
+        <button @click="openHistory()"
+          :class="alertMode === 'history' ? 'bg-[#3b82f6] text-white' : 'text-[#94a3b8] hover:text-[#f1f5f9]'"
+          class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors">History</button>
+      </div>
+      <div x-show="alertMode === 'active'" class="flex rounded-lg border border-[rgba(255,255,255,0.08)] p-0.5 bg-[#1a2236]">
+        <button @click="alertView = 'cards'"
+          :class="alertView === 'cards' ? 'bg-[#3b82f6] text-white' : 'text-[#94a3b8] hover:text-[#f1f5f9]'"
+          class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors">Cards</button>
+        <button @click="alertView = 'list'"
+          :class="alertView === 'list' ? 'bg-[#3b82f6] text-white' : 'text-[#94a3b8] hover:text-[#f1f5f9]'"
+          class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors">List</button>
+      </div>
     </div>
   </div>
 
   <!-- Loading: skeleton -->
-  <template x-if="loading">
+  <template x-if="alertMode === 'active' && loading">
     <div class="space-y-4 py-6">
       <div class="h-8 w-48 rounded-lg bg-[#1a2236] animate-pulse"></div>
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -25,7 +34,7 @@
     </div>
   </template>
 
-  <template x-if="!loading">
+  <template x-if="alertMode === 'active' && !loading">
     <div>
       <!-- All Clear empty state -->
       <template x-if="powerByHost.length === 0 && portsByHost.length === 0 && healthAlertCount === 0">
@@ -193,6 +202,132 @@
       </template>
     </div>
   </template>
+
+  <template x-if="alertMode === 'history'">
+    <div class="space-y-4">
+      <div class="mission-card bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] p-4">
+        <div class="flex flex-wrap items-end gap-3">
+          <div>
+            <label class="block text-xs font-medium uppercase tracking-wide text-[#64748b] mb-1">Date</label>
+            <input type="date" x-model="historyDate" @change="resetAlertHistory()"
+              class="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#111827] px-3 py-2 text-sm text-[#f1f5f9] focus:outline-none focus:border-[#3b82f6]/60">
+          </div>
+          <button @click="loadAlertHistory()" :disabled="historyLoading || !historyDate"
+            class="px-4 py-2 rounded-lg bg-[#3b82f6] hover:bg-[#2563eb] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors">Show Alerts</button>
+          <p class="text-sm text-[#94a3b8]" x-text="historySummaryText"></p>
+        </div>
+      </div>
+
+      <div class="mission-card bg-[#1a2236] rounded-xl border border-[rgba(255,255,255,0.08)] overflow-hidden">
+        <div class="px-5 py-4 border-b border-[rgba(255,255,255,0.08)]">
+          <h2 class="text-sm font-semibold text-[#f1f5f9]">Alerting History</h2>
+          <p class="text-xs text-[#94a3b8] mt-0.5">Health threshold and port-down alerts recorded from stored scan history</p>
+        </div>
+        <div>
+          <template x-if="historyLoading">
+            <div class="px-4 py-8 text-center text-sm text-[#64748b]">Loading...</div>
+          </template>
+          <template x-if="!historyLoading && historyLoaded && alertHistoryGroups.length === 0">
+            <div class="px-4 py-8 text-center text-sm text-[#64748b]">No alerting records found for this date.</div>
+          </template>
+          <template x-if="!historyLoading && !historyLoaded">
+            <div class="px-4 py-8 text-center text-sm text-[#64748b]">Select a date to view alerting history.</div>
+          </template>
+
+          <div x-show="!historyLoading && historyLoaded && alertHistoryGroups.length > 0" class="divide-y divide-[rgba(255,255,255,0.06)]">
+            <template x-for="group in pagedAlertHistoryGroups" :key="group.key">
+              <div>
+                <button type="button" @click="toggleHistoryGroup(group.key)"
+                  class="w-full px-4 py-3 text-left hover:bg-[#111827]/70 transition-colors">
+                  <div class="grid grid-cols-1 lg:grid-cols-[130px_120px_140px_1fr_32px] gap-3 items-center">
+                    <span class="text-sm font-mono text-[#94a3b8]" x-text="group.time_label"></span>
+                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded-full w-fit"
+                      :class="group.severity === 'CRITICAL' ? 'bg-[#ef4444]/20 text-[#ef4444]' : 'bg-[#f59e0b]/20 text-[#f59e0b]'">
+                      <span class="w-1.5 h-1.5 rounded-full" :class="group.severity === 'CRITICAL' ? 'bg-[#ef4444]' : 'bg-[#f59e0b]'"></span>
+                      <span x-text="group.severity"></span>
+                    </span>
+                    <span class="text-sm text-[#f1f5f9]" x-text="group.type"></span>
+                    <span class="text-sm text-[#cbd5e1] truncate" x-text="group.summary"></span>
+                    <svg class="w-4 h-4 text-[#64748b] transition-transform justify-self-end"
+                      :class="expandedHistoryGroup === group.key ? 'rotate-180' : ''"
+                      fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/>
+                    </svg>
+                  </div>
+                </button>
+                <div x-show="expandedHistoryGroup === group.key" x-transition class="bg-[#111827] px-4 py-3 border-t border-[rgba(255,255,255,0.06)]">
+                  <div class="space-y-2">
+                    <template x-for="host in group.hosts" :key="host.key">
+                      <div class="rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#0a0e1a] overflow-hidden">
+                        <button type="button" @click="toggleHistoryHost(host.key)"
+                          class="w-full px-3 py-2 text-left hover:bg-[#111827] transition-colors">
+                          <div class="grid grid-cols-1 md:grid-cols-[1fr_160px_120px_24px] gap-2 items-center">
+                            <div class="min-w-0">
+                              <p class="text-sm font-semibold text-[#f1f5f9] truncate" x-text="host.device"></p>
+                              <p class="text-xs font-mono text-[#94a3b8] truncate" x-text="host.host"></p>
+                            </div>
+                            <span class="text-xs text-[#cbd5e1]" x-text="host.summary"></span>
+                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded-full w-fit"
+                              :class="host.severity === 'CRITICAL' ? 'bg-[#ef4444]/20 text-[#ef4444]' : 'bg-[#f59e0b]/20 text-[#f59e0b]'">
+                              <span class="w-1.5 h-1.5 rounded-full" :class="host.severity === 'CRITICAL' ? 'bg-[#ef4444]' : 'bg-[#f59e0b]'"></span>
+                              <span x-text="host.severity"></span>
+                            </span>
+                            <svg class="w-4 h-4 text-[#64748b] transition-transform justify-self-end"
+                              :class="expandedHistoryHost === host.key ? 'rotate-180' : ''"
+                              fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/>
+                            </svg>
+                          </div>
+                        </button>
+                        <div x-show="expandedHistoryHost === host.key" x-transition class="px-3 py-3 border-t border-[rgba(255,255,255,0.06)] bg-[#111827]">
+                          <template x-if="group.type === 'Health'">
+                            <div class="space-y-2">
+                              <template x-for="item in host.items" :key="item.key">
+                                <div class="grid grid-cols-1 md:grid-cols-[90px_1fr] gap-2 rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#0a0e1a] px-3 py-2">
+                                  <span class="text-xs font-mono text-[#64748b]" x-text="fmtTime(item.measured_at)"></span>
+                                  <span class="text-sm text-[#cbd5e1]" x-text="item.detail"></span>
+                                </div>
+                              </template>
+                            </div>
+                          </template>
+                          <template x-if="group.type === 'Port Protection'">
+                            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+                              <template x-for="item in host.items" :key="item.key">
+                                <div class="rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#0a0e1a] px-3 py-2">
+                                  <div class="flex items-center justify-between gap-2">
+                                    <span class="font-mono text-sm text-[#f1f5f9]" x-text="item.port_label"></span>
+                                    <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                                      :class="item.severity === 'CRITICAL' ? 'bg-[#ef4444]/20 text-[#ef4444]' : 'bg-[#f59e0b]/20 text-[#f59e0b]'"
+                                      x-text="item.count + 'x'"></span>
+                                  </div>
+                                  <p class="mt-1 text-xs text-[#94a3b8]" x-text="item.state_label"></p>
+                                  <p class="mt-1 text-xs text-[#64748b]" x-text="item.window_label"></p>
+                                </div>
+                              </template>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <div x-show="historyLoaded" class="flex items-center justify-between gap-3 px-4 py-3 border-t border-[rgba(255,255,255,0.08)]">
+            <p class="text-xs text-[#94a3b8]" x-text="historyPageLabel"></p>
+            <div class="flex items-center gap-2">
+              <button type="button" @click="prevHistoryPage()" :disabled="historyPage <= 1"
+                class="px-3 py-1.5 rounded-lg border border-[rgba(255,255,255,0.08)] text-xs font-semibold text-[#94a3b8] hover:text-[#f1f5f9] disabled:opacity-40 disabled:cursor-not-allowed">Previous</button>
+              <button type="button" @click="nextHistoryPage()" :disabled="historyPage >= historyTotalPages"
+                class="px-3 py-1.5 rounded-lg border border-[rgba(255,255,255,0.08)] text-xs font-semibold text-[#94a3b8] hover:text-[#f1f5f9] disabled:opacity-40 disabled:cursor-not-allowed">Next</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
 </div>
 
 <style>
@@ -210,11 +345,26 @@
       downPorts: [],
       healthData: [],
       showAllHealth: false,
+      alertMode: 'active',
       alertView: 'cards',
+      historyDate: new Date().toISOString().slice(0, 10),
+      historyLoading: false,
+      historyLoaded: false,
+      historyDetail: { health: [], ports: [] },
+      historyGroups: [],
+      historyPage: 1,
+      historyPageSize: 15,
+      historyPagination: { has_next: false, total_pages: 1, total: 0 },
+      expandedHistoryGroup: null,
+      expandedHistoryHost: null,
 
       async init() {
         await this.loadData();
-        window.addEventListener('vendor-changed', () => { this.loading = true; this.loadData(); });
+        window.addEventListener('vendor-changed', () => {
+          this.loading = true;
+          this.loadData();
+          if (this.alertMode === 'history' && this.historyLoaded) this.loadAlertHistory();
+        });
       },
       async loadData() {
         var vp = vendorParam();
@@ -227,6 +377,92 @@
         this.downPorts = (await portRes.json()) || [];
         this.healthData = (await hRes.json()) || [];
         this.loading = false;
+      },
+
+      openHistory() {
+        this.alertMode = 'history';
+        if (!this.historyLoaded) this.loadAlertHistory();
+      },
+
+      resetAlertHistory() {
+        this.historyLoaded = false;
+        this.historyDetail = { health: [], ports: [] };
+        this.historyGroups = [];
+        this.historyPage = 1;
+        this.historyPagination = { has_next: false, total_pages: 1, total: 0 };
+        this.expandedHistoryGroup = null;
+        this.expandedHistoryHost = null;
+      },
+
+      async loadAlertHistory() {
+        if (!this.historyDate) return;
+        this.historyLoading = true;
+        try {
+          var res = await fetch('/api/history/day?mode=alerts&date=' + encodeURIComponent(this.historyDate) + '&page=' + this.historyPage + '&page_size=' + this.historyPageSize + '&' + vendorParam());
+          this.historyDetail = await res.json();
+          this.historyGroups = this.historyDetail.groups || [];
+          this.historyPagination = this.historyDetail.pagination || { has_next: false, total_pages: 1, total: this.historyGroups.length };
+        } catch (e) {
+          this.historyDetail = { health: [], ports: [] };
+          this.historyGroups = [];
+          this.historyPagination = { has_next: false, total_pages: 1, total: 0 };
+        }
+        this.expandedHistoryGroup = null;
+        this.expandedHistoryHost = null;
+        this.historyLoaded = true;
+        this.historyLoading = false;
+      },
+
+      fmtTime(value) {
+        if (!value) return '-';
+        return new Date(value).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      },
+
+      fmtTimeRange(start, end) {
+        return this.fmtTime(start) + ' - ' + this.fmtTime(end);
+      },
+
+      get historySummaryText() {
+        if (!this.historyLoaded) return 'Pick a date to inspect stored alerts.';
+        var count = this.alertHistoryGroups.length;
+        return count + ' grouped alert window' + (count === 1 ? '' : 's') + ' on this page';
+      },
+
+      toggleHistoryGroup(key) {
+        this.expandedHistoryGroup = this.expandedHistoryGroup === key ? null : key;
+        this.expandedHistoryHost = null;
+      },
+
+      toggleHistoryHost(key) {
+        this.expandedHistoryHost = this.expandedHistoryHost === key ? null : key;
+      },
+
+      prevHistoryPage() {
+        if (this.historyPage <= 1) return;
+        this.historyPage--;
+        this.loadAlertHistory();
+      },
+
+      nextHistoryPage() {
+        if (this.historyPage >= this.historyTotalPages) return;
+        this.historyPage++;
+        this.loadAlertHistory();
+      },
+
+      get historyTotalPages() {
+        return Math.max(1, Number(this.historyPagination.total_pages || 1));
+      },
+
+      get historyPageLabel() {
+        var total = Number(this.historyPagination.total || this.alertHistoryGroups.length || 0);
+        if (total === 0) return 'No alert groups';
+        var from = ((this.historyPage - 1) * this.historyPageSize) + 1;
+        var to = Math.min(total, this.historyPage * this.historyPageSize);
+        return 'Showing ' + from + '-' + to + ' of ' + total;
+      },
+
+      get pagedAlertHistoryGroups() {
+        return this.alertHistoryGroups;
       },
 
       // Power: worstRx <= -30 = CRITICAL, else WARNING
@@ -316,6 +552,166 @@
           return (a.device || '').localeCompare(b.device || '');
         });
         return feed;
+      },
+
+      get alertHistoryGroups() {
+        if (this.historyGroups && this.historyGroups.length) return this.historyGroups;
+        var groupMap = {};
+        var order = { CRITICAL: 0, WARNING: 1 };
+        var bucketMs = 5 * 60 * 1000;
+        var healthSeverity = function(cpu, temp) {
+          if (cpu > 80 || temp > 65) return 'CRITICAL';
+          if (cpu > 60 || temp > 55) return 'WARNING';
+          return 'NORMAL';
+        };
+        var ensureGroup = function(key, attrs) {
+          if (!groupMap[key]) {
+            groupMap[key] = {
+              key: key,
+              type: attrs.type,
+              severity: attrs.severity,
+              start_ts: attrs.start_ts,
+              end_ts: attrs.end_ts,
+              time_label: attrs.time_label,
+              hosts: [],
+              hostMap: {}
+            };
+          }
+          var group = groupMap[key];
+          if ((order[attrs.severity] || 1) < (order[group.severity] || 1)) group.severity = attrs.severity;
+          return group;
+        };
+        var ensureHost = function(group, attrs) {
+          if (!group.hostMap[attrs.host]) {
+            group.hostMap[attrs.host] = {
+              key: group.key + '-' + attrs.host,
+              device: attrs.device,
+              host: attrs.host,
+              severity: attrs.severity,
+              items: [],
+              portMap: {}
+            };
+            group.hosts.push(group.hostMap[attrs.host]);
+          }
+          var host = group.hostMap[attrs.host];
+          if ((order[attrs.severity] || 1) < (order[host.severity] || 1)) host.severity = attrs.severity;
+          return host;
+        };
+        var timeLabel = function(startTs) {
+          var start = new Date(startTs);
+          var end = new Date(startTs + bucketMs);
+          return start.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) + ' - ' + end.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        };
+        (this.historyDetail.health || []).forEach(function(h) {
+          var cpuMax = (h.cpu_loads || []).reduce(function(max, c) {
+            return (c.average_pct || 0) > max.val ? { val: c.average_pct || 0, slot: c.slot || '-' } : max;
+          }, { val: 0, slot: '-' });
+          var tempMax = (h.temperatures || []).reduce(function(max, t) {
+            return (t.act_temp || 0) > max.val ? { val: t.act_temp || 0, slot: t.slot || '-' } : max;
+          }, { val: 0, slot: '-' });
+          var severity = healthSeverity(cpuMax.val, tempMax.val);
+          if (severity === 'NORMAL') return;
+          var ts = new Date(h.measured_at).getTime();
+          var startTs = Math.floor(ts / bucketMs) * bucketMs;
+          var group = ensureGroup('health-' + startTs, {
+            type: 'Health',
+            severity: severity,
+            start_ts: startTs,
+            end_ts: startTs + bucketMs,
+            time_label: timeLabel(startTs)
+          });
+          var host = ensureHost(group, {
+            severity: severity,
+            device: h.device,
+            host: h.host
+          });
+          host.items.push({
+            key: 'health-' + h.id,
+            measured_at: h.measured_at,
+            severity: severity,
+            detail: 'CPU ' + cpuMax.val + '% (' + cpuMax.slot + ') / Temp ' + tempMax.val + '\u00B0C (' + tempMax.slot + ')'
+          });
+        });
+        (this.historyDetail.ports || []).forEach(function(p) {
+          var actDown = p.port_state === 'act-down' || p.paired_state === 'act-down';
+          var severity = actDown ? 'CRITICAL' : 'WARNING';
+          var ts = new Date(p.measured_at).getTime();
+          var startTs = Math.floor(ts / bucketMs) * bucketMs;
+          var group = ensureGroup('port-' + startTs, {
+            type: 'Port Protection',
+            severity: severity,
+            start_ts: startTs,
+            end_ts: startTs + bucketMs,
+            time_label: timeLabel(startTs)
+          });
+          var host = ensureHost(group, {
+            severity: severity,
+            device: p.device,
+            host: p.host
+          });
+          var portKey = p.port + '|' + (p.paired_port || '');
+          if (!host.portMap[portKey]) {
+            host.portMap[portKey] = {
+              key: 'port-' + p.id,
+              severity: severity,
+              first_ts: ts,
+              last_ts: ts,
+              count: 0,
+              port_label: p.port + (p.paired_port ? ' / ' + p.paired_port : ''),
+              stateMap: {},
+              state_label: '',
+              window_label: ''
+            };
+            host.items.push(host.portMap[portKey]);
+          }
+          var item = host.portMap[portKey];
+          item.count++;
+          item.first_ts = Math.min(item.first_ts, ts);
+          item.last_ts = Math.max(item.last_ts, ts);
+          item.stateMap[(p.port_state || '-') + (p.paired_state ? ' / ' + p.paired_state : '')] = true;
+          if ((order[severity] || 1) < (order[item.severity] || 1)) item.severity = severity;
+        });
+        var groups = Object.values(groupMap);
+        groups.forEach(function(group) {
+          group.hosts.forEach(function(host) {
+            if (group.type === 'Port Protection') {
+              host.items.forEach(function(item) {
+                var first = new Date(item.first_ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                var last = new Date(item.last_ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                item.window_label = first === last ? first : first + ' - ' + last;
+                item.state_label = Object.keys(item.stateMap).join(', ');
+                delete item.stateMap;
+              });
+              host.items.sort(function(a, b) {
+                var sevDiff = (order[a.severity] || 1) - (order[b.severity] || 1);
+                if (sevDiff !== 0) return sevDiff;
+                return (a.port_label || '').localeCompare(b.port_label || '');
+              });
+              host.summary = host.items.length + ' port' + (host.items.length === 1 ? '' : 's') + ', ' + host.items.reduce(function(sum, item) { return sum + item.count; }, 0) + ' readings';
+            } else {
+              host.items.sort(function(a, b) {
+                return new Date(a.measured_at).getTime() - new Date(b.measured_at).getTime();
+              });
+              host.summary = host.items.length + ' health sample' + (host.items.length === 1 ? '' : 's');
+            }
+            delete host.portMap;
+          });
+          group.hosts.sort(function(a, b) {
+            var sevDiff = (order[a.severity] || 1) - (order[b.severity] || 1);
+            if (sevDiff !== 0) return sevDiff;
+            return (a.device || '').localeCompare(b.device || '');
+          });
+          var problemCount = group.hosts.reduce(function(sum, host) { return sum + host.items.length; }, 0);
+          group.summary = group.hosts.length + ' IP' + (group.hosts.length === 1 ? '' : 's') + ', ' + problemCount + ' problem group' + (problemCount === 1 ? '' : 's');
+          delete group.hostMap;
+        });
+        groups.sort(function(a, b) {
+          if (a.start_ts !== b.start_ts) return a.start_ts - b.start_ts;
+          var sevDiff = (order[a.severity] || 1) - (order[b.severity] || 1);
+          if (sevDiff !== 0) return sevDiff;
+          return (a.type || '').localeCompare(b.type || '');
+        });
+        return groups;
       }
     };
   }

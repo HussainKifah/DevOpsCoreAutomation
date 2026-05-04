@@ -41,6 +41,8 @@ func Connect(cfg *config.Config) *gorm.DB {
 		&models.OltInventory{},
 		&models.OntInventoryItem{},
 		&models.OntInterface{},
+		&models.AccessOlt{},
+		&models.AccessOltCredential{},
 		&models.WorkflowDevice{},
 		&models.WorkflowJob{},
 		&models.WorkflowRun{},
@@ -58,9 +60,9 @@ func Connect(cfg *config.Config) *gorm.DB {
 		&models.EsSyslogFilter{},
 		&models.EsSyslogAlert{},
 		&models.EsSyslogSlackIncident{},
-		&models.SlackTicketReminder{},
 		&models.RuijieMailAlert{},
 		&models.RuijieSlackIncident{},
+		&models.BetterStackSlackIncident{},
 		&models.IPCapacityNode{},
 		&models.IPCapacityAction{},
 	); err != nil {
@@ -133,6 +135,12 @@ func Connect(cfg *config.Config) *gorm.DB {
 	if err := db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_ip_capacity_nodes_identity ON ip_capacity_nodes (province, name, type)").Error; err != nil {
 		log.Printf("ip_capacity_nodes identity index warning: %v", err)
 	}
+	if err := db.Exec("ALTER TABLE ip_capacity_actions ADD COLUMN IF NOT EXISTS cost_per_mbps_iqd bigint NOT NULL DEFAULT 0").Error; err != nil {
+		log.Printf("ip_capacity_actions add cost_per_mbps_iqd warning: %v", err)
+	}
+	if err := db.Exec("ALTER TABLE ip_capacity_actions ADD COLUMN IF NOT EXISTS total_cost_iqd bigint NOT NULL DEFAULT 0").Error; err != nil {
+		log.Printf("ip_capacity_actions add total_cost_iqd warning: %v", err)
+	}
 
 	go func() {
 		indexes := []string{
@@ -142,6 +150,7 @@ func Connect(cfg *config.Config) *gorm.DB {
 			"CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_ps_host_measured ON port_snapshots (host, measured_at)",
 			"CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_es_syslog_slack_incidents_snoozed_at ON es_syslog_slack_incidents (snoozed_at)",
 			"CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_ruijie_slack_incidents_snoozed_at ON ruijie_slack_incidents (snoozed_at)",
+			"CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_better_stack_slack_incidents_open_due ON better_stack_slack_incidents (resolved_at_utc, next_reminder_at)",
 			"CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_noc_data_histories_run_at_host ON noc_data_histories (run_at, host)",
 		}
 		for _, ddl := range indexes {

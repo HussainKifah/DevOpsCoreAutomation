@@ -12,7 +12,7 @@ The main application entrypoint is `cmd/api/main.go`.
 - IP team workflow jobs with encrypted device credentials and run output history.
 - NOC password device management and rotation.
 - Elasticsearch syslog alert polling with deduplication, Slack batching, reminders, and checkmark resolution.
-- Slack ticket/thread reminders for selected ticket messages.
+- Slack latest request/incident reminders for structured channel messages.
 - Ruijie Cloud alarm forwarding from Microsoft 365/Outlook Junk Email to Slack with reminder tracking.
 
 ## Tech Stack
@@ -43,7 +43,6 @@ internal/scheduler/      Background scan, backup, cleanup, syslog, workflow, and
 internal/shell/          SSH connection and command execution
 internal/extractor/      Vendor output parsing
 internal/syslog/         Elasticsearch syslog polling helpers and Slack formatting
-internal/SlackReminders/ Slack ticket/thread reminder worker
 internal/Ruijie/         Ruijie Cloud mail polling and Slack reminders
 templates/               HTML templates and static files
 utils/                   Shared utilities
@@ -171,11 +170,11 @@ Slack Events should point to:
 POST https://your-host/api/slack/events
 ```
 
-The Events endpoint is used to stop syslog, ticket, and Ruijie reminders when a supported checkmark reaction is added.
+The Events endpoint is used to stop syslog and Ruijie reminders when a supported checkmark reaction is added.
 
 Useful Slack scopes/events:
 - Scopes: `chat:write`, `channels:history`, `reactions:read`, `users:read`
-- Events: `reaction_added`, `message.channels`
+- Events: `reaction_added`
 - Add private-channel equivalents when the channel is private.
 
 ## Ruijie Mail Alarms

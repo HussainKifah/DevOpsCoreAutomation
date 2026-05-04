@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	auth "github.com/Flafl/DevOpsCore/internal/Auth"
 	"github.com/Flafl/DevOpsCore/internal/models"
 	"github.com/Flafl/DevOpsCore/internal/repository"
 	"github.com/gin-gonic/gin"
@@ -18,6 +19,7 @@ import (
 type mockIPCapacityRepo struct {
 	createActionErr error
 	historyDay      time.Time
+	lastAction      *models.IPCapacityAction
 }
 
 func (m *mockIPCapacityRepo) ListNodes(string) ([]repository.IPCapacityNodeWithLatest, error) {
@@ -32,7 +34,11 @@ func (m *mockIPCapacityRepo) DeleteNode(uint) error                   { return n
 func (m *mockIPCapacityRepo) ListActions() ([]repository.IPCapacityActionWithNode, error) {
 	return nil, nil
 }
-func (m *mockIPCapacityRepo) CreateAction(*models.IPCapacityAction) error {
+func (m *mockIPCapacityRepo) CreateAction(action *models.IPCapacityAction) error {
+	if action != nil {
+		copied := *action
+		m.lastAction = &copied
+	}
 	return m.createActionErr
 }
 func (m *mockIPCapacityRepo) GetAction(id uint) (*models.IPCapacityAction, error) {
@@ -53,9 +59,22 @@ func (m *mockIPCapacityRepo) GetAllHistory() ([]repository.IPCapacityHistorySnap
 }
 
 func setupIPCapacityRouter(repo repository.IPCapacityRepository) *gin.Engine {
+	return setupIPCapacityRouterWithUser(repo, nil, "")
+}
+
+func setupIPCapacityRouterWithUser(repo repository.IPCapacityRepository, costAuth func(string) bool, email string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	h := NewIPCapacityHandler(repo)
+	if costAuth != nil {
+		h.costAuth = costAuth
+	}
+	if email != "" {
+		r.Use(func(c *gin.Context) {
+			c.Set("user", &auth.Claims{Email: email})
+			c.Next()
+		})
+	}
 	r.POST("/actions", h.CreateAction)
 	r.GET("/history/day", h.GetDayHistory)
 	return r
@@ -107,6 +126,60 @@ func TestIPCapacityHandlerMissingNodeReturnsNotFound(t *testing.T) {
 	})
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404; body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestIPCapacityHandlerAllowedEmailCanCreateActionWithCost(t *testing.T) {
+	repo := &mockIPCapacityRepo{}
+	r := setupIPCapacityRouterWithUser(repo, func(email string) bool {
+		return email == "cost@example.com"
+	}, "cost@example.com")
+	w := postJSON(t, r, "/actions", map[string]any{
+		"node_id":           1,
+		"type":              "upgrade",
+		"amount_iqd":        100,
+		"cost_per_mbps_iqd": 25,
+	})
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body=%s", w.Code, w.Body.String())
+	}
+	if repo.lastAction == nil || repo.lastAction.CostPerMbpsIQD != 25 {
+		t.Fatalf("stored cost = %#v, want 25", repo.lastAction)
+	}
+}
+
+func TestIPCapacityHandlerNonAllowedEmailIgnoresSubmittedCost(t *testing.T) {
+	repo := &mockIPCapacityRepo{}
+	r := setupIPCapacityRouterWithUser(repo, func(email string) bool {
+		return false
+	}, "viewer@example.com")
+	w := postJSON(t, r, "/actions", map[string]any{
+		"node_id":           1,
+		"type":              "upgrade",
+		"amount_iqd":        100,
+		"cost_per_mbps_iqd": 25,
+	})
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body=%s", w.Code, w.Body.String())
+	}
+	if repo.lastAction == nil || repo.lastAction.CostPerMbpsIQD != 0 {
+		t.Fatalf("stored cost = %#v, want 0", repo.lastAction)
+	}
+}
+
+func TestIPCapacityHandlerAllowedEmailRejectsNegativeCost(t *testing.T) {
+	repo := &mockIPCapacityRepo{}
+	r := setupIPCapacityRouterWithUser(repo, func(email string) bool {
+		return email == "cost@example.com"
+	}, "cost@example.com")
+	w := postJSON(t, r, "/actions", map[string]any{
+		"node_id":           1,
+		"type":              "upgrade",
+		"amount_iqd":        100,
+		"cost_per_mbps_iqd": -1,
+	})
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body=%s", w.Code, w.Body.String())
 	}
 }
 

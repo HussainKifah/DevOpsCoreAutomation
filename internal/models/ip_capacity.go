@@ -30,6 +30,8 @@ type IPCapacityAction struct {
 	Node              IPCapacityNode `gorm:"constraint:OnDelete:CASCADE" json:"node,omitempty"`
 	Type              string         `gorm:"size:20;not null;index" json:"type"`
 	AmountIQD         int64          `gorm:"not null" json:"amount_iqd"`
+	CostPerMbpsIQD    int64          `gorm:"not null;default:0" json:"cost_per_mbps_iqd"`
+	TotalCostIQD      int64          `gorm:"not null;default:0" json:"total_cost_iqd"`
 	CapacityBeforeIQD int64          `gorm:"not null;default:0" json:"capacity_before_iqd"`
 	CapacityAfterIQD  int64          `gorm:"not null;default:0" json:"capacity_after_iqd"`
 	ActionAt          time.Time      `gorm:"not null;index" json:"action_at"`

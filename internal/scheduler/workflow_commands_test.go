@@ -3,6 +3,8 @@ package scheduler
 import (
 	"reflect"
 	"testing"
+
+	"github.com/Flafl/DevOpsCore/internal/models"
 )
 
 func TestWorkflowCommandLines(t *testing.T) {
@@ -19,5 +21,28 @@ func TestWorkflowCommandLines(t *testing.T) {
 
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("workflowCommandLines() = %#v, want %#v", got, want)
+	}
+}
+
+func TestWorkflowSchedulerTransportMethodForIPBackups(t *testing.T) {
+	t.Parallel()
+
+	ws := &WorkflowScheduler{scope: "ip"}
+
+	if got := ws.transportMethod(&models.WorkflowJob{JobType: "backup"}); got != "ssh" {
+		t.Fatalf("transportMethod(ip backup) = %q, want ssh", got)
+	}
+	if got := ws.transportMethod(&models.WorkflowJob{JobType: "command"}); got != "" {
+		t.Fatalf("transportMethod(ip command) = %q, want empty auto method", got)
+	}
+}
+
+func TestWorkflowSchedulerTransportMethodKeepsNOCBackupsAuto(t *testing.T) {
+	t.Parallel()
+
+	ws := &WorkflowScheduler{scope: "noc"}
+
+	if got := ws.transportMethod(&models.WorkflowJob{JobType: "backup"}); got != "" {
+		t.Fatalf("transportMethod(noc backup) = %q, want empty auto method", got)
 	}
 }

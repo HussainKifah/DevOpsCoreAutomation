@@ -29,6 +29,7 @@ type IPCapacityNodeDaySummary struct {
 	OpeningCapacityIQD int64     `json:"opening_capacity_iqd"`
 	ClosingCapacityIQD int64     `json:"closing_capacity_iqd"`
 	DifferenceIQD      int64     `json:"difference_iqd"`
+	TotalCostIQD       int64     `json:"total_cost_iqd"`
 	LatestActionAt     time.Time `json:"latest_action_at"`
 }
 
@@ -44,6 +45,7 @@ type IPCapacityHistorySnapshot struct {
 	NodeType           string    `json:"node_type"`
 	NodeProvince       string    `json:"node_province"`
 	CurrentCapacityIQD int64     `json:"current_capacity_iqd"`
+	TotalCostIQD       int64     `json:"total_cost_iqd"`
 	LatestActionAt     time.Time `json:"latest_action_at"`
 }
 
@@ -54,6 +56,7 @@ type IPCapacityImportRow struct {
 	CapacityBeforeUpdateIQD int64
 	ActionType              string
 	AmountIQD               int64
+	CostPerMbpsIQD          int64
 	ActionAt                time.Time
 }
 
@@ -111,6 +114,9 @@ func validateCapacityAction(action *models.IPCapacityAction) error {
 	}
 	if action.AmountIQD <= 0 {
 		return errors.New("amount_iqd must be greater than 0")
+	}
+	if action.CostPerMbpsIQD < 0 {
+		return errors.New("cost_per_mbps_iqd cannot be negative")
 	}
 	if action.ActionAt.IsZero() {
 		action.ActionAt = time.Now()
@@ -274,9 +280,10 @@ func (r *ipCapacityRepo) UpdateAction(action *models.IPCapacityAction) error {
 			return errors.New("node_id cannot be changed")
 		}
 		if err := tx.Model(&models.IPCapacityAction{}).Where("id = ?", action.ID).Updates(map[string]interface{}{
-			"type":       action.Type,
-			"amount_iqd": action.AmountIQD,
-			"action_at":  action.ActionAt,
+			"type":              action.Type,
+			"amount_iqd":        action.AmountIQD,
+			"cost_per_mbps_iqd": action.CostPerMbpsIQD,
+			"action_at":         action.ActionAt,
 		}).Error; err != nil {
 			return err
 		}
@@ -323,9 +330,10 @@ func (r *ipCapacityRepo) ImportActions(rows []IPCapacityImportRow) (*IPCapacityI
 				return errors.New("capacity before update cannot be negative")
 			}
 			action := models.IPCapacityAction{
-				Type:      row.ActionType,
-				AmountIQD: row.AmountIQD,
-				ActionAt:  row.ActionAt,
+				Type:           row.ActionType,
+				AmountIQD:      row.AmountIQD,
+				CostPerMbpsIQD: row.CostPerMbpsIQD,
+				ActionAt:       row.ActionAt,
 			}
 
 			var node models.IPCapacityNode
@@ -425,6 +433,7 @@ func (r *ipCapacityRepo) GetAllHistory() ([]IPCapacityHistorySnapshot, error) {
 				NodeType:           summary.NodeType,
 				NodeProvince:       summary.NodeProvince,
 				CurrentCapacityIQD: summary.ClosingCapacityIQD,
+				TotalCostIQD:       summary.TotalCostIQD,
 				LatestActionAt:     summary.LatestActionAt,
 			})
 		}
@@ -470,6 +479,12 @@ func (r *ipCapacityRepo) buildFullDayHistory(nodes []models.IPCapacityNode, acti
 		if dayAction, ok := dayActionByNode[node.ID]; ok {
 			latestAt = dayAction.ActionAt
 		}
+		totalCost := int64(0)
+		for _, action := range actions {
+			if action.NodeID == node.ID {
+				totalCost += action.TotalCostIQD
+			}
+		}
 
 		history.Summaries = append(history.Summaries, IPCapacityNodeDaySummary{
 			NodeID:             node.ID,
@@ -479,6 +494,7 @@ func (r *ipCapacityRepo) buildFullDayHistory(nodes []models.IPCapacityNode, acti
 			OpeningCapacityIQD: opening,
 			ClosingCapacityIQD: closing,
 			DifferenceIQD:      closing - opening,
+			TotalCostIQD:       totalCost,
 			LatestActionAt:     latestAt,
 		})
 	}
@@ -500,8 +516,10 @@ func recalculateCapacityNode(tx *gorm.DB, nodeID uint) error {
 		switch actions[i].Type {
 		case models.IPCapacityActionUpgrade:
 			total += actions[i].AmountIQD
+			actions[i].TotalCostIQD = actions[i].AmountIQD * actions[i].CostPerMbpsIQD
 		case models.IPCapacityActionDowngrade:
 			total -= actions[i].AmountIQD
+			actions[i].TotalCostIQD = -actions[i].AmountIQD * actions[i].CostPerMbpsIQD
 		default:
 			return errors.New("invalid action type")
 		}
@@ -509,6 +527,7 @@ func recalculateCapacityNode(tx *gorm.DB, nodeID uint) error {
 		if err := tx.Model(&models.IPCapacityAction{}).Where("id = ?", actions[i].ID).Updates(map[string]interface{}{
 			"capacity_before_iqd": actions[i].CapacityBeforeIQD,
 			"capacity_after_iqd":  actions[i].CapacityAfterIQD,
+			"total_cost_iqd":      actions[i].TotalCostIQD,
 		}).Error; err != nil {
 			return err
 		}
@@ -546,6 +565,7 @@ func buildDayHistory(actions []models.IPCapacityAction) *IPCapacityDayHistory {
 				OpeningCapacityIQD: action.CapacityBeforeIQD,
 				ClosingCapacityIQD: action.CapacityAfterIQD,
 				DifferenceIQD:      action.CapacityAfterIQD - action.CapacityBeforeIQD,
+				TotalCostIQD:       action.TotalCostIQD,
 				LatestActionAt:     action.ActionAt,
 			})
 			byNode[action.NodeID] = len(history.Summaries) - 1
@@ -554,6 +574,7 @@ func buildDayHistory(actions []models.IPCapacityAction) *IPCapacityDayHistory {
 		summary := &history.Summaries[idx]
 		summary.ClosingCapacityIQD = action.CapacityAfterIQD
 		summary.DifferenceIQD = summary.ClosingCapacityIQD - summary.OpeningCapacityIQD
+		summary.TotalCostIQD += action.TotalCostIQD
 		summary.LatestActionAt = action.ActionAt
 	}
 	return history

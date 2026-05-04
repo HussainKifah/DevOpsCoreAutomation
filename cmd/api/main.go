@@ -14,7 +14,7 @@ import (
 	"github.com/Flafl/DevOpsCore/db"
 	auth "github.com/Flafl/DevOpsCore/internal/Auth"
 	ruijie "github.com/Flafl/DevOpsCore/internal/Ruijie"
-	slackreminders "github.com/Flafl/DevOpsCore/internal/SlackReminders"
+	betterstack "github.com/Flafl/DevOpsCore/internal/betterstack"
 	"github.com/Flafl/DevOpsCore/internal/handlers"
 	"github.com/Flafl/DevOpsCore/internal/repository"
 	"github.com/Flafl/DevOpsCore/internal/router"
@@ -40,13 +40,14 @@ func main() {
 	backupRepo := repository.NewBackupRepository(database)
 	userRepo := repository.NewUserRepository(database)
 	inventoryRepo := repository.NewInventoryRepo(database)
+	accessOltRepo := repository.NewAccessOltRepository(database)
 	workflowRepo := repository.NewWorkflowRepository(database)
 	nocWorkflowRepo := repository.NewWorkflowRepositoryForScope(database, "noc")
 	nocPassRepo := repository.NewNocPassRepository(database)
 	nocDataRepo := repository.NewNocDataRepository(database)
-	slackTicketRepo := repository.NewSlackTicketReminderRepository(database)
 	ruijieMailRepo := repository.NewRuijieMailRepository(database)
 	ipCapacityRepo := repository.NewIPCapacityRepository(database)
+	betterStackRepo := repository.NewBetterStackRepository(database)
 
 	jwtManager := auth.NewJWTManager(auth.JWTconfig{
 		SecretKey:            []byte(cfg.JWTSecret),
@@ -105,6 +106,7 @@ func main() {
 	userH := handlers.NewUserHandler(userRepo)
 	authH := handlers.NewAuthHandler(userRepo, jwtManager)
 	inventoryH := handlers.NewInventoryHandler(inventoryRepo)
+	accessOltH := handlers.NewAccessOltHandler(accessOltRepo, cryptoKey)
 	scanH := handlers.NewScanHandler(sched)
 	workflowH := handlers.NewWorkflowHandler(workflowRepo, wfSched, cryptoKey)
 	nocWorkflowH := handlers.NewNocWorkflowHandler(nocWorkflowRepo, nocWfSched, cryptoKey, nocDataRepo)
@@ -112,16 +114,17 @@ func main() {
 	nocDataH := handlers.NewNocDataHandler(nocDataRepo, cryptoKey, nocDataCollector, cfg)
 	esSyslogRepo := repository.NewEsSyslogRepository(database)
 	esSyslogH := handlers.NewEsSyslogHandler(esSyslogRepo)
-	ipCapacityH := handlers.NewIPCapacityHandler(ipCapacityRepo)
+	ipCapacityH := handlers.NewIPCapacityHandler(ipCapacityRepo, cfg)
+	betterStackH := handlers.NewBetterStackHandler(betterStackRepo, cfg)
 	betterStackWebhookH := handlers.NewBetterStackWebhookHandler(cfg.BetterStackWebhookSecret)
 
 	var slackAPI *slack.Client
 	var slackBatcher *syslog.SlackSyslogBatcher
 	var slackReminder *syslog.SlackReminderWorker
-	var slackTicketWorker *slackreminders.Worker
 	var slackActivityLogWorker *scheduler.ActivityLogSlackWorker
 	var ruijieMailPoller *ruijie.MailPoller
 	var ruijieReminder *ruijie.ReminderWorker
+	var betterStackWorker *betterstack.Worker
 	var slackEventsH *handlers.SlackEventsHandler
 	if cfg.SlackSyslogConfigured() {
 		slackAPI = slack.New(cfg.SlackBotToken)
@@ -135,15 +138,7 @@ func main() {
 		if slackAPI == nil {
 			slackAPI = slack.New(cfg.SlackBotToken)
 		}
-		slackEventsH = handlers.NewSlackEventsHandler(cfg, esSyslogRepo, slackTicketRepo, ruijieMailRepo, slackAPI)
-	}
-	if cfg.SlackTicketReminderConfigured() {
-		if slackAPI == nil {
-			slackAPI = slack.New(cfg.SlackBotToken)
-		}
-		slackTicketWorker = slackreminders.NewWorker(cfg, slackTicketRepo, slackAPI)
-		slackTicketWorker.Start()
-		log.Printf("[slack-ticket-reminders] enabled channel=%s every=%s", cfg.SlackTicketChannelID, cfg.SlackTicketReminderInterval)
+		slackEventsH = handlers.NewSlackEventsHandler(cfg, esSyslogRepo, ruijieMailRepo, slackAPI)
 	}
 	if cfg.SlackActivityLogConfigured() {
 		if slackAPI == nil {
@@ -162,10 +157,18 @@ func main() {
 		ruijieReminder.Start()
 		log.Printf("[ruijie-mail] enabled channel=%s every=%s", cfg.RuijieSlackChannelID, cfg.RuijieSlackReminderInterval)
 	}
+	if cfg.BetterStackConfigured() {
+		if slackAPI == nil {
+			slackAPI = slack.New(cfg.SlackBotToken)
+		}
+		betterStackClient := betterstack.NewClient(cfg.BetterStackAPIToken)
+		betterStackWorker = betterstack.NewWorker(cfg, betterStackRepo, betterStackClient, slackAPI)
+		betterStackWorker.Start()
+	}
 
 	pageH := handlers.NewPageHandler(filepath.Join(projectRoot, "templates"), userRepo, jwtManager)
 
-	router.Setup(server, jwtManager, hub, powerH, descH, healthH, healthHistoryH, portH, portHistoryH, calendarH, backupH, userH, authH, pageH, inventoryH, scanH, workflowH, nocWorkflowH, nocPassH, nocDataH, esSyslogH, ipCapacityH, slackEventsH, betterStackWebhookH)
+	router.Setup(server, jwtManager, hub, powerH, descH, healthH, healthHistoryH, portH, portHistoryH, calendarH, backupH, userH, authH, pageH, inventoryH, accessOltH, scanH, workflowH, nocWorkflowH, nocPassH, nocDataH, esSyslogH, ipCapacityH, betterStackH, slackEventsH, betterStackWebhookH)
 
 	esSyslogPoller := scheduler.NewEsSyslogPoller(cfg, esSyslogRepo, slackBatcher)
 	esSyslogPoller.Start()
@@ -207,9 +210,6 @@ func main() {
 	if slackReminder != nil {
 		slackReminder.Stop()
 	}
-	if slackTicketWorker != nil {
-		slackTicketWorker.Stop()
-	}
 	if slackActivityLogWorker != nil {
 		slackActivityLogWorker.Stop()
 	}
@@ -218,6 +218,9 @@ func main() {
 	}
 	if ruijieReminder != nil {
 		ruijieReminder.Stop()
+	}
+	if betterStackWorker != nil {
+		betterStackWorker.Stop()
 	}
 	sshPool.Close()
 

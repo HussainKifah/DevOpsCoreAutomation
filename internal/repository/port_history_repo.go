@@ -26,6 +26,7 @@ type PortHistoryRepository interface {
 	DeleteOlderThan(cutoff time.Time) (int64, error)
 	GetCalendarDays(from, to time.Time, vendor string) ([]PortCalendarDay, error)
 	GetSnapshotsForDate(date time.Time, vendor string) ([]models.PortSnapshot, error)
+	GetSnapshotsForRange(from, to time.Time, vendor string) ([]models.PortSnapshot, error)
 }
 
 type PortDownCount struct {
@@ -88,9 +89,13 @@ func (r *portHistoryRepository) GetCalendarDays(from, to time.Time, vendor strin
 
 func (r *portHistoryRepository) GetSnapshotsForDate(date time.Time, vendor string) ([]models.PortSnapshot, error) {
 	nextDay := date.AddDate(0, 0, 1)
+	return r.GetSnapshotsForRange(date, nextDay, vendor)
+}
+
+func (r *portHistoryRepository) GetSnapshotsForRange(from, to time.Time, vendor string) ([]models.PortSnapshot, error) {
 	var out []models.PortSnapshot
 	err := r.DB.
-		Where("measured_at >= ? AND measured_at < ? AND vendor = ?", date, nextDay, vendor).
+		Where("measured_at >= ? AND measured_at < ? AND vendor = ?", from, to, vendor).
 		Order("measured_at, host, port").
 		Find(&out).Error
 	return out, err

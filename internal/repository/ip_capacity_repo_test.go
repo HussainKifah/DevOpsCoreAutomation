@@ -34,16 +34,16 @@ func TestIPCapacityRepositoryRecalculatesActions(t *testing.T) {
 	repo := NewIPCapacityRepository(db)
 	base := time.Date(2026, 4, 25, 9, 0, 0, 0, time.Local)
 
-	node := &models.IPCapacityNode{Name: "BNG-01", InitialCapacityIQD: 1000}
+	node := &models.IPCapacityNode{Name: "BNG-01", Type: "BNG", Province: "Baghdad", InitialCapacityIQD: 1000}
 	if err := repo.CreateNode(node); err != nil {
 		t.Fatalf("create node: %v", err)
 	}
 
-	up := &models.IPCapacityAction{NodeID: node.ID, Type: models.IPCapacityActionUpgrade, AmountIQD: 500, ActionAt: base}
+	up := &models.IPCapacityAction{NodeID: node.ID, Type: models.IPCapacityActionUpgrade, AmountIQD: 500, CostPerMbpsIQD: 2, ActionAt: base}
 	if err := repo.CreateAction(up); err != nil {
 		t.Fatalf("create upgrade: %v", err)
 	}
-	down := &models.IPCapacityAction{NodeID: node.ID, Type: models.IPCapacityActionDowngrade, AmountIQD: 200, ActionAt: base.Add(time.Hour)}
+	down := &models.IPCapacityAction{NodeID: node.ID, Type: models.IPCapacityActionDowngrade, AmountIQD: 200, CostPerMbpsIQD: 3, ActionAt: base.Add(time.Hour)}
 	if err := repo.CreateAction(down); err != nil {
 		t.Fatalf("create downgrade: %v", err)
 	}
@@ -58,8 +58,14 @@ func TestIPCapacityRepositoryRecalculatesActions(t *testing.T) {
 	if actions[1].CapacityBeforeIQD != 1000 || actions[1].CapacityAfterIQD != 1500 {
 		t.Fatalf("upgrade totals = %d/%d, want 1000/1500", actions[1].CapacityBeforeIQD, actions[1].CapacityAfterIQD)
 	}
+	if actions[1].TotalCostIQD != 1000 {
+		t.Fatalf("upgrade cost = %d, want 1000", actions[1].TotalCostIQD)
+	}
 	if actions[0].CapacityBeforeIQD != 1500 || actions[0].CapacityAfterIQD != 1300 {
 		t.Fatalf("downgrade totals = %d/%d, want 1500/1300", actions[0].CapacityBeforeIQD, actions[0].CapacityAfterIQD)
+	}
+	if actions[0].TotalCostIQD != -600 {
+		t.Fatalf("downgrade cost = %d, want -600", actions[0].TotalCostIQD)
 	}
 	updatedNode, err := repo.GetNode(node.ID)
 	if err != nil {
@@ -70,12 +76,20 @@ func TestIPCapacityRepositoryRecalculatesActions(t *testing.T) {
 	}
 
 	down.AmountIQD = 100
+	down.CostPerMbpsIQD = 4
 	if err := repo.UpdateAction(down); err != nil {
 		t.Fatalf("update action: %v", err)
 	}
 	updatedNode, _ = repo.GetNode(node.ID)
 	if updatedNode.CurrentCapacityIQD != 1400 {
 		t.Fatalf("current total after edit = %d, want 1400", updatedNode.CurrentCapacityIQD)
+	}
+	actions, err = repo.ListActions()
+	if err != nil {
+		t.Fatalf("list actions after edit: %v", err)
+	}
+	if actions[0].TotalCostIQD != -400 {
+		t.Fatalf("downgrade cost after edit = %d, want -400", actions[0].TotalCostIQD)
 	}
 
 	if err := repo.DeleteAction(up.ID); err != nil {
@@ -92,14 +106,14 @@ func TestIPCapacityRepositoryDayHistorySummary(t *testing.T) {
 	repo := NewIPCapacityRepository(db)
 	day := time.Date(2026, 4, 25, 10, 0, 0, 0, time.Local)
 
-	node := &models.IPCapacityNode{Name: "BNG-02", InitialCapacityIQD: 2000}
+	node := &models.IPCapacityNode{Name: "BNG-02", Type: "BNG", Province: "Baghdad", InitialCapacityIQD: 2000}
 	if err := repo.CreateNode(node); err != nil {
 		t.Fatalf("create node: %v", err)
 	}
-	if err := repo.CreateAction(&models.IPCapacityAction{NodeID: node.ID, Type: models.IPCapacityActionUpgrade, AmountIQD: 300, ActionAt: day}); err != nil {
+	if err := repo.CreateAction(&models.IPCapacityAction{NodeID: node.ID, Type: models.IPCapacityActionUpgrade, AmountIQD: 300, CostPerMbpsIQD: 2, ActionAt: day}); err != nil {
 		t.Fatalf("create upgrade: %v", err)
 	}
-	if err := repo.CreateAction(&models.IPCapacityAction{NodeID: node.ID, Type: models.IPCapacityActionDowngrade, AmountIQD: 100, ActionAt: day.Add(2 * time.Hour)}); err != nil {
+	if err := repo.CreateAction(&models.IPCapacityAction{NodeID: node.ID, Type: models.IPCapacityActionDowngrade, AmountIQD: 100, CostPerMbpsIQD: 5, ActionAt: day.Add(2 * time.Hour)}); err != nil {
 		t.Fatalf("create downgrade: %v", err)
 	}
 
@@ -114,7 +128,20 @@ func TestIPCapacityRepositoryDayHistorySummary(t *testing.T) {
 	if got.OpeningCapacityIQD != 2000 || got.ClosingCapacityIQD != 2200 || got.DifferenceIQD != 200 {
 		t.Fatalf("summary = %d/%d/%d, want 2000/2200/200", got.OpeningCapacityIQD, got.ClosingCapacityIQD, got.DifferenceIQD)
 	}
+	if got.TotalCostIQD != 100 {
+		t.Fatalf("summary cost = %d, want 100", got.TotalCostIQD)
+	}
 	if len(history.Actions) != 2 {
 		t.Fatalf("expected 2 actions, got %d", len(history.Actions))
+	}
+	allHistory, err := repo.GetAllHistory()
+	if err != nil {
+		t.Fatalf("all history: %v", err)
+	}
+	if len(allHistory) == 0 {
+		t.Fatalf("expected all history rows")
+	}
+	if allHistory[0].TotalCostIQD != 100 {
+		t.Fatalf("all history cost = %d, want 100", allHistory[0].TotalCostIQD)
 	}
 }
